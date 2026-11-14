@@ -302,8 +302,6 @@ export class GameEngine {
         this.state.currentTier = (this.state.currentTier + 1) as GameTier;
         this.state.activeDirections = this.getActiveSidesForTier(this.state.currentTier);
         this.state.tierTimeRemaining = getTierDuration(this.state.currentTier);
-        // Trigger a new wave immediately so the new level's added side is felt right away
-        this.obstacleSpawnTimer = this.nextWaveInterval;
         if (this.onTierUpCallback) {
           this.onTierUpCallback(this.state.currentTier);
         }
@@ -425,7 +423,49 @@ export class GameEngine {
   }
 
   /**
+   * Checks if there is sufficient clearance near the spawn edge for a given direction,
+   * and returns a safe speed that will never overtake any existing obstacle ahead of it
+   * moving in the same direction.
+   */
+  private getSafeSameSideSpeed(direction: ObstacleDirection, desiredSpeed: number): number | null {
+    const isVerticalTravel = direction === 'north' || direction === 'south';
+    const halfBound = isVerticalTravel ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
+    const spawnCoord = halfBound + GAME_CONFIG.obstacles.spawnDistanceOffset;
+    const minSameSideSeparation = 180; // Minimum pixel distance between waves from the same side
+
+    let maxAllowedSpeed = desiredSpeed;
+
+    for (const obs of this.state.obstacles) {
+      if (obs.direction !== direction) continue;
+
+      let distFromSpawn = Infinity;
+      if (direction === 'north') {
+        distFromSpawn = obs.y - (-spawnCoord);
+      } else if (direction === 'south') {
+        distFromSpawn = spawnCoord - obs.y;
+      } else if (direction === 'west') {
+        distFromSpawn = obs.x - (-spawnCoord);
+      } else if (direction === 'east') {
+        distFromSpawn = spawnCoord - obs.x;
+      }
+
+      // Do not spawn if a previous wave from this same side is still too close to the spawn line
+      if (distFromSpawn < minSameSideSeparation) {
+        return null;
+      }
+
+      // Never allow a trailing wave from the same side to travel faster than a wave ahead of it
+      if (obs.speed < maxAllowedSpeed) {
+        maxAllowedSpeed = obs.speed;
+      }
+    }
+
+    return maxAllowedSpeed;
+  }
+
+  /**
    * Spawns a specific procedural obstacle archetype from a cardinal direction.
+   * Guarantees at least one wide navigable opening and zero overlapping segments.
    */
   private spawnPatternFromDirection(
     direction: ObstacleDirection,
@@ -435,25 +475,37 @@ export class GameEngine {
     safeX: number,
     safeY: number
   ) {
+    const safeSpeed = this.getSafeSameSideSpeed(direction, speed);
+    if (safeSpeed === null) {
+      return; // Skip if previous wave from the same side hasn't cleared the spawn zone
+    }
+
     const baseGap = Math.max(
       GAME_CONFIG.obstacles.gapMinWidth,
       GAME_CONFIG.obstacles.gapBaseWidth - tier * GAME_CONFIG.obstacles.gapTierDecrement
     );
     const gapVar = GAME_CONFIG.randomness.gapSizeVariance;
     const gapSize = Math.max(
-      GAME_CONFIG.obstacles.gapMinWidth,
+      88, // Always at least 88px wide (>3.3x player diameter) so there is an unmistakable opening
       baseGap * (1 + this.randomRange(-gapVar, gapVar))
     );
 
     const isVerticalTravel = direction === 'north' || direction === 'south';
     const lateralHalfSpan = isVerticalTravel ? this.ARENA_WIDTH / 2 : this.ARENA_HEIGHT / 2;
-    const clampLimit = lateralHalfSpan * GAME_CONFIG.randomness.gapPositionVariance;
+    const edgeMargin = 32; // Keep gaps strictly inside the arena walls
+    const maxGapCenter = Math.max(
+      20,
+      Math.min(
+        lateralHalfSpan * GAME_CONFIG.randomness.gapPositionVariance,
+        lateralHalfSpan - gapSize / 2 - edgeMargin
+      )
+    );
+
     const targetSafeLateral = isVerticalTravel ? safeX : safeY;
-    const jitter = this.randomRange(-35, 35);
-    const gapCenter = Math.max(-clampLimit, Math.min(clampLimit, targetSafeLateral + jitter));
+    const jitter = this.randomRange(-30, 30);
+    const gapCenter = Math.max(-maxGapCenter, Math.min(maxGapCenter, targetSafeLateral + jitter));
 
     const barThickness = GAME_CONFIG.obstacles.barThickness;
-    const barLength = lateralHalfSpan * 2 * GAME_CONFIG.obstacles.barLengthMultiplier;
 
     const dirColors: Record<string, string> = {
       north: '#ff2a6d', // Neon Crimson
@@ -465,107 +517,159 @@ export class GameEngine {
 
     switch (patternType) {
       case 'single-gap-wall': {
-        const leftCenter = gapCenter - gapSize / 2 - barLength / 2;
-        const rightCenter = gapCenter + gapSize / 2 + barLength / 2;
-        this.addLocalRectObstacle(direction, leftCenter, 0, barLength, barThickness, speed, 0, color);
-        this.addLocalRectObstacle(direction, rightCenter, 0, barLength, barThickness, speed, 0, color);
+        this.addSegmentedWallWithGaps(
+          direction,
+          lateralHalfSpan,
+          [{ start: gapCenter - gapSize / 2, end: gapCenter + gapSize / 2 }],
+          barThickness,
+          safeSpeed,
+          color
+        );
         break;
       }
 
       case 'double-gap-wall': {
-        const islandWidth = GAME_CONFIG.obstacles.doubleGapIslandWidth;
-        const sideGap = Math.max(GAME_CONFIG.obstacles.gapMinWidth, gapSize * 0.92);
-        // Place one of the two gaps near gapCenter so the safe zone remains open
-        const shiftDir = this.random() < 0.5 ? 1 : -1;
-        const islandCenter = Math.max(
-          -clampLimit * 0.6,
-          Math.min(clampLimit * 0.6, gapCenter + shiftDir * (sideGap / 2 + islandWidth / 2))
+        const islandWidth = Math.max(48, GAME_CONFIG.obstacles.doubleGapIslandWidth);
+        const sideGap = Math.max(84, gapSize * 0.95);
+        // Place one gap at gapCenter, and the second gap on the side with more room
+        const placeSecondOnRight = gapCenter <= 0;
+        const secondGapCenter = placeSecondOnRight
+          ? gapCenter + sideGap + islandWidth
+          : gapCenter - (sideGap + islandWidth);
+
+        const gaps = [
+          { start: gapCenter - sideGap / 2, end: gapCenter + sideGap / 2 },
+          { start: secondGapCenter - sideGap / 2, end: secondGapCenter + sideGap / 2 },
+        ];
+        this.addSegmentedWallWithGaps(
+          direction,
+          lateralHalfSpan,
+          gaps,
+          barThickness,
+          safeSpeed,
+          color
         );
-
-        const leftOuterCenter = islandCenter - islandWidth / 2 - sideGap - barLength / 2;
-        const rightOuterCenter = islandCenter + islandWidth / 2 + sideGap + barLength / 2;
-
-        this.addLocalRectObstacle(direction, leftOuterCenter, 0, barLength, barThickness, speed, 0, color);
-        this.addLocalRectObstacle(direction, islandCenter, 0, islandWidth, barThickness, speed, 0, color);
-        this.addLocalRectObstacle(direction, rightOuterCenter, 0, barLength, barThickness, speed, 0, color);
         break;
       }
 
       case 'sweeping-half-wall': {
-        // Anchored to one side, leaving an open passage around gapCenter
-        const anchorNegativeSide = gapCenter >= 0;
-        const passageEdge = anchorNegativeSide
-          ? gapCenter - gapSize * 0.35
-          : gapCenter + gapSize * 0.35;
-        const wallCenter = anchorNegativeSide
-          ? passageEdge - barLength / 2
-          : passageEdge + barLength / 2;
-
-        this.addLocalRectObstacle(
+        // Leaves one entire side from gapCenter outward completely open (never a solid line)
+        const openPositiveSide = gapCenter >= 0;
+        const openStart = openPositiveSide ? gapCenter - gapSize / 2 : -lateralHalfSpan;
+        const openEnd = openPositiveSide ? lateralHalfSpan : gapCenter + gapSize / 2;
+        this.addSegmentedWallWithGaps(
           direction,
-          wallCenter,
-          0,
-          barLength,
-          barThickness + 4,
-          speed,
-          0,
+          lateralHalfSpan,
+          [{ start: openStart, end: openEnd }],
+          barThickness + 2,
+          safeSpeed,
           color
         );
         break;
       }
 
       case 'staggered-blocks': {
-        // 3 staggered rectangular blocks that avoid the safe gapCenter corridor
-        const candidateZones = [-lateralHalfSpan * 0.65, 0, lateralHalfSpan * 0.65];
-        candidateZones.forEach((zoneCenter, i) => {
-          const lateral = zoneCenter + this.randomRange(-28, 28);
-          // Skip or shift any block that would block the safe gapCenter
-          const distFromGap = Math.abs(lateral - gapCenter);
-          const adjustedLateral =
-            distFromGap < gapSize * 0.75
-              ? lateral + (lateral >= gapCenter ? gapSize * 0.8 : -gapSize * 0.8)
-              : lateral;
-
-          const blockWidth = this.randomRange(68, 110);
-          const depthOffset = i * 28;
-          this.addLocalRectObstacle(
-            direction,
-            adjustedLateral,
-            depthOffset,
-            blockWidth,
-            barThickness + 2,
-            speed,
-            0,
-            color
-          );
-        });
+        // Three wide openings (left, safe center, right) with 2 non-overlapping solid blocks between them
+        const centerGap = Math.max(92, gapSize);
+        const outerMarginGap = 54;
+        this.addSegmentedWallWithGaps(
+          direction,
+          lateralHalfSpan,
+          [
+            { start: -lateralHalfSpan, end: -lateralHalfSpan + outerMarginGap },
+            { start: gapCenter - centerGap / 2, end: gapCenter + centerGap / 2 },
+            { start: lateralHalfSpan - outerMarginGap, end: lateralHalfSpan },
+          ],
+          barThickness + 2,
+          safeSpeed,
+          color
+        );
         break;
       }
 
       case 'orb-cluster': {
-        // 4 circular pulse orbs with staggered depth and slight lateral drift
-        const orbCount = 4;
-        const spread = lateralHalfSpan * 0.78;
+        // Non-overlapping pulse orbs on a single wave plane with a guaranteed clear gap around gapCenter
+        const orbRadius = 12;
+        const orbCount = isVerticalTravel ? 4 : 5;
+        const usableHalf = lateralHalfSpan - 28;
         for (let i = 0; i < orbCount; i++) {
-          const baseLat = -spread + (i / (orbCount - 1)) * (spread * 2);
-          let orbLat = baseLat + this.randomRange(-22, 22);
-          if (Math.abs(orbLat - gapCenter) < gapSize * 0.55) {
-            orbLat += orbLat >= gapCenter ? gapSize * 0.6 : -gapSize * 0.6;
+          const orbLat = -usableHalf + (i / (orbCount - 1)) * (usableHalf * 2);
+          // Skip any orb that falls inside the guaranteed safe opening
+          if (Math.abs(orbLat - gapCenter) < gapSize * 0.6 + orbRadius) {
+            continue;
           }
-          const depthOffset = this.randomRange(0, 42);
-          const lateralDrift = this.randomRange(-24, 24);
           this.addLocalCircleObstacle(
             direction,
             orbLat,
-            depthOffset,
-            12,
-            speed,
-            lateralDrift,
+            0,
+            orbRadius,
+            safeSpeed,
+            0,
             '#ffea00'
           );
         }
         break;
       }
+    }
+  }
+
+  /**
+   * Slices the playable span [-lateralHalfSpan, +lateralHalfSpan] by removing all gap intervals,
+   * and spawns non-overlapping rectangular segments for the remaining solid parts.
+   * Guarantees there is NEVER a solid wall across the arena and NEVER any overlapping segments.
+   */
+  private addSegmentedWallWithGaps(
+    direction: ObstacleDirection,
+    lateralHalfSpan: number,
+    rawGaps: Array<{ start: number; end: number }>,
+    thickness: number,
+    speed: number,
+    color: string
+  ) {
+    // Normalize and clamp gaps to [-lateralHalfSpan, +lateralHalfSpan]
+    const clampedGaps = rawGaps
+      .map((g) => ({
+        start: Math.max(-lateralHalfSpan, Math.min(lateralHalfSpan, Math.min(g.start, g.end))),
+        end: Math.max(-lateralHalfSpan, Math.min(lateralHalfSpan, Math.max(g.start, g.end))),
+      }))
+      .filter((g) => g.end - g.start >= 20)
+      .sort((a, b) => a.start - b.start);
+
+    // Fallback safety: if no valid gap was provided, carve a 100px center opening
+    if (clampedGaps.length === 0) {
+      clampedGaps.push({ start: -50, end: 50 });
+    }
+
+    // Merge overlapping gaps so solid segments never overlap
+    const mergedGaps: Array<{ start: number; end: number }> = [];
+    for (const g of clampedGaps) {
+      if (mergedGaps.length === 0 || g.start > mergedGaps[mergedGaps.length - 1].end) {
+        mergedGaps.push({ ...g });
+      } else {
+        mergedGaps[mergedGaps.length - 1].end = Math.max(
+          mergedGaps[mergedGaps.length - 1].end,
+          g.end
+        );
+      }
+    }
+
+    // Build complement solid segments in [-lateralHalfSpan, +lateralHalfSpan]
+    let cursor = -lateralHalfSpan;
+    const minSolidWidth = 18;
+
+    for (const gap of mergedGaps) {
+      const segLength = gap.start - cursor;
+      if (segLength >= minSolidWidth) {
+        const segCenter = cursor + segLength / 2;
+        this.addLocalRectObstacle(direction, segCenter, 0, segLength, thickness, speed, 0, color);
+      }
+      cursor = Math.max(cursor, gap.end);
+    }
+
+    const tailLength = lateralHalfSpan - cursor;
+    if (tailLength >= minSolidWidth) {
+      const segCenter = cursor + tailLength / 2;
+      this.addLocalRectObstacle(direction, segCenter, 0, tailLength, thickness, speed, 0, color);
     }
   }
 
