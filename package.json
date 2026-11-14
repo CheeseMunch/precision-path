@@ -1,0 +1,15 @@
+{
+  "name": "precision-path",
+  "version": "1.0.0",
+  "description": "Multiplayer radial survival browser game with dedicated server, MikroORM & PostgreSQL",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev --prefix server",
+    "dev:client": "npm run dev --prefix client",
+    "build": "npm run build --prefix server && npm run build --prefix client"
+  }
+}
