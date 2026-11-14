@@ -4,6 +4,7 @@ class SoundSystem {
   private readyAudio: HTMLAudioElement | null = null;
   private goAudio: HTMLAudioElement | null = null;
   private gameAudio: HTMLAudioElement | null = null;
+  private bgmAudio: HTMLAudioElement | null = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -13,6 +14,10 @@ class SoundSystem {
       this.goAudio.preload = 'auto';
       this.gameAudio = new Audio('/sounds/game.mp3');
       this.gameAudio.preload = 'auto';
+      this.bgmAudio = new Audio('/sounds/bgm.mp3');
+      this.bgmAudio.preload = 'auto';
+      this.bgmAudio.loop = true;
+      this.bgmAudio.volume = 0.26;
     }
   }
 
@@ -87,7 +92,30 @@ class SoundSystem {
     osc2.stop(now + 0.4);
   }
 
+  public startMusic() {
+    if (!this.enabled || !this.bgmAudio) return;
+    try {
+      this.bgmAudio.currentTime = 0;
+      this.bgmAudio.volume = 0.26;
+      this.bgmAudio.play().catch(() => {});
+    } catch {
+      // Ignore autoplay errors
+    }
+  }
+
+  public stopMusic() {
+    if (!this.bgmAudio) return;
+    try {
+      this.bgmAudio.pause();
+      this.bgmAudio.currentTime = 0;
+    } catch {
+      // Ignore
+    }
+  }
+
   public playCollision() {
+    // Stop background music immediately right before "GAME!" plays
+    this.stopMusic();
     if (!this.enabled) return;
     // Play the announcer "GAME!" voice effect when you lose
     this.playClip(this.gameAudio);

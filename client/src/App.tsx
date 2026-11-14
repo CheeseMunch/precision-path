@@ -52,6 +52,7 @@ export const App: React.FC = () => {
       setMyPlayerId(playerId);
       wasAliveRef.current = true;
       if (state.status === 'countdown') {
+        sound.stopMusic();
         setReadyGoTrigger((n) => n + 1);
         setShowReadyGo(true);
       }
@@ -67,6 +68,7 @@ export const App: React.FC = () => {
     });
 
     s.on('roomLeft', () => {
+      sound.stopMusic();
       setShowReadyGo(false);
       setGameState(null);
     });
@@ -79,6 +81,7 @@ export const App: React.FC = () => {
 
       // Trigger green-screen "Ready... Go!" video overlay when entering countdown
       if (state.status === 'countdown' && lastStatusRef.current !== 'countdown') {
+        sound.stopMusic();
         setReadyGoTrigger((n) => n + 1);
         setShowReadyGo(true);
       }
@@ -89,14 +92,16 @@ export const App: React.FC = () => {
         lastTierRef.current = 1;
       }
 
-      // Play "GAME!" voice clip if local player was just eliminated
+      // Stop music and play "GAME!" voice clip if local player was just eliminated
       if (me && wasAliveRef.current && !me.alive) {
         wasAliveRef.current = false;
         setShowReadyGo(false);
+        sound.stopMusic();
         sound.playCollision();
       }
 
       if (state.status === 'gameover') {
+        sound.stopMusic();
         setShowReadyGo(false);
       }
 
@@ -177,6 +182,7 @@ export const App: React.FC = () => {
   }, [socket]);
 
   const handleLeaveRoom = () => {
+    sound.stopMusic();
     if (socket) {
       socket.emit('leaveRoom');
     }
@@ -240,7 +246,15 @@ export const App: React.FC = () => {
           {showReadyGo && gameState.status !== 'gameover' && (
             <ReadyGoOverlay
               playTrigger={readyGoTrigger}
-              onFinished={() => setShowReadyGo(false)}
+              onFinished={() => {
+                setShowReadyGo(false);
+                if (
+                  gameState.status === 'playing' &&
+                  gameState.players[myPlayerId]?.alive !== false
+                ) {
+                  sound.startMusic();
+                }
+              }}
             />
           )}
 
