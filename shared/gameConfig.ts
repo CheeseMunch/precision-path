@@ -39,8 +39,8 @@ export const GAME_CONFIG = {
       4: 7, // Round 4 (4 directions) -> Endless Mode starts after 7s
     } as Record<1 | 2 | 3 | 4, number>,
 
-    /** Pre-match countdown timer in seconds */
-    startCountdownDuration: 3,
+    /** Pre-match countdown timer in seconds (1s READY.. -> GO!) */
+    startCountdownDuration: 1,
   },
 
   // ==========================================

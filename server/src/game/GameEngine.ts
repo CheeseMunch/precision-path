@@ -180,10 +180,7 @@ export class GameEngine {
     const didTeleport = Boolean(input.isTeleport) || jumpDist > 52;
 
     if (didTeleport && this.state.status === 'playing') {
-      // Teleporting costs 20 points
-      player.score -= 20;
-
-      // Any gate wave that the player teleports over (or lands directly on) yields no gate bonus
+      // Any gate wave that the player teleports over (or lands directly on) yields 0 points
       for (const wave of this.gateWaves) {
         if (wave.resolvedPlayers.has(playerId)) continue;
         const oldCoord = wave.isVertical ? oldY : oldX;
@@ -223,7 +220,7 @@ export class GameEngine {
     this.stop();
     this.resetGame();
     this.state.status = 'countdown';
-    this.state.countdownTimer = GAME_CONFIG.rounds.startCountdownDuration;
+    this.state.countdownTimer = 1;
 
     for (const id in this.state.players) {
       const p = this.state.players[id];
@@ -239,18 +236,15 @@ export class GameEngine {
       this.onStateUpdateCallback(this.state);
     }
 
-    this.countdownIntervalId = setInterval(() => {
-      this.state.countdownTimer--;
-      if (this.onStateUpdateCallback) this.onStateUpdateCallback(this.state);
-
-      if (this.state.countdownTimer <= 0) {
-        if (this.countdownIntervalId) {
-          clearInterval(this.countdownIntervalId);
-          this.countdownIntervalId = null;
-        }
-        this.startGame();
+    // Hold "Ready" phase for 2.0s so the match begins right when "Go!" hits in the overlay video
+    this.countdownIntervalId = setTimeout(() => {
+      this.countdownIntervalId = null;
+      this.state.countdownTimer = 0;
+      this.startGame();
+      if (this.onStateUpdateCallback) {
+        this.onStateUpdateCallback(this.state);
       }
-    }, 1000);
+    }, 2000);
   }
 
   public startGame() {

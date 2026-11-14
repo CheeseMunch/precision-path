@@ -1,6 +1,20 @@
 class SoundSystem {
   private ctx: AudioContext | null = null;
   public enabled: boolean = true;
+  private readyAudio: HTMLAudioElement | null = null;
+  private goAudio: HTMLAudioElement | null = null;
+  private gameAudio: HTMLAudioElement | null = null;
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      this.readyAudio = new Audio('/sounds/ready.mp3');
+      this.readyAudio.preload = 'auto';
+      this.goAudio = new Audio('/sounds/go.mp3');
+      this.goAudio.preload = 'auto';
+      this.gameAudio = new Audio('/sounds/game.mp3');
+      this.gameAudio.preload = 'auto';
+    }
+  }
 
   private initCtx() {
     if (!this.ctx) {
@@ -14,24 +28,31 @@ class SoundSystem {
     }
   }
 
+  private playClip(audio: HTMLAudioElement | null) {
+    if (!this.enabled || !audio) return;
+    try {
+      audio.currentTime = 0;
+      audio.volume = 0.85;
+      audio.play().catch(() => {});
+    } catch {
+      // Ignore autoplay errors before user gesture
+    }
+  }
+
+  public playReady() {
+    this.playClip(this.readyAudio);
+  }
+
+  public playGo() {
+    this.playClip(this.goAudio);
+  }
+
   public playCountdown(final: boolean = false) {
-    if (!this.enabled) return;
-    this.initCtx();
-    if (!this.ctx) return;
-
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(final ? 880 : 440, this.ctx.currentTime);
-    gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + (final ? 0.4 : 0.2));
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start();
-    osc.stop(this.ctx.currentTime + (final ? 0.4 : 0.2));
+    if (final) {
+      this.playGo();
+    } else {
+      this.playReady();
+    }
   }
 
   public playTierUp() {
@@ -68,26 +89,8 @@ class SoundSystem {
 
   public playCollision() {
     if (!this.enabled) return;
-    this.initCtx();
-    if (!this.ctx) return;
-
-    const now = this.ctx.currentTime;
-    // Low frequency crunch / boom
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(160, now);
-    osc.frequency.exponentialRampToValueAtTime(35, now + 0.3);
-
-    gain.gain.setValueAtTime(0.3, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-
-    osc.connect(gain);
-    gain.connect(this.ctx.destination);
-
-    osc.start(now);
-    osc.stop(now + 0.3);
+    // Play the announcer "GAME!" voice effect when you lose
+    this.playClip(this.gameAudio);
   }
 
   public playVictory() {

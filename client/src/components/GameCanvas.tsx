@@ -92,9 +92,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
           popupsRef.current.push({
             x: coords.x,
             y: coords.y - 22,
-            text: '-20 TELEPORT',
-            color: '#ff4d6d',
-            alpha: 0.95,
+            text: 'TELEPORT',
+            color: '#00f0ff',
+            alpha: 0.9,
           });
         }
         return;
@@ -369,12 +369,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
           }
         }
 
-        // Player Name Label
+        // Player Name Label ("YOU" for local player, name for others)
         ctx.shadowBlur = 0;
         ctx.fillStyle = isMe ? '#00f0ff' : '#ffffff';
         ctx.font = 'bold 11px Orbitron, sans-serif';
         ctx.textAlign = 'center';
-        ctx.fillText(isMe ? `YOU (${player.name})` : player.name, 0, -player.radius - 9);
+        ctx.fillText(isMe ? 'YOU' : player.name, 0, -player.radius - 9);
 
         ctx.restore();
       }

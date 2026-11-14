@@ -8,6 +8,7 @@ import { HUD } from './components/HUD';
 import { GameOverModal } from './components/GameOverModal';
 import { LeaderboardModal } from './components/LeaderboardModal';
 import { ConfigModal } from './components/ConfigModal';
+import { ReadyGoOverlay } from './components/ReadyGoOverlay';
 import { sound } from './utils/sound';
 import { SERVER_URL } from './utils/api';
 import { Play, RotateCcw, Sliders, Home, Pause } from 'lucide-react';
@@ -22,9 +23,10 @@ export const App: React.FC = () => {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showConfig, setShowConfig] = useState(false);
+  const [showReadyGo, setShowReadyGo] = useState(false);
+  const [readyGoTrigger, setReadyGoTrigger] = useState(0);
 
   const lastTierRef = useRef<number>(1);
-  const lastCountdownRef = useRef<number>(-1);
   const wasAliveRef = useRef<boolean>(true);
   const lastStatusRef = useRef<string>('lobby');
 
@@ -49,6 +51,10 @@ export const App: React.FC = () => {
     s.on('roomCreated', ({ playerId, state }: { roomId: string; playerId: string; state: GameState }) => {
       setMyPlayerId(playerId);
       wasAliveRef.current = true;
+      if (state.status === 'countdown') {
+        setReadyGoTrigger((n) => n + 1);
+        setShowReadyGo(true);
+      }
       lastStatusRef.current = state.status;
       setGameState(state);
     });
@@ -61,6 +67,7 @@ export const App: React.FC = () => {
     });
 
     s.on('roomLeft', () => {
+      setShowReadyGo(false);
       setGameState(null);
     });
 
@@ -70,10 +77,10 @@ export const App: React.FC = () => {
       const myId = s.id || '';
       const me = state.players[myId];
 
-      // Play countdown beep
-      if (state.status === 'countdown' && state.countdownTimer !== lastCountdownRef.current) {
-        lastCountdownRef.current = state.countdownTimer;
-        sound.playCountdown(state.countdownTimer <= 0);
+      // Trigger green-screen "Ready... Go!" video overlay when entering countdown
+      if (state.status === 'countdown' && lastStatusRef.current !== 'countdown') {
+        setReadyGoTrigger((n) => n + 1);
+        setShowReadyGo(true);
       }
 
       // Reset alive tracking when round begins from countdown
@@ -82,7 +89,7 @@ export const App: React.FC = () => {
         lastTierRef.current = 1;
       }
 
-      // Play collision sound if local player was just eliminated
+      // Play "GAME!" voice clip if local player was just eliminated
       if (me && wasAliveRef.current && !me.alive) {
         wasAliveRef.current = false;
         sound.playCollision();
@@ -224,16 +231,12 @@ export const App: React.FC = () => {
             onSendInput={handleSendInput}
           />
 
-          {/* Countdown Overlay */}
-          {gameState.status === 'countdown' && (
-            <div className="absolute inset-0 z-30 flex flex-col items-center justify-center pointer-events-none bg-black/40 backdrop-blur-sm">
-              <div className="text-8xl md:text-9xl font-black font-display text-cyan-400 animate-bounce drop-shadow-[0_0_35px_rgba(0,240,255,0.8)]">
-                {gameState.countdownTimer > 0 ? gameState.countdownTimer : 'GO!'}
-              </div>
-              <div className="text-xs uppercase font-mono tracking-widest text-gray-300 mt-2">
-                Keep circle inside boundary & slip through obstacle gaps (ESC to Pause)
-              </div>
-            </div>
+          {/* Green-Screen Chroma-Keyed "Ready... Go!" Video Overlay */}
+          {(showReadyGo || gameState.status === 'countdown') && (
+            <ReadyGoOverlay
+              playTrigger={readyGoTrigger}
+              onFinished={() => setShowReadyGo(false)}
+            />
           )}
 
           {/* Paused Overlay (ESC) */}
