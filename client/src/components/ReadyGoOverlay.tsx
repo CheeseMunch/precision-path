@@ -28,8 +28,8 @@ export const ReadyGoOverlay: React.FC<ReadyGoOverlayProps> = ({ playTrigger, onF
     let active = true;
 
     video.currentTime = 0;
-    video.muted = !sound.enabled;
-    video.volume = 0.9;
+    video.muted = !sound.enabled || sound.volume <= 0;
+    video.volume = Math.min(1, 0.76 * sound.volume);
     video.play().catch(() => {
       // Fallback if browser blocks unmuted autoplay: play muted
       video.muted = true;

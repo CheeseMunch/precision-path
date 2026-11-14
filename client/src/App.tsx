@@ -11,7 +11,7 @@ import { ConfigModal } from './components/ConfigModal';
 import { ReadyGoOverlay } from './components/ReadyGoOverlay';
 import { sound } from './utils/sound';
 import { SERVER_URL } from './utils/api';
-import { Play, RotateCcw, Sliders, Home, Pause } from 'lucide-react';
+import { Play, RotateCcw, Sliders, Home, Pause, Volume2, VolumeX } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -25,6 +25,7 @@ export const App: React.FC = () => {
   const [showConfig, setShowConfig] = useState(false);
   const [showReadyGo, setShowReadyGo] = useState(false);
   const [readyGoTrigger, setReadyGoTrigger] = useState(0);
+  const [volume, setVolume] = useState<number>(sound.volume);
 
   const lastTierRef = useRef<number>(1);
   const wasAliveRef = useRef<boolean>(true);
@@ -90,6 +91,13 @@ export const App: React.FC = () => {
       if (state.status === 'playing' && lastStatusRef.current === 'countdown') {
         wasAliveRef.current = true;
         lastTierRef.current = 1;
+      }
+
+      // Pause or resume background music when entering/leaving pause screen
+      if (state.status === 'paused' && lastStatusRef.current !== 'paused') {
+        sound.pauseMusic();
+      } else if (state.status === 'playing' && lastStatusRef.current === 'paused') {
+        sound.resumeMusic();
       }
 
       // Stop music and play "GAME!" voice clip if local player was just eliminated
@@ -275,6 +283,42 @@ export const App: React.FC = () => {
                       Paused by {gameState.pausedBy}
                     </p>
                   )}
+                </div>
+
+                {/* Volume Slider */}
+                <div className="bg-[#090b12] border border-cyber-border/70 rounded-lg px-3.5 py-3 flex flex-col gap-2 text-left">
+                  <div className="flex items-center justify-between text-xs font-mono">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = volume > 0 ? 0 : 0.85;
+                        setVolume(next);
+                        sound.setVolume(next);
+                      }}
+                      className="flex items-center gap-1.5 text-cyan-400 hover:text-cyan-300 transition"
+                    >
+                      {volume > 0 ? (
+                        <Volume2 className="w-4 h-4" />
+                      ) : (
+                        <VolumeX className="w-4 h-4 text-red-400" />
+                      )}
+                      <span className="uppercase font-bold">Volume</span>
+                    </button>
+                    <span className="text-gray-200 font-bold">{Math.round(volume * 100)}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={volume}
+                    onChange={(e) => {
+                      const val = Number(e.target.value);
+                      setVolume(val);
+                      sound.setVolume(val);
+                    }}
+                    className="w-full accent-cyan-400 cursor-pointer"
+                  />
                 </div>
 
                 <div className="flex flex-col gap-2.5">

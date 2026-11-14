@@ -1,14 +1,25 @@
 class SoundSystem {
   private ctx: AudioContext | null = null;
   public enabled: boolean = true;
+  // Default volume lowered by 15% (0.85)
+  public volume: number = 0.85;
+  private readonly baseBgmVolume = 0.22; // 15% lower than previous 0.26
+  private readonly baseSfxVolume = 0.72; // 15% lower than previous 0.85
   private readyAudio: HTMLAudioElement | null = null;
   private goAudio: HTMLAudioElement | null = null;
   private gameAudio: HTMLAudioElement | null = null;
   private bgmAudio: HTMLAudioElement | null = null;
   private musicActive: boolean = false;
+  private musicPaused: boolean = false;
 
   constructor() {
     if (typeof window !== 'undefined') {
+      const savedVol = localStorage.getItem('precision_volume_v2');
+      if (savedVol !== null && !Number.isNaN(Number(savedVol))) {
+        this.volume = Math.max(0, Math.min(1, Number(savedVol)));
+        this.enabled = this.volume > 0;
+      }
+
       this.readyAudio = new Audio('/sounds/ready.mp3');
       this.readyAudio.preload = 'auto';
       this.goAudio = new Audio('/sounds/go.mp3');
@@ -18,7 +29,7 @@ class SoundSystem {
       this.bgmAudio = new Audio('/sounds/bgm.mp3');
       this.bgmAudio.preload = 'auto';
       this.bgmAudio.loop = true;
-      this.bgmAudio.volume = 0.26;
+      this.bgmAudio.volume = this.baseBgmVolume * this.volume;
 
       // Seamless continuous loop while musicActive is true
       this.bgmAudio.addEventListener('timeupdate', () => {
@@ -54,11 +65,27 @@ class SoundSystem {
     }
   }
 
+  public setVolume(vol: number) {
+    this.volume = Math.max(0, Math.min(1, vol));
+    this.enabled = this.volume > 0;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('precision_volume_v2', String(this.volume));
+    }
+    if (this.bgmAudio) {
+      this.bgmAudio.volume = this.baseBgmVolume * this.volume;
+      if (this.volume === 0 && !this.bgmAudio.paused) {
+        this.bgmAudio.pause();
+      } else if (this.volume > 0 && this.musicActive && !this.musicPaused && this.bgmAudio.paused) {
+        this.bgmAudio.play().catch(() => {});
+      }
+    }
+  }
+
   private playClip(audio: HTMLAudioElement | null) {
-    if (!this.enabled || !audio) return;
+    if (!this.enabled || this.volume <= 0 || !audio) return;
     try {
       audio.currentTime = 0;
-      audio.volume = 0.85;
+      audio.volume = Math.min(1, this.baseSfxVolume * this.volume);
       audio.play().catch(() => {});
     } catch {
       // Ignore autoplay errors before user gesture
@@ -115,27 +142,50 @@ class SoundSystem {
 
   public startMusic() {
     this.musicActive = true;
-    if (!this.enabled || !this.bgmAudio) return;
+    this.musicPaused = false;
+    if (!this.enabled || this.volume <= 0 || !this.bgmAudio) return;
     try {
       this.bgmAudio.loop = true;
       this.bgmAudio.currentTime = 0;
-      this.bgmAudio.volume = 0.26;
+      this.bgmAudio.volume = this.baseBgmVolume * this.volume;
       this.bgmAudio.play().catch(() => {});
     } catch {
       // Ignore autoplay errors
     }
   }
 
+  public pauseMusic() {
+    this.musicPaused = true;
+    if (!this.bgmAudio) return;
+    try {
+      this.bgmAudio.pause();
+    } catch {
+      // Ignore
+    }
+  }
+
+  public resumeMusic() {
+    this.musicPaused = false;
+    if (!this.musicActive || !this.enabled || this.volume <= 0 || !this.bgmAudio) return;
+    try {
+      this.bgmAudio.volume = this.baseBgmVolume * this.volume;
+      this.bgmAudio.play().catch(() => {});
+    } catch {
+      // Ignore
+    }
+  }
+
   public ensureMusicPlaying() {
-    if (!this.musicActive || !this.enabled || !this.bgmAudio) return;
+    if (!this.musicActive || this.musicPaused || !this.enabled || this.volume <= 0 || !this.bgmAudio) return;
     if (this.bgmAudio.paused) {
-      this.bgmAudio.volume = 0.26;
+      this.bgmAudio.volume = this.baseBgmVolume * this.volume;
       this.bgmAudio.play().catch(() => {});
     }
   }
 
   public stopMusic() {
     this.musicActive = false;
+    this.musicPaused = false;
     if (!this.bgmAudio) return;
     try {
       this.bgmAudio.pause();
