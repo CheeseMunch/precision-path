@@ -5,6 +5,7 @@ class SoundSystem {
   private goAudio: HTMLAudioElement | null = null;
   private gameAudio: HTMLAudioElement | null = null;
   private bgmAudio: HTMLAudioElement | null = null;
+  private musicActive: boolean = false;
 
   constructor() {
     if (typeof window !== 'undefined') {
@@ -18,6 +19,26 @@ class SoundSystem {
       this.bgmAudio.preload = 'auto';
       this.bgmAudio.loop = true;
       this.bgmAudio.volume = 0.26;
+
+      // Seamless continuous loop while musicActive is true
+      this.bgmAudio.addEventListener('timeupdate', () => {
+        if (
+          this.musicActive &&
+          this.bgmAudio &&
+          this.bgmAudio.duration > 0 &&
+          this.bgmAudio.currentTime >= this.bgmAudio.duration - 0.25
+        ) {
+          this.bgmAudio.currentTime = 0;
+          this.bgmAudio.play().catch(() => {});
+        }
+      });
+
+      this.bgmAudio.addEventListener('ended', () => {
+        if (this.musicActive && this.bgmAudio) {
+          this.bgmAudio.currentTime = 0;
+          this.bgmAudio.play().catch(() => {});
+        }
+      });
     }
   }
 
@@ -93,8 +114,10 @@ class SoundSystem {
   }
 
   public startMusic() {
+    this.musicActive = true;
     if (!this.enabled || !this.bgmAudio) return;
     try {
+      this.bgmAudio.loop = true;
       this.bgmAudio.currentTime = 0;
       this.bgmAudio.volume = 0.26;
       this.bgmAudio.play().catch(() => {});
@@ -103,7 +126,16 @@ class SoundSystem {
     }
   }
 
+  public ensureMusicPlaying() {
+    if (!this.musicActive || !this.enabled || !this.bgmAudio) return;
+    if (this.bgmAudio.paused) {
+      this.bgmAudio.volume = 0.26;
+      this.bgmAudio.play().catch(() => {});
+    }
+  }
+
   public stopMusic() {
+    this.musicActive = false;
     if (!this.bgmAudio) return;
     try {
       this.bgmAudio.pause();

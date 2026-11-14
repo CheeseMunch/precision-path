@@ -178,6 +178,7 @@ export const App: React.FC = () => {
 
   const handleSendInput = useCallback((input: ClientInput) => {
     if (!socket) return;
+    sound.ensureMusicPlaying();
     socket.emit('playerInput', input);
   }, [socket]);
 
