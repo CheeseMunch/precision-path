@@ -15,7 +15,8 @@ server/temp/
 server/.env
 client/.env
 
-# Logs & OS files
+# Logs, DB & OS files
+.pgdata/
 *.log
 npm-debug.log*
 .DS_Store

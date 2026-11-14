@@ -7,4 +7,5 @@ server/dist
 .env
 server/.env
 client/.env
+.pgdata
 *.log
