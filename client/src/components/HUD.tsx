@@ -89,11 +89,14 @@ export const HUD: React.FC<HUDProps> = ({
           )}
         </div>
 
-        {/* Alive Players & Timer */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-1.5 bg-cyber-panel/80 px-3 py-1 rounded border border-cyber-border text-xs font-mono">
+        {/* Alive Players, Gate Score & Timer */}
+        <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 bg-cyber-panel/80 px-2.5 py-1 rounded border border-cyber-border text-xs font-mono">
             <Users className="w-3.5 h-3.5 text-cyan-400" />
             <span>{alivePlayers.length}/{Object.keys(gameState.players).length}</span>
+          </div>
+          <div className="bg-cyber-panel/80 px-3 py-1 rounded border border-yellow-500/40 text-xs font-mono text-yellow-400 font-bold">
+            PTS: {myPlayer?.score || 0}
           </div>
           <div className="bg-cyber-panel/80 px-3 py-1 rounded border border-cyber-border text-xs font-mono text-cyan-300 font-bold">
             {gameState.elapsedTime.toFixed(1)}s

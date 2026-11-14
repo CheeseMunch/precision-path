@@ -14,52 +14,137 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
   const gameStateRef = useRef<GameState>(gameState);
   const myPlayerIdRef = useRef<string>(myPlayerId);
   const localPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const isDraggingRef = useRef<boolean>(false);
+  const lastScoreRef = useRef<number>(0);
+  const popupsRef = useRef<
+    Array<{ x: number; y: number; text: string; color: string; alpha: number }>
+  >([]);
+  const ripplesRef = useRef<
+    Array<{ x: number; y: number; radius: number; maxRadius: number; alpha: number }>
+  >([]);
 
   // Keep refs updated without restarting the 60FPS animation loop
   gameStateRef.current = gameState;
   myPlayerIdRef.current = myPlayerId;
 
-  // Send scaled input to server throttled to ~50Hz
-  const handlePointerCoords = useCallback((clientX: number, clientY: number) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
+  // Detect gate score increases and spawn floating "+100 GATE!" popups
+  useEffect(() => {
+    const me = gameState.players[myPlayerId];
+    if (!me) return;
+    if (gameState.status === 'countdown' || gameState.elapsedTime < 0.2) {
+      lastScoreRef.current = me.score;
+      return;
+    }
+    if (me.score > lastScoreRef.current) {
+      const gained = me.score - lastScoreRef.current;
+      popupsRef.current.push({
+        x: me.x,
+        y: me.y - 24,
+        text: `+${gained} GATE!`,
+        color: '#00ff66',
+        alpha: 1.0,
+      });
+    }
+    lastScoreRef.current = me.score;
+  }, [gameState, myPlayerId]);
 
+  const toArenaCoords = useCallback((clientX: number, clientY: number) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
-    if (rect.width === 0 || rect.height === 0) return;
+    if (rect.width === 0 || rect.height === 0) return null;
 
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-
-    // Scale DOM pixels to internal 680x680 canvas coordinate space
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
 
-    const x = (clientX - centerX) * scaleX;
-    const y = (clientY - centerY) * scaleY;
+    return {
+      x: (clientX - centerX) * scaleX,
+      y: (clientY - centerY) * scaleY,
+    };
+  }, []);
 
-    localPointerRef.current = { x, y };
+  // Send immediate click/tap (teleport if distant) or throttled drag movement
+  const sendMoveOrTeleport = useCallback(
+    (clientX: number, clientY: number, isInitialTapOrClick: boolean) => {
+      const coords = toArenaCoords(clientX, clientY);
+      if (!coords) return;
 
-    const now = performance.now();
-    if (now - inputThrottleRef.current > 18) {
-      inputThrottleRef.current = now;
-      onSendInput({ x, y });
-    }
-  }, [onSendInput]);
+      localPointerRef.current = coords;
+      const me = gameStateRef.current.players[myPlayerIdRef.current];
+      const distFromPlayer = me ? Math.hypot(coords.x - me.x, coords.y - me.y) : 999;
 
-  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    handlePointerCoords(e.clientX, e.clientY);
+      if (isInitialTapOrClick) {
+        const isTeleport = distFromPlayer > 38;
+        inputThrottleRef.current = performance.now();
+        onSendInput({ x: coords.x, y: coords.y, isTeleport });
+
+        if (isTeleport && me?.alive) {
+          ripplesRef.current.push({
+            x: coords.x,
+            y: coords.y,
+            radius: 8,
+            maxRadius: 34,
+            alpha: 0.9,
+          });
+          popupsRef.current.push({
+            x: coords.x,
+            y: coords.y - 22,
+            text: 'TELEPORT (0 PTS)',
+            color: '#94a3b8',
+            alpha: 0.85,
+          });
+        }
+        return;
+      }
+
+      const now = performance.now();
+      if (now - inputThrottleRef.current > 18) {
+        inputThrottleRef.current = now;
+        onSendInput({ x: coords.x, y: coords.y, isTeleport: false });
+      }
+    },
+    [onSendInput, toArenaCoords]
+  );
+
+  const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (e.button !== 0) return;
+    isDraggingRef.current = true;
+    sendMoveOrTeleport(e.clientX, e.clientY, true);
   };
 
-  const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
-    if (e.touches.length > 0) {
-      handlePointerCoords(e.touches[0].clientX, e.touches[0].clientY);
+  const onMouseUp = () => {
+    isDraggingRef.current = false;
+  };
+
+  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const coords = toArenaCoords(e.clientX, e.clientY);
+    if (coords) {
+      localPointerRef.current = coords;
+    }
+    if (isDraggingRef.current && (e.buttons & 1) === 1) {
+      sendMoveOrTeleport(e.clientX, e.clientY, false);
+    } else {
+      isDraggingRef.current = false;
     }
   };
 
   const onTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (e.touches.length > 0) {
-      handlePointerCoords(e.touches[0].clientX, e.touches[0].clientY);
+      isDraggingRef.current = true;
+      sendMoveOrTeleport(e.touches[0].clientX, e.touches[0].clientY, true);
     }
+  };
+
+  const onTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
+    if (e.touches.length > 0) {
+      sendMoveOrTeleport(e.touches[0].clientX, e.touches[0].clientY, false);
+    }
+  };
+
+  const onTouchEnd = () => {
+    isDraggingRef.current = false;
   };
 
   // Persistent 60FPS+ Render Loop
@@ -293,6 +378,43 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
         ctx.restore();
       }
 
+      // 8. Draw Teleport Ripples & Floating Gate Score Popups
+      const remainingRipples: typeof ripplesRef.current = [];
+      for (const r of ripplesRef.current) {
+        r.radius += (r.maxRadius - r.radius) * 0.22;
+        r.alpha -= 0.045;
+        if (r.alpha > 0.02) {
+          ctx.save();
+          ctx.strokeStyle = `rgba(0, 240, 255, ${r.alpha})`;
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+          remainingRipples.push(r);
+        }
+      }
+      ripplesRef.current = remainingRipples;
+
+      const remainingPopups: typeof popupsRef.current = [];
+      for (const p of popupsRef.current) {
+        p.y -= 0.9;
+        p.alpha -= 0.022;
+        if (p.alpha > 0.02) {
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, p.alpha);
+          ctx.fillStyle = p.color;
+          ctx.shadowColor = p.color;
+          ctx.shadowBlur = 8;
+          ctx.font = 'bold 12px Orbitron, monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(p.text, p.x, p.y);
+          ctx.restore();
+          remainingPopups.push(p);
+        }
+      }
+      popupsRef.current = remainingPopups;
+
       ctx.restore(); // Restore center translate
       animFrameRef.current = requestAnimationFrame(render);
     };
@@ -310,9 +432,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
         ref={canvasRef}
         width={500}
         height={850}
+        onMouseDown={onMouseDown}
+        onMouseUp={onMouseUp}
+        onMouseLeave={onMouseUp}
         onMouseMove={onMouseMove}
         onTouchMove={onTouchMove}
         onTouchStart={onTouchStart}
+        onTouchEnd={onTouchEnd}
         className="max-w-[94vw] max-h-[85vh] w-auto h-auto aspect-[500/850] rounded-[28px] border border-cyber-border/60 shadow-2xl bg-[#090b12] touch-none"
       />
     </div>

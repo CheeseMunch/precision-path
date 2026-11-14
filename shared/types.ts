@@ -9,6 +9,7 @@ export interface Player {
   radius: number;
   alive: boolean;
   score: number;
+  gatesCleared?: number;
   survivedTime: number; // in seconds
   isHost: boolean;
   rank?: number;
@@ -58,6 +59,7 @@ export interface GameState {
 export interface ClientInput {
   x: number; // target position relative to arena center
   y: number;
+  isTeleport?: boolean; // true when player clicks/taps a spot to teleport instead of dragging
 }
 
 export interface LeaderboardEntry {
@@ -66,5 +68,6 @@ export interface LeaderboardEntry {
   bestSurvivalTime: number;
   highestTier: number;
   totalGames: number;
+  totalScore?: number;
   createdAt: string;
 }

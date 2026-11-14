@@ -6,6 +6,17 @@ export class GameEngine {
   private intervalId: NodeJS.Timeout | null = null;
   private countdownIntervalId: NodeJS.Timeout | null = null;
   private scheduledSpawns: Array<{ triggerAtElapsed: number; execute: () => void }> = [];
+  private gateWaves: Array<{
+    id: string;
+    direction: ObstacleDirection;
+    isVertical: boolean;
+    travelSign: number; // +1 for north/west, -1 for south/east
+    coord: number;
+    speed: number;
+    tier: GameTier;
+    resolvedPlayers: Set<string>;
+    teleportedPlayers: Set<string>;
+  }> = [];
   private tickRate = GAME_CONFIG.engine.serverTickRate;
   private obstacleSpawnTimer = 0;
   private nextWaveInterval = GAME_CONFIG.obstacles.waveIntervals[1];
@@ -160,8 +171,34 @@ export class GameEngine {
     const maxX = this.ARENA_WIDTH / 2 - player.radius;
     const maxY = this.ARENA_HEIGHT / 2 - player.radius;
 
-    player.x = Math.max(-maxX, Math.min(maxX, input.x));
-    player.y = Math.max(-maxY, Math.min(maxY, input.y));
+    const oldX = player.x;
+    const oldY = player.y;
+    const newX = Math.max(-maxX, Math.min(maxX, input.x));
+    const newY = Math.max(-maxY, Math.min(maxY, input.y));
+
+    const jumpDist = Math.hypot(newX - oldX, newY - oldY);
+    const didTeleport = Boolean(input.isTeleport) || jumpDist > 52;
+
+    if (didTeleport && this.state.status === 'playing') {
+      // Any gate wave that the player teleports over (or lands directly on) yields 0 points
+      for (const wave of this.gateWaves) {
+        if (wave.resolvedPlayers.has(playerId)) continue;
+        const oldCoord = wave.isVertical ? oldY : oldX;
+        const newCoord = wave.isVertical ? newY : newX;
+
+        const relOld = (oldCoord - wave.coord) * wave.travelSign;
+        const relNew = (newCoord - wave.coord) * wave.travelSign;
+
+        // If player jumped across the gate wave plane or teleported right onto it
+        if ((relOld >= -18 && relNew <= 28) || Math.abs(newCoord - wave.coord) < 38) {
+          wave.teleportedPlayers.add(playerId);
+          wave.resolvedPlayers.add(playerId);
+        }
+      }
+    }
+
+    player.x = newX;
+    player.y = newY;
   }
 
   public togglePause(playerId: string) {
@@ -191,6 +228,7 @@ export class GameEngine {
       p.x = 0;
       p.y = 0;
       p.score = 0;
+      p.gatesCleared = 0;
       p.survivedTime = 0;
     }
 
@@ -232,6 +270,7 @@ export class GameEngine {
       const p = this.state.players[id];
       p.alive = true;
       p.score = 0;
+      p.gatesCleared = 0;
       p.survivedTime = 0;
     }
 
@@ -260,6 +299,7 @@ export class GameEngine {
     this.state.tierTimeRemaining = getTierDuration(1);
     this.state.elapsedTime = 0;
     this.scheduledSpawns = [];
+    this.gateWaves = [];
   }
 
   private tick() {
@@ -281,7 +321,6 @@ export class GameEngine {
       const p = this.state.players[id];
       if (p.alive) {
         p.survivedTime += dt;
-        p.score = Math.floor(p.survivedTime * 10 * this.state.currentTier);
       }
     }
 
@@ -289,6 +328,7 @@ export class GameEngine {
     this.spawnObstacles(dt);
     this.updateObstacles(dt);
     this.checkCollisions();
+    this.updateGateWaves(dt);
 
     if (this.onStateUpdateCallback) {
       this.onStateUpdateCallback(this.state);
@@ -506,6 +546,22 @@ export class GameEngine {
     const gapCenter = Math.max(-maxGapCenter, Math.min(maxGapCenter, targetSafeLateral + jitter));
 
     const barThickness = GAME_CONFIG.obstacles.barThickness;
+
+    // Register this wave for gate-passage scoring (0 points if player teleports over it)
+    const halfBound = isVerticalTravel ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
+    const spawnDist = halfBound + GAME_CONFIG.obstacles.spawnDistanceOffset;
+    const travelSign = direction === 'north' || direction === 'west' ? 1 : -1;
+    this.gateWaves.push({
+      id: crypto.randomUUID(),
+      direction,
+      isVertical: isVerticalTravel,
+      travelSign,
+      coord: -travelSign * spawnDist,
+      speed: safeSpeed,
+      tier,
+      resolvedPlayers: new Set(),
+      teleportedPlayers: new Set(),
+    });
 
     const dirColors: Record<string, string> = {
       north: '#ff2a6d', // Neon Crimson
@@ -844,6 +900,44 @@ export class GameEngine {
     }
 
     this.state.obstacles = remaining;
+  }
+
+  /**
+   * Advances gate wave planes and awards +100 points to any alive player who navigated
+   * through the gate without teleporting over it.
+   */
+  private updateGateWaves(dt: number) {
+    const despawnLimitX = this.ARENA_WIDTH / 2 + 90;
+    const despawnLimitY = this.ARENA_HEIGHT / 2 + 90;
+    const remainingWaves: typeof this.gateWaves = [];
+
+    for (const wave of this.gateWaves) {
+      wave.coord += wave.travelSign * wave.speed * dt;
+
+      for (const id in this.state.players) {
+        const p = this.state.players[id];
+        if (!p.alive || wave.resolvedPlayers.has(id)) continue;
+
+        const playerCoord = wave.isVertical ? p.y : p.x;
+        const rel = (playerCoord - wave.coord) * wave.travelSign;
+
+        // Wave plane has passed the player's center without killing them
+        if (rel <= 0) {
+          wave.resolvedPlayers.add(id);
+          if (!wave.teleportedPlayers.has(id)) {
+            p.score += 100;
+            p.gatesCleared = (p.gatesCleared || 0) + 1;
+          }
+        }
+      }
+
+      const limit = wave.isVertical ? despawnLimitY : despawnLimitX;
+      if (Math.abs(wave.coord) <= limit) {
+        remainingWaves.push(wave);
+      }
+    }
+
+    this.gateWaves = remainingWaves;
   }
 
   private checkCollisions() {
