@@ -51,7 +51,7 @@ All gameplay timings, arena geometry, and procedural randomness parameters live 
 | **Database & ORM** | **PostgreSQL 16 + MikroORM v6** | Unit-of-Work persistence for `User` high scores and `MatchHistory` records, with automatic in-memory fallback when PostgreSQL is offline. |
 | **Edge Reverse Tunnel** | **Cloudflare Tunnel (`cloudflared`)** | Encrypted outbound QUIC tunnel from the host PC (`localhost:4000`) to Cloudflare's global edge (`precisionpath.pro`), requiring zero router port-forwarding and hiding the host IP. |
 | **Domain & DNS** | **Porkbun + Cloudflare DNS** | Domain `precisionpath.pro` registered on Porkbun, delegated to Cloudflare authoritative nameservers (`ophelia.ns.cloudflare.com`, `zac.ns.cloudflare.com`) with proxied `CNAME` tunnel routes and Universal SSL. |
-| **Containerization** | **Docker & Docker Compose** | Multi-stage `Dockerfile` and `docker-compose.yml` bundling the Node.js server, built React frontend, and `postgres:16-alpine` for Coolify or VPS hosting. |
+| **Containerization** | **Docker & Docker Compose** | Optional `Dockerfile` and `docker-compose.yml` bundling the Node.js server, built React frontend, and `postgres:16-alpine`. |
 
 ---
 
@@ -138,21 +138,14 @@ If setting up on a new Windows machine:
 
 ---
 
-### 3. Docker & Coolify Self-Hosted Deployment
+### 3. Docker Compose (Optional Containerized Run)
 
-The repository includes a production [`Dockerfile`](./Dockerfile) and [`docker-compose.yml`](./docker-compose.yml) that bundle the React UI, Node.js server, and PostgreSQL 16.
+The repository includes an optional [`Dockerfile`](./Dockerfile) and [`docker-compose.yml`](./docker-compose.yml) that bundle the React UI, Node.js server, and PostgreSQL 16:
 
-#### Option A: Run with Docker Compose (Local or Any Linux VPS)
 ```bash
 docker compose up -d --build
 ```
 *Exposes the full application + WebSockets on port `4000` with persistent PostgreSQL storage.*
-
-#### Option B: Deploy with Coolify
-1. In your **Coolify Dashboard**, click **+ New Resource** $\rightarrow$ **Public Repository**.
-2. Enter `https://github.com/CheeseMunch/precision-path`.
-3. Select **Docker Compose** as the build pack.
-4. Set the `app` service domain to `https://precisionpath.pro` (port `4000`) and click **Deploy**.
 
 ---
 
