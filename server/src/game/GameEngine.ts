@@ -180,7 +180,10 @@ export class GameEngine {
     const didTeleport = Boolean(input.isTeleport) || jumpDist > 52;
 
     if (didTeleport && this.state.status === 'playing') {
-      // Any gate wave that the player teleports over (or lands directly on) yields 0 points
+      // Teleporting costs 20 points
+      player.score -= 20;
+
+      // Any gate wave that the player teleports over (or lands directly on) yields no gate bonus
       for (const wave of this.gateWaves) {
         if (wave.resolvedPlayers.has(playerId)) continue;
         const oldCoord = wave.isVertical ? oldY : oldX;
@@ -342,6 +345,15 @@ export class GameEngine {
         this.state.currentTier = (this.state.currentTier + 1) as GameTier;
         this.state.activeDirections = this.getActiveSidesForTier(this.state.currentTier);
         this.state.tierTimeRemaining = getTierDuration(this.state.currentTier);
+
+        // Award +500 points to every alive player for reaching the next stage
+        for (const id in this.state.players) {
+          const p = this.state.players[id];
+          if (p.alive) {
+            p.score += 500;
+          }
+        }
+
         if (this.onTierUpCallback) {
           this.onTierUpCallback(this.state.currentTier);
         }

@@ -37,11 +37,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
     }
     if (me.score > lastScoreRef.current) {
       const gained = me.score - lastScoreRef.current;
+      const isStageUp = gained >= 400;
       popupsRef.current.push({
         x: me.x,
-        y: me.y - 24,
-        text: `+${gained} GATE!`,
-        color: '#00ff66',
+        y: me.y - 26,
+        text: isStageUp ? `+${gained} NEXT STAGE!` : `+${gained} GATE!`,
+        color: isStageUp ? '#facc15' : '#00ff66',
         alpha: 1.0,
       });
     }
@@ -91,9 +92,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
           popupsRef.current.push({
             x: coords.x,
             y: coords.y - 22,
-            text: 'TELEPORT (0 PTS)',
-            color: '#94a3b8',
-            alpha: 0.85,
+            text: '-20 TELEPORT',
+            color: '#ff4d6d',
+            alpha: 0.95,
           });
         }
         return;
