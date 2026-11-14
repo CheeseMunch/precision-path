@@ -190,12 +190,14 @@ export const App: React.FC = () => {
     : 'game';
 
   return (
-    <main className="w-screen h-screen overflow-hidden bg-[#07080c] relative flex flex-col justify-center items-center select-none font-sans">
-      {/* Network status badge */}
-      <div className="absolute bottom-2 right-3 z-30 flex items-center gap-2 text-[10px] font-mono text-gray-500">
-        <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500 animate-ping'}`} />
-        <span>{connected ? 'CONNECTED' : 'CONNECTING...'}</span>
-      </div>
+    <main className="w-screen h-[100dvh] overflow-hidden bg-[#07080c] relative flex flex-col justify-center items-center select-none font-sans">
+      {/* Network status badge (lobby & waiting room only) */}
+      {currentView !== 'game' && (
+        <div className="absolute bottom-2 right-3 z-30 flex items-center gap-2 text-[10px] font-mono text-gray-500">
+          <span className={`w-2 h-2 rounded-full ${connected ? 'bg-green-400' : 'bg-red-500 animate-ping'}`} />
+          <span>{connected ? 'CONNECTED' : 'CONNECTING...'}</span>
+        </div>
+      )}
 
       {/* View 1: Main Menu Lobby */}
       {currentView === 'lobby' && (
@@ -221,12 +223,10 @@ export const App: React.FC = () => {
 
       {/* View 3: Active Gameplay */}
       {currentView === 'game' && gameState && (
-        <div className="relative w-full h-full flex items-center justify-center">
+        <div className="relative w-full h-full flex flex-col overflow-hidden">
           <HUD
             gameState={gameState}
             myPlayerId={myPlayerId}
-            onOpenLeaderboard={() => setShowLeaderboard(true)}
-            onLeaveRoom={handleLeaveRoom}
             onTogglePause={handleTogglePause}
           />
 

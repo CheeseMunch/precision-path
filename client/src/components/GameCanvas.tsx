@@ -214,10 +214,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       ctx.lineTo(0, 16);
       ctx.stroke();
 
-      // 3. Draw Obstacles clipped cleanly to outer rectangular phone perimeter
+      // 3. Draw Obstacles across full playable rectangle
       ctx.save();
       ctx.beginPath();
-      ctx.roundRect(-halfW - 18, -halfH - 18, arenaWidth + 36, arenaHeight + 36, 26);
+      ctx.rect(-halfW, -halfH, arenaWidth, arenaHeight);
       ctx.clip();
 
       for (const obs of currentState.obstacles) {
@@ -246,63 +246,62 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       }
       ctx.restore(); // Remove clip
 
-      // 4. Draw Playable Phone-Screen Rectangular Boundary
+      // 4. Draw Playable Full-Screen Rectangular Boundary
       ctx.save();
       ctx.shadowColor = currentState.currentTier === 5 ? '#ff0055' : '#00f0ff';
-      ctx.shadowBlur = 16 + Math.sin(pulse) * 5;
+      ctx.shadowBlur = 14 + Math.sin(pulse) * 4;
       ctx.beginPath();
-      ctx.roundRect(-halfW, -halfH, arenaWidth, arenaHeight, 22);
-      ctx.strokeStyle = currentState.currentTier === 5 ? 'rgba(255, 0, 85, 0.85)' : 'rgba(0, 240, 255, 0.8)';
-      ctx.lineWidth = 4;
+      ctx.rect(-halfW + 1.5, -halfH + 1.5, arenaWidth - 3, arenaHeight - 3);
+      ctx.strokeStyle = currentState.currentTier === 5 ? 'rgba(255, 0, 85, 0.85)' : 'rgba(0, 240, 255, 0.75)';
+      ctx.lineWidth = 3;
       ctx.stroke();
       ctx.restore();
 
-      // 5. Draw Active Side Warning Bars along the 4 edges of the Rectangle
+      // 5. Draw Active Side Warning Bars flush along the 4 edges of the Rectangle
       const activeDirs = new Set(
         currentState.activeDirections && currentState.activeDirections.length > 0
           ? currentState.activeDirections
           : currentState.obstacles.map((o) => o.direction)
       );
-      const edgeOffset = 10;
-      const hBarSpan = arenaWidth * 0.55;
-      const vBarSpan = arenaHeight * 0.55;
+      const hBarSpan = arenaWidth * 0.65;
+      const vBarSpan = arenaHeight * 0.65;
       ctx.save();
-      ctx.lineWidth = 4;
+      ctx.lineWidth = 5;
       ctx.lineCap = 'round';
       if (activeDirs.has('north')) {
-        ctx.strokeStyle = 'rgba(255, 42, 109, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 42, 109, 0.9)';
         ctx.shadowColor = '#ff2a6d';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
         ctx.beginPath();
-        ctx.moveTo(-hBarSpan / 2, -halfH - edgeOffset);
-        ctx.lineTo(hBarSpan / 2, -halfH - edgeOffset);
+        ctx.moveTo(-hBarSpan / 2, -halfH + 3);
+        ctx.lineTo(hBarSpan / 2, -halfH + 3);
         ctx.stroke();
       }
       if (activeDirs.has('south')) {
-        ctx.strokeStyle = 'rgba(255, 119, 0, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 119, 0, 0.9)';
         ctx.shadowColor = '#ff7700';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
         ctx.beginPath();
-        ctx.moveTo(-hBarSpan / 2, halfH + edgeOffset);
-        ctx.lineTo(hBarSpan / 2, halfH + edgeOffset);
+        ctx.moveTo(-hBarSpan / 2, halfH - 3);
+        ctx.lineTo(hBarSpan / 2, halfH - 3);
         ctx.stroke();
       }
       if (activeDirs.has('east')) {
-        ctx.strokeStyle = 'rgba(211, 0, 197, 0.85)';
+        ctx.strokeStyle = 'rgba(211, 0, 197, 0.9)';
         ctx.shadowColor = '#d300c5';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
         ctx.beginPath();
-        ctx.moveTo(halfW + edgeOffset, -vBarSpan / 2);
-        ctx.lineTo(halfW + edgeOffset, vBarSpan / 2);
+        ctx.moveTo(halfW - 3, -vBarSpan / 2);
+        ctx.lineTo(halfW - 3, vBarSpan / 2);
         ctx.stroke();
       }
       if (activeDirs.has('west')) {
-        ctx.strokeStyle = 'rgba(5, 213, 250, 0.85)';
+        ctx.strokeStyle = 'rgba(5, 213, 250, 0.9)';
         ctx.shadowColor = '#05d5fa';
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 12;
         ctx.beginPath();
-        ctx.moveTo(-halfW - edgeOffset, -vBarSpan / 2);
-        ctx.lineTo(-halfW - edgeOffset, vBarSpan / 2);
+        ctx.moveTo(-halfW + 3, -vBarSpan / 2);
+        ctx.lineTo(-halfW + 3, vBarSpan / 2);
         ctx.stroke();
       }
       ctx.restore();
@@ -428,11 +427,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
   }, []);
 
   return (
-    <div className="relative flex items-center justify-center w-full h-full pt-12 pb-3 select-none cursor-crosshair">
+    <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden select-none cursor-crosshair">
       <canvas
         ref={canvasRef}
-        width={500}
-        height={850}
+        width={450}
+        height={800}
         onMouseDown={onMouseDown}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}
@@ -440,7 +439,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
         onTouchMove={onTouchMove}
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
-        className="max-w-[94vw] max-h-[85vh] w-auto h-auto aspect-[500/850] rounded-[28px] border border-cyber-border/60 shadow-2xl bg-[#090b12] touch-none"
+        className="w-full h-full sm:w-auto sm:h-full sm:aspect-[9/16] block bg-[#090b12] touch-none"
       />
     </div>
   );
