@@ -7,13 +7,21 @@ interface GameCanvasProps {
   onSendInput: (input: ClientInput) => void;
 }
 
+const LOGICAL_WIDTH = 450;
+const LOGICAL_HEIGHT = 800;
+
 export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, onSendInput }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const inputThrottleRef = useRef<number>(0);
   const gameStateRef = useRef<GameState>(gameState);
+  const lastStateTimeRef = useRef<number>(performance.now());
   const myPlayerIdRef = useRef<string>(myPlayerId);
   const localPointerRef = useRef<{ x: number; y: number } | null>(null);
+  // Zero-latency client-predicted position for the local player ball
+  const localPlayerPosRef = useRef<{ x: number; y: number } | null>(null);
+  // Smoothed display positions for remote multiplayer players
+  const remotePlayerPosRef = useRef<Record<string, { x: number; y: number }>>({});
   const isDraggingRef = useRef<boolean>(false);
   const lastScoreRef = useRef<number>(0);
   const popupsRef = useRef<
@@ -23,24 +31,33 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
     Array<{ x: number; y: number; radius: number; maxRadius: number; alpha: number }>
   >([]);
 
-  // Keep refs updated without restarting the 60FPS animation loop
-  gameStateRef.current = gameState;
-  myPlayerIdRef.current = myPlayerId;
-
-  // Detect gate score increases and spawn floating "+100 GATE!" popups
+  // Update state ref and record arrival timestamp for sub-frame 120Hz/144Hz/240Hz extrapolation
   useEffect(() => {
+    gameStateRef.current = gameState;
+    lastStateTimeRef.current = performance.now();
+    myPlayerIdRef.current = myPlayerId;
+
     const me = gameState.players[myPlayerId];
     if (!me) return;
-    if (gameState.status === 'countdown' || gameState.elapsedTime < 0.2) {
+
+    // Reset predicted position at match start / countdown
+    if (gameState.status === 'countdown' || gameState.elapsedTime < 0.15) {
+      localPlayerPosRef.current = { x: me.x, y: me.y };
       lastScoreRef.current = me.score;
       return;
     }
+
+    if (!localPlayerPosRef.current) {
+      localPlayerPosRef.current = { x: me.x, y: me.y };
+    }
+
     if (me.score > lastScoreRef.current) {
       const gained = me.score - lastScoreRef.current;
       const isStageUp = gained >= 400;
+      const pos = localPlayerPosRef.current || { x: me.x, y: me.y };
       popupsRef.current.push({
-        x: me.x,
-        y: me.y - 26,
+        x: pos.x,
+        y: pos.y - 26,
         text: isStageUp ? `+${gained} NEXT STAGE!` : `+${gained} GATE!`,
         color: isStageUp ? '#facc15' : '#00ff66',
         alpha: 1.0,
@@ -57,8 +74,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
 
     const centerX = rect.left + rect.width / 2;
     const centerY = rect.top + rect.height / 2;
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    const scaleX = LOGICAL_WIDTH / rect.width;
+    const scaleY = LOGICAL_HEIGHT / rect.height;
 
     return {
       x: (clientX - centerX) * scaleX,
@@ -66,32 +83,48 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
     };
   }, []);
 
-  // Send immediate click/tap (teleport if distant) or throttled drag movement
+  // Send immediate click/tap (teleport if distant) or high-frequency (120Hz) drag movement
   const sendMoveOrTeleport = useCallback(
     (clientX: number, clientY: number, isInitialTapOrClick: boolean) => {
       const coords = toArenaCoords(clientX, clientY);
       if (!coords) return;
 
       localPointerRef.current = coords;
-      const me = gameStateRef.current.players[myPlayerIdRef.current];
-      const distFromPlayer = me ? Math.hypot(coords.x - me.x, coords.y - me.y) : 999;
+      const currentState = gameStateRef.current;
+      const me = currentState.players[myPlayerIdRef.current];
+      const radius = me?.radius || 13;
+      const maxX = (currentState.arenaWidth || LOGICAL_WIDTH) / 2 - radius;
+      const maxY = (currentState.arenaHeight || LOGICAL_HEIGHT) / 2 - radius;
+      const clampedX = Math.max(-maxX, Math.min(maxX, coords.x));
+      const clampedY = Math.max(-maxY, Math.min(maxY, coords.y));
+
+      const currentPos = localPlayerPosRef.current || (me ? { x: me.x, y: me.y } : { x: 0, y: 0 });
+      const distFromPlayer = Math.hypot(clampedX - currentPos.x, clampedY - currentPos.y);
+
+      // Update local player position immediately for 0ms input latency at native display Hz
+      if (
+        (currentState.status === 'playing' || currentState.status === 'countdown') &&
+        (!me || me.alive)
+      ) {
+        localPlayerPosRef.current = { x: clampedX, y: clampedY };
+      }
 
       if (isInitialTapOrClick) {
         const isTeleport = distFromPlayer > 38;
         inputThrottleRef.current = performance.now();
-        onSendInput({ x: coords.x, y: coords.y, isTeleport });
+        onSendInput({ x: clampedX, y: clampedY, isTeleport });
 
-        if (isTeleport && me?.alive) {
+        if (isTeleport && me?.alive && currentState.status === 'playing') {
           ripplesRef.current.push({
-            x: coords.x,
-            y: coords.y,
+            x: clampedX,
+            y: clampedY,
             radius: 8,
             maxRadius: 34,
             alpha: 0.9,
           });
           popupsRef.current.push({
-            x: coords.x,
-            y: coords.y - 22,
+            x: clampedX,
+            y: clampedY - 22,
             text: 'TELEPORT',
             color: '#00f0ff',
             alpha: 0.9,
@@ -101,9 +134,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       }
 
       const now = performance.now();
-      if (now - inputThrottleRef.current > 18) {
+      if (now - inputThrottleRef.current >= 8) {
         inputThrottleRef.current = now;
-        onSendInput({ x: coords.x, y: coords.y, isTeleport: false });
+        onSendInput({ x: clampedX, y: clampedY, isTeleport: false });
       }
     },
     [onSendInput, toArenaCoords]
@@ -148,30 +181,46 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
     isDraggingRef.current = false;
   };
 
-  // Persistent 60FPS+ Render Loop
+  // Native Refresh Rate (60Hz / 120Hz / 144Hz / 240Hz) Render Loop with Velocity Extrapolation
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
-    let pulse = 0;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = LOGICAL_WIDTH * dpr;
+    canvas.height = LOGICAL_HEIGHT * dpr;
 
-    const render = () => {
-      pulse += 0.04;
+    let pulse = 0;
+    let lastFrameTime = performance.now();
+
+    const render = (now: number) => {
+      const frameDt = Math.min(0.05, Math.max(0.001, (now - lastFrameTime) / 1000));
+      lastFrameTime = now;
+      pulse += frameDt * 2.4;
+
       const currentState = gameStateRef.current;
       const currentMyId = myPlayerIdRef.current;
 
-      const width = canvas.width;
-      const height = canvas.height;
+      // Sub-frame time elapsed since last server packet for buttery-smooth wall gliding
+      const extrapolateDt =
+        currentState.status === 'playing'
+          ? Math.min(0.06, Math.max(0, (now - lastStateTimeRef.current) / 1000))
+          : 0;
+
+      const width = LOGICAL_WIDTH;
+      const height = LOGICAL_HEIGHT;
       const centerX = width / 2;
       const centerY = height / 2;
-      const arenaWidth = currentState.arenaWidth || 450;
-      const arenaHeight = currentState.arenaHeight || 800;
+      const arenaWidth = currentState.arenaWidth || LOGICAL_WIDTH;
+      const arenaHeight = currentState.arenaHeight || LOGICAL_HEIGHT;
       const halfW = arenaWidth / 2;
       const halfH = arenaHeight / 2;
 
-      ctx.clearRect(0, 0, width, height);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.fillStyle = '#090b12';
+      ctx.fillRect(0, 0, width, height);
 
       // 1. Draw Subtle Background Grid
       ctx.save();
@@ -214,22 +263,25 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       ctx.lineTo(0, 16);
       ctx.stroke();
 
-      // 3. Draw Obstacles across full playable rectangle
+      // 3. Draw Obstacles with Sub-Frame Velocity Extrapolation
       ctx.save();
       ctx.beginPath();
       ctx.rect(-halfW, -halfH, arenaWidth, arenaHeight);
       ctx.clip();
 
       for (const obs of currentState.obstacles) {
+        const renderX = obs.x + obs.vx * extrapolateDt;
+        const renderY = obs.y + obs.vy * extrapolateDt;
+
         ctx.save();
-        ctx.translate(obs.x, obs.y);
+        ctx.translate(renderX, renderY);
         if (obs.rotation) {
-          ctx.rotate(obs.rotation);
+          ctx.rotate(obs.rotation + (obs.rotationSpeed || 0) * extrapolateDt);
         }
 
         ctx.fillStyle = obs.color || '#ff2a6d';
         ctx.shadowColor = obs.color || '#ff2a6d';
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 10;
 
         if (obs.type === 'circle') {
           ctx.beginPath();
@@ -252,7 +304,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       ctx.shadowBlur = 14 + Math.sin(pulse) * 4;
       ctx.beginPath();
       ctx.rect(-halfW + 1.5, -halfH + 1.5, arenaWidth - 3, arenaHeight - 3);
-      ctx.strokeStyle = currentState.currentTier === 5 ? 'rgba(255, 0, 85, 0.85)' : 'rgba(0, 240, 255, 0.75)';
+      ctx.strokeStyle =
+        currentState.currentTier === 5 ? 'rgba(255, 0, 85, 0.85)' : 'rgba(0, 240, 255, 0.75)';
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.restore();
@@ -323,13 +376,32 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
         ctx.restore();
       }
 
-      // 7. Draw Players
+      // 7. Draw Players (Zero-Latency Local Prediction + Smooth Remote Interpolation)
+      const lerpAlpha = Math.min(1, frameDt * 28);
       for (const id in currentState.players) {
         const player = currentState.players[id];
         const isMe = id === currentMyId;
 
+        let drawX = player.x;
+        let drawY = player.y;
+
+        if (isMe && player.alive && localPlayerPosRef.current) {
+          drawX = localPlayerPosRef.current.x;
+          drawY = localPlayerPosRef.current.y;
+        } else {
+          const prev = remotePlayerPosRef.current[id];
+          if (!prev || Math.hypot(player.x - prev.x, player.y - prev.y) > 60) {
+            remotePlayerPosRef.current[id] = { x: player.x, y: player.y };
+          } else {
+            prev.x += (player.x - prev.x) * lerpAlpha;
+            prev.y += (player.y - prev.y) * lerpAlpha;
+            drawX = prev.x;
+            drawY = prev.y;
+          }
+        }
+
         ctx.save();
-        ctx.translate(player.x, player.y);
+        ctx.translate(drawX, drawY);
 
         if (!player.alive) {
           // Ghost mode (Eliminated)
@@ -344,7 +416,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
         } else {
           // Alive Player
           ctx.shadowColor = player.color;
-          ctx.shadowBlur = isMe ? 20 : 12;
+          ctx.shadowBlur = isMe ? 18 : 12;
 
           // Outer circle
           ctx.beginPath();
@@ -378,11 +450,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
         ctx.restore();
       }
 
-      // 8. Draw Teleport Ripples & Floating Gate Score Popups
+      // 8. Draw Teleport Ripples & Floating Gate Score Popups (delta-time scaled)
       const remainingRipples: typeof ripplesRef.current = [];
       for (const r of ripplesRef.current) {
-        r.radius += (r.maxRadius - r.radius) * 0.22;
-        r.alpha -= 0.045;
+        r.radius += (r.maxRadius - r.radius) * Math.min(1, frameDt * 14);
+        r.alpha -= frameDt * 2.7;
         if (r.alpha > 0.02) {
           ctx.save();
           ctx.strokeStyle = `rgba(0, 240, 255, ${r.alpha})`;
@@ -398,8 +470,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
 
       const remainingPopups: typeof popupsRef.current = [];
       for (const p of popupsRef.current) {
-        p.y -= 0.9;
-        p.alpha -= 0.022;
+        p.y -= frameDt * 54;
+        p.alpha -= frameDt * 1.35;
         if (p.alpha > 0.02) {
           ctx.save();
           ctx.globalAlpha = Math.max(0, p.alpha);
@@ -430,8 +502,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
     <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden select-none cursor-crosshair">
       <canvas
         ref={canvasRef}
-        width={450}
-        height={800}
+        width={LOGICAL_WIDTH}
+        height={LOGICAL_HEIGHT}
         onMouseDown={onMouseDown}
         onMouseUp={onMouseUp}
         onMouseLeave={onMouseUp}

@@ -200,11 +200,11 @@ export const GAME_CONFIG = {
   // 6. ENGINE & NETWORK RATES
   // ==========================================
   engine: {
-    /** Authoritative server simulation ticks per second */
-    serverTickRate: 30,
+    /** Authoritative server simulation ticks per second (60Hz high-frequency tick) */
+    serverTickRate: 60,
 
-    /** Client pointer input throttle in milliseconds (~55Hz) */
-    clientInputThrottleMs: 18,
+    /** Client pointer input throttle in milliseconds (~120Hz) */
+    clientInputThrottleMs: 8,
   },
 };
 
