@@ -42,7 +42,9 @@ export interface GameState {
   activeDirections?: ObstacleDirection[];
   tierTimeRemaining: number;
   elapsedTime: number;
-  arenaRadius: number; // inner circle radius for bounds
+  arenaRadius: number; // legacy fallback
+  arenaWidth: number;  // playable phone rectangle width
+  arenaHeight: number; // playable phone rectangle height
   players: Record<string, Player>;
   obstacles: Obstacle[];
   winner?: {

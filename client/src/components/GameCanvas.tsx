@@ -80,7 +80,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       const height = canvas.height;
       const centerX = width / 2;
       const centerY = height / 2;
-      const arenaRadius = currentState.arenaRadius || 325;
+      const arenaWidth = currentState.arenaWidth || 450;
+      const arenaHeight = currentState.arenaHeight || 800;
+      const halfW = arenaWidth / 2;
+      const halfH = arenaHeight / 2;
 
       ctx.clearRect(0, 0, width, height);
 
@@ -106,12 +109,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       ctx.save();
       ctx.translate(centerX, centerY);
 
-      // 2. Inner Concentric Guide Rings & Crosshair
+      // 2. Inner Rectangular Guide Frames & Center Crosshair
       ctx.strokeStyle = 'rgba(0, 240, 255, 0.06)';
       ctx.lineWidth = 1;
-      for (let r = 65; r < arenaRadius; r += 65) {
+      for (const scale of [0.33, 0.66]) {
+        const gw = arenaWidth * scale;
+        const gh = arenaHeight * scale;
         ctx.beginPath();
-        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.roundRect(-gw / 2, -gh / 2, gw, gh, 14);
         ctx.stroke();
       }
 
@@ -123,10 +128,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       ctx.lineTo(0, 16);
       ctx.stroke();
 
-      // 3. Draw Obstacles clipped cleanly to outer perimeter
+      // 3. Draw Obstacles clipped cleanly to outer rectangular phone perimeter
       ctx.save();
       ctx.beginPath();
-      ctx.arc(0, 0, arenaRadius + 28, 0, Math.PI * 2);
+      ctx.roundRect(-halfW - 18, -halfH - 18, arenaWidth + 36, arenaHeight + 36, 26);
       ctx.clip();
 
       for (const obs of currentState.obstacles) {
@@ -155,59 +160,74 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       }
       ctx.restore(); // Remove clip
 
-      // 4. Draw Arena Boundary Ring
+      // 4. Draw Playable Phone-Screen Rectangular Boundary
       ctx.save();
       ctx.shadowColor = currentState.currentTier === 5 ? '#ff0055' : '#00f0ff';
       ctx.shadowBlur = 16 + Math.sin(pulse) * 5;
       ctx.beginPath();
-      ctx.arc(0, 0, arenaRadius, 0, Math.PI * 2);
-      ctx.strokeStyle = currentState.currentTier === 5 ? 'rgba(255, 0, 85, 0.8)' : 'rgba(0, 240, 255, 0.75)';
+      ctx.roundRect(-halfW, -halfH, arenaWidth, arenaHeight, 22);
+      ctx.strokeStyle = currentState.currentTier === 5 ? 'rgba(255, 0, 85, 0.85)' : 'rgba(0, 240, 255, 0.8)';
       ctx.lineWidth = 4;
       ctx.stroke();
       ctx.restore();
 
-      // 5. Draw Active Side Warning Arcs on Outer Rim (1 side in L1, 2 in L2, 3 in L3, 4 in L4+)
+      // 5. Draw Active Side Warning Bars along the 4 edges of the Rectangle
       const activeDirs = new Set(
         currentState.activeDirections && currentState.activeDirections.length > 0
           ? currentState.activeDirections
           : currentState.obstacles.map((o) => o.direction)
       );
-      const arcRadius = arenaRadius + 14;
+      const edgeOffset = 10;
+      const hBarSpan = arenaWidth * 0.55;
+      const vBarSpan = arenaHeight * 0.55;
       ctx.save();
       ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
       if (activeDirs.has('north')) {
-        ctx.strokeStyle = 'rgba(255, 42, 109, 0.75)';
+        ctx.strokeStyle = 'rgba(255, 42, 109, 0.85)';
+        ctx.shadowColor = '#ff2a6d';
+        ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.arc(0, 0, arcRadius, -Math.PI * 0.7, -Math.PI * 0.3);
+        ctx.moveTo(-hBarSpan / 2, -halfH - edgeOffset);
+        ctx.lineTo(hBarSpan / 2, -halfH - edgeOffset);
         ctx.stroke();
       }
       if (activeDirs.has('south')) {
-        ctx.strokeStyle = 'rgba(255, 119, 0, 0.75)';
+        ctx.strokeStyle = 'rgba(255, 119, 0, 0.85)';
+        ctx.shadowColor = '#ff7700';
+        ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.arc(0, 0, arcRadius, Math.PI * 0.3, Math.PI * 0.7);
+        ctx.moveTo(-hBarSpan / 2, halfH + edgeOffset);
+        ctx.lineTo(hBarSpan / 2, halfH + edgeOffset);
         ctx.stroke();
       }
       if (activeDirs.has('east')) {
-        ctx.strokeStyle = 'rgba(211, 0, 197, 0.75)';
+        ctx.strokeStyle = 'rgba(211, 0, 197, 0.85)';
+        ctx.shadowColor = '#d300c5';
+        ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.arc(0, 0, arcRadius, -Math.PI * 0.2, Math.PI * 0.2);
+        ctx.moveTo(halfW + edgeOffset, -vBarSpan / 2);
+        ctx.lineTo(halfW + edgeOffset, vBarSpan / 2);
         ctx.stroke();
       }
       if (activeDirs.has('west')) {
-        ctx.strokeStyle = 'rgba(5, 213, 250, 0.75)';
+        ctx.strokeStyle = 'rgba(5, 213, 250, 0.85)';
+        ctx.shadowColor = '#05d5fa';
+        ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.arc(0, 0, arcRadius, Math.PI * 0.8, Math.PI * 1.2);
+        ctx.moveTo(-halfW - edgeOffset, -vBarSpan / 2);
+        ctx.lineTo(-halfW - edgeOffset, vBarSpan / 2);
         ctx.stroke();
       }
       ctx.restore();
 
-      // 6. Draw Subtle Target Reticle for Local Pointer
+      // 6. Draw Subtle Target Reticle for Local Pointer (clamped to rectangle)
       if (localPointerRef.current && currentState.players[currentMyId]?.alive) {
         const ptr = localPointerRef.current;
-        const dist = Math.hypot(ptr.x, ptr.y);
-        const maxDist = arenaRadius - 13;
-        const clampedX = dist <= maxDist ? ptr.x : (ptr.x / dist) * maxDist;
-        const clampedY = dist <= maxDist ? ptr.y : (ptr.y / dist) * maxDist;
+        const maxX = halfW - 13;
+        const maxY = halfH - 13;
+        const clampedX = Math.max(-maxX, Math.min(maxX, ptr.x));
+        const clampedY = Math.max(-maxY, Math.min(maxY, ptr.y));
 
         ctx.save();
         ctx.strokeStyle = 'rgba(0, 240, 255, 0.25)';
@@ -285,15 +305,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
   }, []);
 
   return (
-    <div className="relative flex items-center justify-center w-full h-full select-none cursor-crosshair">
+    <div className="relative flex items-center justify-center w-full h-full pt-12 pb-3 select-none cursor-crosshair">
       <canvas
         ref={canvasRef}
-        width={850}
+        width={500}
         height={850}
         onMouseMove={onMouseMove}
         onTouchMove={onTouchMove}
         onTouchStart={onTouchStart}
-        className="max-w-[94vw] max-h-[82vh] aspect-square rounded-full border border-cyber-border/50 shadow-2xl bg-[#090b12] touch-none"
+        className="max-w-[94vw] max-h-[85vh] w-auto h-auto aspect-[500/850] rounded-[28px] border border-cyber-border/60 shadow-2xl bg-[#090b12] touch-none"
       />
     </div>
   );

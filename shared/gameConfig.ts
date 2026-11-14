@@ -180,7 +180,13 @@ export const GAME_CONFIG = {
   // 5. ARENA & PLAYER GEOMETRY
   // ==========================================
   arena: {
-    /** Inner playable circle radius in pixels (25% larger than original 260px) */
+    /** Playable phone-screen rectangular width in pixels (9:16 portrait aspect ratio) */
+    width: 450,
+
+    /** Playable phone-screen rectangular height in pixels (9:16 portrait aspect ratio) */
+    height: 800,
+
+    /** Legacy fallback radius */
     radius: 325,
 
     /** Player circle radius in pixels */

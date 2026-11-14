@@ -16,7 +16,9 @@ export class GameEngine {
   private onTierUpCallback?: (tier: GameTier) => void;
   private onStateUpdateCallback?: (state: GameState) => void;
 
-  // Arena configuration from central config
+  // Arena configuration from central config (phone-screen 9:16 portrait rectangle)
+  public readonly ARENA_WIDTH = GAME_CONFIG.arena.width;
+  public readonly ARENA_HEIGHT = GAME_CONFIG.arena.height;
   public readonly ARENA_RADIUS = GAME_CONFIG.arena.radius;
   public readonly PLAYER_RADIUS = GAME_CONFIG.arena.playerRadius;
 
@@ -31,6 +33,8 @@ export class GameEngine {
       tierTimeRemaining: getTierDuration(1),
       elapsedTime: 0,
       arenaRadius: this.ARENA_RADIUS,
+      arenaWidth: this.ARENA_WIDTH,
+      arenaHeight: this.ARENA_HEIGHT,
       players: {},
       obstacles: [],
       winner: null,
@@ -153,16 +157,11 @@ export class GameEngine {
     if (!player || !player.alive) return;
     if (!Number.isFinite(input.x) || !Number.isFinite(input.y)) return;
 
-    const dist = Math.hypot(input.x, input.y);
-    const maxDist = this.ARENA_RADIUS - player.radius;
+    const maxX = this.ARENA_WIDTH / 2 - player.radius;
+    const maxY = this.ARENA_HEIGHT / 2 - player.radius;
 
-    if (dist <= maxDist) {
-      player.x = input.x;
-      player.y = input.y;
-    } else if (dist > 0) {
-      player.x = (input.x / dist) * maxDist;
-      player.y = (input.y / dist) * maxDist;
-    }
+    player.x = Math.max(-maxX, Math.min(maxX, input.x));
+    player.y = Math.max(-maxY, Math.min(maxY, input.y));
   }
 
   public togglePause(playerId: string) {
@@ -395,11 +394,12 @@ export class GameEngine {
       tier * GAME_CONFIG.obstacles.speedPerTier +
       endlessBonus;
 
-    // Pick a navigable focal zone inside the arena so multi-directional waves always leave a survivable corridor
-    const maxSafeOffset =
-      this.ARENA_RADIUS * Math.min(0.8, GAME_CONFIG.randomness.gapPositionVariance * 0.85);
-    const safeX = this.randomRange(-maxSafeOffset, maxSafeOffset);
-    const safeY = this.randomRange(-maxSafeOffset, maxSafeOffset);
+    // Pick a navigable focal zone inside the rectangular arena so multi-directional waves always leave a survivable corridor
+    const safeFactor = Math.min(0.8, GAME_CONFIG.randomness.gapPositionVariance * 0.85);
+    const maxSafeOffsetX = (this.ARENA_WIDTH / 2) * safeFactor;
+    const maxSafeOffsetY = (this.ARENA_HEIGHT / 2) * safeFactor;
+    const safeX = this.randomRange(-maxSafeOffsetX, maxSafeOffsetX);
+    const safeY = this.randomRange(-maxSafeOffsetY, maxSafeOffsetY);
 
     let accumulatedDelayMs = 0;
     directions.forEach((dir, idx) => {
@@ -445,14 +445,15 @@ export class GameEngine {
       baseGap * (1 + this.randomRange(-gapVar, gapVar))
     );
 
-    const clampLimit = this.ARENA_RADIUS * GAME_CONFIG.randomness.gapPositionVariance;
-    const targetSafeLateral =
-      direction === 'north' || direction === 'south' ? safeX : safeY;
-    const jitter = this.randomRange(-45, 45);
+    const isVerticalTravel = direction === 'north' || direction === 'south';
+    const lateralHalfSpan = isVerticalTravel ? this.ARENA_WIDTH / 2 : this.ARENA_HEIGHT / 2;
+    const clampLimit = lateralHalfSpan * GAME_CONFIG.randomness.gapPositionVariance;
+    const targetSafeLateral = isVerticalTravel ? safeX : safeY;
+    const jitter = this.randomRange(-35, 35);
     const gapCenter = Math.max(-clampLimit, Math.min(clampLimit, targetSafeLateral + jitter));
 
     const barThickness = GAME_CONFIG.obstacles.barThickness;
-    const barLength = this.ARENA_RADIUS * GAME_CONFIG.obstacles.barLengthMultiplier;
+    const barLength = lateralHalfSpan * 2 * GAME_CONFIG.obstacles.barLengthMultiplier;
 
     const dirColors: Record<string, string> = {
       north: '#ff2a6d', // Neon Crimson
@@ -515,7 +516,7 @@ export class GameEngine {
 
       case 'staggered-blocks': {
         // 3 staggered rectangular blocks that avoid the safe gapCenter corridor
-        const candidateZones = [-this.ARENA_RADIUS * 0.65, 0, this.ARENA_RADIUS * 0.65];
+        const candidateZones = [-lateralHalfSpan * 0.65, 0, lateralHalfSpan * 0.65];
         candidateZones.forEach((zoneCenter, i) => {
           const lateral = zoneCenter + this.randomRange(-28, 28);
           // Skip or shift any block that would block the safe gapCenter
@@ -544,7 +545,7 @@ export class GameEngine {
       case 'orb-cluster': {
         // 4 circular pulse orbs with staggered depth and slight lateral drift
         const orbCount = 4;
-        const spread = this.ARENA_RADIUS * 0.78;
+        const spread = lateralHalfSpan * 0.78;
         for (let i = 0; i < orbCount; i++) {
           const baseLat = -spread + (i / (orbCount - 1)) * (spread * 2);
           let orbLat = baseLat + this.randomRange(-22, 22);
@@ -582,8 +583,10 @@ export class GameEngine {
     lateralDrift: number,
     color: string
   ) {
+    const isVerticalTravel = direction === 'north' || direction === 'south';
+    const halfBound = isVerticalTravel ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
     const spawnDist =
-      this.ARENA_RADIUS + GAME_CONFIG.obstacles.spawnDistanceOffset + depthOffset;
+      halfBound + GAME_CONFIG.obstacles.spawnDistanceOffset + depthOffset;
 
     let x = 0;
     let y = 0;
@@ -656,8 +659,10 @@ export class GameEngine {
     lateralDrift: number,
     color: string
   ) {
+    const isVerticalTravel = direction === 'north' || direction === 'south';
+    const halfBound = isVerticalTravel ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
     const spawnDist =
-      this.ARENA_RADIUS + GAME_CONFIG.obstacles.spawnDistanceOffset + depthOffset;
+      halfBound + GAME_CONFIG.obstacles.spawnDistanceOffset + depthOffset;
 
     let x = 0;
     let y = 0;
@@ -709,7 +714,8 @@ export class GameEngine {
   }
 
   private updateObstacles(dt: number) {
-    const despawnLimit = this.ARENA_RADIUS + 90;
+    const despawnLimitX = this.ARENA_WIDTH / 2 + 90;
+    const despawnLimitY = this.ARENA_HEIGHT / 2 + 90;
     const remaining: Obstacle[] = [];
 
     for (const obs of this.state.obstacles) {
@@ -721,11 +727,11 @@ export class GameEngine {
       }
 
       let outOfBounds = false;
-      if (obs.direction === 'north' && obs.y > despawnLimit) outOfBounds = true;
-      else if (obs.direction === 'south' && obs.y < -despawnLimit) outOfBounds = true;
-      else if (obs.direction === 'west' && obs.x > despawnLimit) outOfBounds = true;
-      else if (obs.direction === 'east' && obs.x < -despawnLimit) outOfBounds = true;
-      else if (obs.direction === 'radial' && Math.hypot(obs.x, obs.y) > despawnLimit + 40)
+      if (obs.direction === 'north' && obs.y > despawnLimitY) outOfBounds = true;
+      else if (obs.direction === 'south' && obs.y < -despawnLimitY) outOfBounds = true;
+      else if (obs.direction === 'west' && obs.x > despawnLimitX) outOfBounds = true;
+      else if (obs.direction === 'east' && obs.x < -despawnLimitX) outOfBounds = true;
+      else if (obs.direction === 'radial' && Math.hypot(obs.x, obs.y) > despawnLimitY + 40)
         outOfBounds = true;
 
       if (!outOfBounds) {
