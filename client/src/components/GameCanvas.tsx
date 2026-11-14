@@ -3,6 +3,7 @@ import type { GameState, ClientInput } from '../../../shared/types';
 
 interface GameCanvasProps {
   gameState: GameState;
+  liveGameStateRef?: React.MutableRefObject<GameState | null>;
   myPlayerId: string;
   onSendInput: (input: ClientInput) => void;
 }
@@ -10,18 +11,24 @@ interface GameCanvasProps {
 const LOGICAL_WIDTH = 450;
 const LOGICAL_HEIGHT = 800;
 
-export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, onSendInput }) => {
+export const GameCanvas: React.FC<GameCanvasProps> = ({
+  gameState,
+  liveGameStateRef,
+  myPlayerId,
+  onSendInput,
+}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const inputThrottleRef = useRef<number>(0);
   const gameStateRef = useRef<GameState>(gameState);
-  const lastStateTimeRef = useRef<number>(performance.now());
   const myPlayerIdRef = useRef<string>(myPlayerId);
   const localPointerRef = useRef<{ x: number; y: number } | null>(null);
   // Zero-latency client-predicted position for the local player ball
   const localPlayerPosRef = useRef<{ x: number; y: number } | null>(null);
   // Smoothed display positions for remote multiplayer players
   const remotePlayerPosRef = useRef<Record<string, { x: number; y: number }>>({});
+  // Monotonic per-obstacle display coordinates driven by the native display frame clock
+  const obstacleDisplayRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   const isDraggingRef = useRef<boolean>(false);
   const lastScoreRef = useRef<number>(0);
   const popupsRef = useRef<
@@ -31,18 +38,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
     Array<{ x: number; y: number; radius: number; maxRadius: number; alpha: number }>
   >([]);
 
-  // Update state ref and record arrival timestamp for sub-frame 120Hz/144Hz/240Hz extrapolation
   useEffect(() => {
     gameStateRef.current = gameState;
-    lastStateTimeRef.current = performance.now();
     myPlayerIdRef.current = myPlayerId;
 
     const me = gameState.players[myPlayerId];
     if (!me) return;
 
-    // Reset predicted position at match start / countdown
     if (gameState.status === 'countdown' || gameState.elapsedTime < 0.15) {
       localPlayerPosRef.current = { x: me.x, y: me.y };
+      obstacleDisplayRef.current.clear();
       lastScoreRef.current = me.score;
       return;
     }
@@ -90,7 +95,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       if (!coords) return;
 
       localPointerRef.current = coords;
-      const currentState = gameStateRef.current;
+      const currentState = liveGameStateRef?.current || gameStateRef.current;
       const me = currentState.players[myPlayerIdRef.current];
       const radius = me?.radius || 13;
       const maxX = (currentState.arenaWidth || LOGICAL_WIDTH) / 2 - radius;
@@ -139,7 +144,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
         onSendInput({ x: clampedX, y: clampedY, isTeleport: false });
       }
     },
-    [onSendInput, toArenaCoords]
+    [liveGameStateRef, onSendInput, toArenaCoords]
   );
 
   const onMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -181,7 +186,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
     isDraggingRef.current = false;
   };
 
-  // Native Refresh Rate (60Hz / 120Hz / 144Hz / 240Hz) Render Loop with Velocity Extrapolation
+  // Native Refresh Rate (60Hz / 120Hz / 144Hz / 240Hz) Render Loop
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -200,14 +205,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       lastFrameTime = now;
       pulse += frameDt * 2.4;
 
-      const currentState = gameStateRef.current;
+      const currentState = liveGameStateRef?.current || gameStateRef.current;
       const currentMyId = myPlayerIdRef.current;
-
-      // Sub-frame time elapsed since last server packet for buttery-smooth wall gliding
-      const extrapolateDt =
-        currentState.status === 'playing'
-          ? Math.min(0.06, Math.max(0, (now - lastStateTimeRef.current) / 1000))
-          : 0;
+      const isPlaying = currentState.status === 'playing';
 
       const width = LOGICAL_WIDTH;
       const height = LOGICAL_HEIGHT;
@@ -263,45 +263,76 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       ctx.lineTo(0, 16);
       ctx.stroke();
 
-      // 3. Draw Obstacles with Sub-Frame Velocity Extrapolation
+      // 3. Draw Obstacles using Monotonic Frame-Clock Integration (Zero End-of-Screen Stutter)
       ctx.save();
       ctx.beginPath();
       ctx.rect(-halfW, -halfH, arenaWidth, arenaHeight);
       ctx.clip();
 
-      for (const obs of currentState.obstacles) {
-        const renderX = obs.x + obs.vx * extrapolateDt;
-        const renderY = obs.y + obs.vy * extrapolateDt;
+      const dispMap = obstacleDisplayRef.current;
+      const activeIds = new Set<string>();
 
-        ctx.save();
-        ctx.translate(renderX, renderY);
-        if (obs.rotation) {
-          ctx.rotate(obs.rotation + (obs.rotationSpeed || 0) * extrapolateDt);
+      for (const obs of currentState.obstacles) {
+        activeIds.add(obs.id);
+        let disp = dispMap.get(obs.id);
+
+        if (!disp) {
+          disp = { x: obs.x, y: obs.y };
+          dispMap.set(obs.id, disp);
+        } else if (isPlaying) {
+          // Advance smoothly by constant velocity on the local display refresh clock
+          disp.x += obs.vx * frameDt;
+          disp.y += obs.vy * frameDt;
+
+          // Gentle forward-only drift convergence so network jitter never pulls a wall backward
+          const errX = obs.x - disp.x;
+          const errY = obs.y - disp.y;
+          if (obs.vx !== 0 && Math.sign(errX) === Math.sign(obs.vx)) {
+            disp.x += errX * 0.08;
+          } else if (Math.abs(errX) > 18) {
+            disp.x += errX * 0.15;
+          }
+          if (obs.vy !== 0 && Math.sign(errY) === Math.sign(obs.vy)) {
+            disp.y += errY * 0.08;
+          } else if (Math.abs(errY) > 18) {
+            disp.y += errY * 0.15;
+          }
         }
 
-        ctx.fillStyle = obs.color || '#ff2a6d';
-        ctx.shadowColor = obs.color || '#ff2a6d';
-        ctx.shadowBlur = 10;
+        const color = obs.color || '#ff2a6d';
+        ctx.fillStyle = color;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = 1;
 
         if (obs.type === 'circle') {
+          const r = obs.radius || 11;
           ctx.beginPath();
-          ctx.arc(0, 0, obs.radius || 11, 0, Math.PI * 2);
+          ctx.arc(disp.x, disp.y, r, 0, Math.PI * 2);
           ctx.fill();
+          ctx.stroke();
         } else {
           const w = obs.width;
           const h = obs.height;
           ctx.beginPath();
-          ctx.roundRect(-w / 2, -h / 2, w, h, 5);
+          ctx.roundRect(disp.x - w / 2, disp.y - h / 2, w, h, 4);
           ctx.fill();
+          ctx.stroke();
         }
-        ctx.restore();
       }
+
+      // Prune despawned obstacle IDs
+      if (dispMap.size > activeIds.size + 10) {
+        for (const id of dispMap.keys()) {
+          if (!activeIds.has(id)) {
+            dispMap.delete(id);
+          }
+        }
+      }
+
       ctx.restore(); // Remove clip
 
       // 4. Draw Playable Full-Screen Rectangular Boundary
       ctx.save();
-      ctx.shadowColor = currentState.currentTier === 5 ? '#ff0055' : '#00f0ff';
-      ctx.shadowBlur = 14 + Math.sin(pulse) * 4;
       ctx.beginPath();
       ctx.rect(-halfW + 1.5, -halfH + 1.5, arenaWidth - 3, arenaHeight - 3);
       ctx.strokeStyle =
@@ -323,8 +354,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       ctx.lineCap = 'round';
       if (activeDirs.has('north')) {
         ctx.strokeStyle = 'rgba(255, 42, 109, 0.9)';
-        ctx.shadowColor = '#ff2a6d';
-        ctx.shadowBlur = 12;
         ctx.beginPath();
         ctx.moveTo(-hBarSpan / 2, -halfH + 3);
         ctx.lineTo(hBarSpan / 2, -halfH + 3);
@@ -332,8 +361,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       }
       if (activeDirs.has('south')) {
         ctx.strokeStyle = 'rgba(255, 119, 0, 0.9)';
-        ctx.shadowColor = '#ff7700';
-        ctx.shadowBlur = 12;
         ctx.beginPath();
         ctx.moveTo(-hBarSpan / 2, halfH - 3);
         ctx.lineTo(hBarSpan / 2, halfH - 3);
@@ -341,8 +368,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       }
       if (activeDirs.has('east')) {
         ctx.strokeStyle = 'rgba(211, 0, 197, 0.9)';
-        ctx.shadowColor = '#d300c5';
-        ctx.shadowBlur = 12;
         ctx.beginPath();
         ctx.moveTo(halfW - 3, -vBarSpan / 2);
         ctx.lineTo(halfW - 3, vBarSpan / 2);
@@ -350,8 +375,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
       }
       if (activeDirs.has('west')) {
         ctx.strokeStyle = 'rgba(5, 213, 250, 0.9)';
-        ctx.shadowColor = '#05d5fa';
-        ctx.shadowBlur = 12;
         ctx.beginPath();
         ctx.moveTo(-halfW + 3, -vBarSpan / 2);
         ctx.lineTo(-halfW + 3, vBarSpan / 2);
@@ -414,10 +437,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
           ctx.setLineDash([4, 4]);
           ctx.stroke();
         } else {
-          // Alive Player
-          ctx.shadowColor = player.color;
-          ctx.shadowBlur = isMe ? 18 : 12;
-
           // Outer circle
           ctx.beginPath();
           ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
@@ -441,7 +460,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
         }
 
         // Player Name Label ("YOU" for local player, name for others)
-        ctx.shadowBlur = 0;
         ctx.fillStyle = isMe ? '#00f0ff' : '#ffffff';
         ctx.font = 'bold 11px Orbitron, sans-serif';
         ctx.textAlign = 'center';
@@ -476,8 +494,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
           ctx.save();
           ctx.globalAlpha = Math.max(0, p.alpha);
           ctx.fillStyle = p.color;
-          ctx.shadowColor = p.color;
-          ctx.shadowBlur = 8;
           ctx.font = 'bold 12px Orbitron, monospace';
           ctx.textAlign = 'center';
           ctx.fillText(p.text, p.x, p.y);
@@ -496,7 +512,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({ gameState, myPlayerId, o
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, []);
+  }, [liveGameStateRef]);
 
   return (
     <div className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden select-none cursor-crosshair">

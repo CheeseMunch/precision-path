@@ -30,6 +30,8 @@ export const App: React.FC = () => {
   const lastTierRef = useRef<number>(1);
   const wasAliveRef = useRef<boolean>(true);
   const lastStatusRef = useRef<string>('lobby');
+  const liveGameStateRef = useRef<GameState | null>(null);
+  const lastUiSyncSignatureRef = useRef<string>('');
 
   useEffect(() => {
     localStorage.setItem('precision_player_name', playerName);
@@ -58,6 +60,7 @@ export const App: React.FC = () => {
         setShowReadyGo(true);
       }
       lastStatusRef.current = state.status;
+      liveGameStateRef.current = state;
       setGameState(state);
     });
 
@@ -65,20 +68,32 @@ export const App: React.FC = () => {
       setMyPlayerId(playerId);
       wasAliveRef.current = state.players[playerId]?.alive ?? true;
       lastStatusRef.current = state.status;
+      liveGameStateRef.current = state;
       setGameState(state);
     });
 
     s.on('roomLeft', () => {
       sound.stopMusic();
       setShowReadyGo(false);
+      liveGameStateRef.current = null;
       setGameState(null);
     });
 
     s.on('gameState', (state: GameState) => {
-      setGameState(state);
+      // Always update the mutable ref immediately for the 120Hz+ Canvas loop (0 React overhead)
+      liveGameStateRef.current = state;
 
       const myId = s.id || '';
       const me = state.players[myId];
+
+      // Only trigger a React state re-render when HUD/Modal-visible fields change
+      const playersArr = Object.values(state.players);
+      const aliveCount = playersArr.filter((p) => p.alive).length;
+      const uiSig = `${state.status}|${state.currentTier}|${me?.score ?? 0}|${me?.alive ?? true}|${aliveCount}/${playersArr.length}|${state.pausedBy ?? ''}|${state.winner?.id ?? ''}`;
+      if (uiSig !== lastUiSyncSignatureRef.current) {
+        lastUiSyncSignatureRef.current = uiSig;
+        setGameState(state);
+      }
 
       // Trigger green-screen "Ready... Go!" video overlay when entering countdown
       if (state.status === 'countdown' && lastStatusRef.current !== 'countdown') {
@@ -247,6 +262,7 @@ export const App: React.FC = () => {
 
           <GameCanvas
             gameState={gameState}
+            liveGameStateRef={liveGameStateRef}
             myPlayerId={myPlayerId}
             onSendInput={handleSendInput}
           />
