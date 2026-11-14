@@ -361,26 +361,6 @@ async function bootstrap() {
     await generator.updateSchema();
     roomManager.setORM(orm);
 
-    // Seed initial pilot leaderboard entries if the users table is empty
-    const em = orm.em.fork();
-    const count = await em.count(User);
-    if (count === 0) {
-      const seeds = [
-        { username: 'HyperGlide', bestSurvivalTime: 84.2, highestTier: 5, totalGames: 42 },
-        { username: 'PixelAce', bestSurvivalTime: 62.5, highestTier: 4, totalGames: 28 },
-        { username: 'VortexSurfer', bestSurvivalTime: 49.8, highestTier: 3, totalGames: 19 },
-      ];
-      for (const s of seeds) {
-        const u = new User();
-        u.username = s.username;
-        u.bestSurvivalTime = s.bestSurvivalTime;
-        u.highestTier = s.highestTier;
-        u.totalGames = s.totalGames;
-        em.persist(u);
-      }
-      await em.flush();
-    }
-
     console.log('[MikroORM] Connected to PostgreSQL successfully!');
   } catch (err: any) {
     console.warn(`[MikroORM] PostgreSQL connection skipped (${err.message}). Running with in-memory persistence.`);

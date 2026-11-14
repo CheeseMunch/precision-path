@@ -10,12 +10,8 @@ export class RoomManager {
   private playerToRoom: Map<string, string> = new Map();
   private io: Server;
   private orm: MikroORM | null = null;
-  // Local in-memory leaderboard fallback
-  private mockLeaderboard: LeaderboardEntry[] = [
-    { id: '1', username: 'HyperGlide', bestSurvivalTime: 84.2, highestTier: 5, totalGames: 42, createdAt: new Date().toISOString() },
-    { id: '2', username: 'PixelAce', bestSurvivalTime: 62.5, highestTier: 4, totalGames: 28, createdAt: new Date().toISOString() },
-    { id: '3', username: 'VortexSurfer', bestSurvivalTime: 49.8, highestTier: 3, totalGames: 19, createdAt: new Date().toISOString() },
-  ];
+  // Local in-memory leaderboard fallback (empty until real players play)
+  private mockLeaderboard: LeaderboardEntry[] = [];
 
   constructor(io: Server, orm: MikroORM | null) {
     this.io = io;
