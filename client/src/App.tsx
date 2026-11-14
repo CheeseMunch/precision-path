@@ -291,7 +291,7 @@ export const App: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
-                        const next = volume > 0 ? 0 : 0.85;
+                        const next = volume > 0 ? 0 : 0.3;
                         setVolume(next);
                         sound.setVolume(next);
                       }}

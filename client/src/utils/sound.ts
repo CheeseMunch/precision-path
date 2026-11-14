@@ -1,10 +1,10 @@
 class SoundSystem {
   private ctx: AudioContext | null = null;
   public enabled: boolean = true;
-  // Default volume lowered by 15% (0.85)
-  public volume: number = 0.85;
-  private readonly baseBgmVolume = 0.22; // 15% lower than previous 0.26
-  private readonly baseSfxVolume = 0.72; // 15% lower than previous 0.85
+  // Default volume set to 30% (0.30)
+  public volume: number = 0.3;
+  private readonly baseBgmVolume = 0.22;
+  private readonly baseSfxVolume = 0.72;
   private readyAudio: HTMLAudioElement | null = null;
   private goAudio: HTMLAudioElement | null = null;
   private gameAudio: HTMLAudioElement | null = null;
@@ -14,7 +14,7 @@ class SoundSystem {
 
   constructor() {
     if (typeof window !== 'undefined') {
-      const savedVol = localStorage.getItem('precision_volume_v2');
+      const savedVol = localStorage.getItem('precision_volume_v3');
       if (savedVol !== null && !Number.isNaN(Number(savedVol))) {
         this.volume = Math.max(0, Math.min(1, Number(savedVol)));
         this.enabled = this.volume > 0;
@@ -69,7 +69,7 @@ class SoundSystem {
     this.volume = Math.max(0, Math.min(1, vol));
     this.enabled = this.volume > 0;
     if (typeof window !== 'undefined') {
-      localStorage.setItem('precision_volume_v2', String(this.volume));
+      localStorage.setItem('precision_volume_v3', String(this.volume));
     }
     if (this.bgmAudio) {
       this.bgmAudio.volume = this.baseBgmVolume * this.volume;
