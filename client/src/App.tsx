@@ -92,7 +92,12 @@ export const App: React.FC = () => {
       // Play "GAME!" voice clip if local player was just eliminated
       if (me && wasAliveRef.current && !me.alive) {
         wasAliveRef.current = false;
+        setShowReadyGo(false);
         sound.playCollision();
+      }
+
+      if (state.status === 'gameover') {
+        setShowReadyGo(false);
       }
 
       // Play victory sound if multiplayer match ends with us as winner
@@ -232,7 +237,7 @@ export const App: React.FC = () => {
           />
 
           {/* Green-Screen Chroma-Keyed "Ready... Go!" Video Overlay */}
-          {(showReadyGo || gameState.status === 'countdown') && (
+          {showReadyGo && gameState.status !== 'gameover' && (
             <ReadyGoOverlay
               playTrigger={readyGoTrigger}
               onFinished={() => setShowReadyGo(false)}

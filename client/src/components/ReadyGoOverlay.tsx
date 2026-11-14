@@ -13,6 +13,8 @@ interface ReadyGoOverlayProps {
 export const ReadyGoOverlay: React.FC<ReadyGoOverlayProps> = ({ playTrigger, onFinished }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const onFinishedRef = useRef(onFinished);
+  onFinishedRef.current = onFinished;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -40,6 +42,7 @@ export const ReadyGoOverlay: React.FC<ReadyGoOverlayProps> = ({ playTrigger, onF
       if (!video.paused && !video.ended && video.readyState >= 2) {
         const w = canvas.width;
         const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
         ctx.drawImage(video, 0, 0, w, h);
 
         const frame = ctx.getImageData(0, 0, w, h);
@@ -77,7 +80,7 @@ export const ReadyGoOverlay: React.FC<ReadyGoOverlayProps> = ({ playTrigger, onF
 
     const handleEnded = () => {
       if (active) {
-        onFinished();
+        onFinishedRef.current();
       }
     };
 
@@ -89,7 +92,7 @@ export const ReadyGoOverlay: React.FC<ReadyGoOverlayProps> = ({ playTrigger, onF
       video.removeEventListener('ended', handleEnded);
       video.pause();
     };
-  }, [playTrigger, onFinished]);
+  }, [playTrigger]);
 
   return (
     <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
