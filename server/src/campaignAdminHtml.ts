@@ -487,6 +487,25 @@ export function renderCampaignAdminPage(adminToken: string): string {
       lvl.waves.push(newWave);
       selectedWaveIdx = lvl.waves.length - 1;
       renderAll();
+      jumpToWave(newWave.id);
+    }
+
+    function jumpToWave(waveId) {
+      const lvl = curLevel();
+      if (!lvl) return;
+      const { items } = computeWaveSchedule(lvl);
+      const item = items.find((it) => it.wave.id === waveId);
+      if (!item) return;
+      const w = item.wave;
+      const isVert = w.side === 'north' || w.side === 'south';
+      const halfBound = isVert ? HALF_H : HALF_W;
+      const centerOffset = (halfBound + SPAWN_OFFSET) / Math.max(40, Number(w.speed || 175));
+      isPlaying = false;
+      lastRafMs = null;
+      document.getElementById('btnPlayPause').innerHTML = '&#9654; Play';
+      simTime = item.spawnAt + centerOffset;
+      updateScrubberUI();
+      drawCanvas();
     }
 
     function togglePlay() {
@@ -598,11 +617,9 @@ export function renderCampaignAdminPage(adminToken: string): string {
           '</div>';
         row.onclick = () => {
           selectedWaveIdx = origIdx;
-          simTime = acc + 0.6;
-          updateScrubberUI();
           renderWaveList();
           renderWaveInspector();
-          drawCanvas();
+          jumpToWave(w.id);
         };
         listEl.appendChild(row);
       });
@@ -630,6 +647,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
         lvl.waves.push(clone);
         selectedWaveIdx = lvl.waves.length - 1;
         renderAll();
+        jumpToWave(clone.id);
       });
       const btnDel = makeActionBtn('Delete', () => {
         lvl.waves.splice(selectedWaveIdx, 1);
@@ -768,28 +786,40 @@ export function renderCampaignAdminPage(adminToken: string): string {
       if (!lvl) { ctx.restore(); return; }
 
       const { items } = computeWaveSchedule(lvl);
+      const selWave = lvl.waves && lvl.waves[selectedWaveIdx];
       for (const item of items) {
         const tSince = simTime - item.spawnAt;
         if (tSince < 0 || tSince > item.duration) continue;
         const w = item.wave;
+        const isSelWave = selWave && w.id === selWave.id;
         const geom = computeWaveGeometry(w, tSince);
 
         // Draw wave obstacles
         ctx.save();
         ctx.fillStyle = geom.color;
         ctx.shadowColor = geom.color;
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = isSelWave ? 16 : 10;
         for (const r of geom.rects) {
           ctx.save();
           ctx.translate(r.x, r.y);
           if (r.rot) ctx.rotate(r.rot);
           ctx.fillRect(-r.w / 2, -r.h / 2, r.w, r.h);
+          if (isSelWave) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(-r.w / 2, -r.h / 2, r.w, r.h);
+          }
           ctx.restore();
         }
         for (const c of geom.circles) {
           ctx.beginPath();
           ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
           ctx.fill();
+          if (isSelWave) {
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+          }
         }
         ctx.restore();
 
