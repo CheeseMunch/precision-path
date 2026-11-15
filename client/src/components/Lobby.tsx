@@ -115,23 +115,13 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       </div>
 
-      {/* Tier Progression Feature Guide */}
-      <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-2xl w-full text-center">
-        <div className="p-3 bg-cyber-panel/50 border border-cyber-border/40 rounded-lg">
-          <div className="text-xs font-bold text-cyan-400 font-mono">ROUND 1 (7s)</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">1-Way Procedural</div>
+      {/* Core Rules Chips */}
+      <div className="mt-8 grid grid-cols-2 gap-3 max-w-md w-full text-center">
+        <div className="p-3.5 bg-cyber-panel/50 border border-cyber-border/40 rounded-lg">
+          <div className="text-xs font-bold text-cyan-400 font-mono">1. PASS THROUGH THE GATES.</div>
         </div>
-        <div className="p-3 bg-cyber-panel/50 border border-cyber-border/40 rounded-lg">
-          <div className="text-xs font-bold text-cyan-400 font-mono">ROUND 2 & 3 (7s)</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">2 & 3 Directions</div>
-        </div>
-        <div className="p-3 bg-cyber-panel/50 border border-cyber-border/40 rounded-lg">
-          <div className="text-xs font-bold text-cyan-400 font-mono">ROUND 4 (7s)</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">All 4 Inward Sides</div>
-        </div>
-        <div className="p-3 bg-cyber-panel/50 border border-pink-500/40 rounded-lg">
-          <div className="text-xs font-bold text-pink-400 font-mono">ENDLESS</div>
-          <div className="text-[11px] text-gray-400 mt-0.5">All Types & Scaling</div>
+        <div className="p-3.5 bg-cyber-panel/50 border border-pink-500/40 rounded-lg">
+          <div className="text-xs font-bold text-pink-400 font-mono">2. SURVIVE.</div>
         </div>
       </div>
     </div>
