@@ -38,11 +38,19 @@ export function renderCampaignAdminPage(adminToken: string): string {
         <p class="text-xs text-slate-400 mt-1">Choose a side, configure incoming obstacle waves &amp; timing, then press Play on the map and click wave openings to attach numbered checkpoint gates.</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
+        <div class="flex items-center bg-slate-900/90 p-1 rounded-lg border border-slate-700">
+          <button id="viewTabLevels" onclick="setViewMode('levels')" class="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition bg-cyan-500 text-black">
+            Level Designer
+          </button>
+          <button id="viewTabPatterns" onclick="setViewMode('patterns')" class="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition text-slate-300 hover:text-white">
+            Pattern Library
+          </button>
+        </div>
         <a href="/db-admin" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold rounded-lg text-xs uppercase tracking-wider border border-gray-700 transition">
           &larr; DB &amp; Endless Admin
         </a>
         <button onclick="saveCampaignConfig()" class="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black rounded-lg text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 transition">
-          Save All Levels
+          Save All Config
         </button>
       </div>
     </div>
@@ -50,15 +58,23 @@ export function renderCampaignAdminPage(adminToken: string): string {
     <!-- Status banner -->
     <div id="statusBanner" class="hidden rounded-lg px-4 py-2 text-xs font-semibold"></div>
 
-    <!-- Level Tabs -->
+    <!-- Level / Pattern Tabs -->
     <div class="cyber-panel rounded-xl p-3 flex flex-wrap items-center justify-between gap-2">
       <div id="levelTabs" class="flex flex-wrap items-center gap-2"></div>
-      <div class="flex items-center gap-2">
+      <div id="levelTabActions" class="flex items-center gap-2">
         <button onclick="addLevel()" class="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition">
           + Add Level
         </button>
         <button onclick="deleteCurrentLevel()" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/35 text-rose-300 border border-rose-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition">
           Delete Level
+        </button>
+      </div>
+      <div id="patternTabActions" class="hidden flex items-center gap-2">
+        <button onclick="addPattern()" class="px-3 py-1.5 bg-violet-600/20 hover:bg-violet-600/35 text-violet-300 border border-violet-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+          + New Pattern
+        </button>
+        <button onclick="deleteCurrentPattern()" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/35 text-rose-300 border border-rose-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+          Delete Pattern
         </button>
       </div>
     </div>
@@ -102,7 +118,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
       <!-- Right: Level Metadata + Side/Obstacle Builder + Wave Queue & Attached Gates -->
       <div class="lg:col-span-6 space-y-4">
         <!-- Level Metadata -->
-        <div class="cyber-panel rounded-xl p-4 space-y-3">
+        <div id="levelMetaPanel" class="cyber-panel rounded-xl p-4 space-y-3">
           <div class="text-xs font-bold uppercase tracking-wider text-cyan-300">Level Settings</div>
           <div class="grid grid-cols-2 gap-3">
             <div>
@@ -120,6 +136,21 @@ export function renderCampaignAdminPage(adminToken: string): string {
             <div>
               <label class="block text-[11px] text-slate-400 mb-1">Par Time (seconds)</label>
               <input id="metaParTime" type="number" class="input-dark" oninput="updateLevelMeta('parTimeSeconds', Number(this.value))" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Pattern Metadata (Pattern Library View) -->
+        <div id="patternMetaPanel" class="hidden cyber-panel rounded-xl p-4 space-y-3">
+          <div class="text-xs font-bold uppercase tracking-wider text-violet-300">Pattern Settings</div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Pattern Name</label>
+              <input id="patMetaName" type="text" class="input-dark" oninput="updatePatternMeta('name', this.value)" />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Description</label>
+              <input id="patMetaDesc" type="text" class="input-dark" oninput="updatePatternMeta('description', this.value)" />
             </div>
           </div>
         </div>
@@ -146,13 +177,27 @@ export function renderCampaignAdminPage(adminToken: string): string {
               + Add Wave
             </button>
           </div>
+          <div id="bundledPatternRow" class="pt-2 border-t border-slate-800/90 space-y-1.5">
+            <div class="text-[11px] font-bold uppercase tracking-wider text-violet-300">Or Insert Bundled Pattern</div>
+            <div class="flex gap-2">
+              <select id="bundledPatternSelect" class="input-dark flex-1"></select>
+              <button onclick="insertBundledPattern()" class="px-4 py-1.5 bg-violet-500 hover:bg-violet-400 text-black font-black rounded-lg text-xs uppercase tracking-wider shrink-0 transition">
+                + Add Pattern
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Wave Queue -->
         <div class="cyber-panel rounded-xl p-4 space-y-2">
-          <div class="flex items-center justify-between">
+          <div class="flex flex-wrap items-center justify-between gap-2">
             <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">Wave Schedule (Order &amp; Delay)</span>
-            <span id="waveCountLabel" class="text-[11px] font-mono text-slate-400">0 waves</span>
+            <div class="flex items-center gap-2">
+              <button onclick="saveSelectedOrAllAsPattern()" class="px-2.5 py-1 bg-violet-600/25 hover:bg-violet-600/40 text-violet-200 border border-violet-500/40 rounded text-[11px] font-bold uppercase tracking-wider transition" title="Save checked waves (or all waves if none checked) as a reusable pattern">
+                Save as Pattern
+              </button>
+              <span id="waveCountLabel" class="text-[11px] font-mono text-slate-400">0 waves</span>
+            </div>
           </div>
           <div id="waveList" class="space-y-1.5 max-h-48 overflow-y-auto pr-1"></div>
         </div>
@@ -182,8 +227,12 @@ export function renderCampaignAdminPage(adminToken: string): string {
     const HITBOX_RADIUS = 6.5;
 
     let levels = [];
+    let patterns = [];
     let currentLevelIdx = 0;
+    let currentPatternIdx = 0;
+    let viewMode = 'levels'; // 'levels' | 'patterns'
     let selectedWaveIdx = 0;
+    let selectedWaveIds = new Set();
     let builderSide = 'north';
 
     let simTime = 0;
@@ -210,6 +259,22 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
     function curLevel() {
       return levels[currentLevelIdx] || null;
+    }
+
+    function curPattern() {
+      return patterns[currentPatternIdx] || null;
+    }
+
+    function activeContainer() {
+      return viewMode === 'levels' ? curLevel() : curPattern();
+    }
+
+    function setViewMode(mode) {
+      viewMode = mode === 'patterns' ? 'patterns' : 'levels';
+      selectedWaveIdx = 0;
+      selectedWaveIds.clear();
+      resetPlayback();
+      renderAll();
     }
 
     function setBuilderSide(side) {
@@ -367,8 +432,11 @@ export function renderCampaignAdminPage(adminToken: string): string {
         const data = await res.json();
         if (!Array.isArray(data.levels) || data.levels.length === 0) throw new Error('Invalid payload');
         levels = data.levels;
+        patterns = Array.isArray(data.patterns) ? data.patterns : [];
         currentLevelIdx = 0;
+        currentPatternIdx = 0;
         selectedWaveIdx = 0;
+        selectedWaveIds.clear();
         resetPlayback();
         renderAll();
       } catch (err) {
@@ -381,17 +449,21 @@ export function renderCampaignAdminPage(adminToken: string): string {
         lvl.levelNumber = idx + 1;
         if (!lvl.id) lvl.id = 'level-' + (idx + 1);
       });
+      patterns.forEach((pat, idx) => {
+        if (!pat.id) pat.id = 'pattern-' + (idx + 1);
+      });
       try {
         const res = await fetch('/api/campaign-config', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-admin-token': ADMIN_TOKEN },
-          body: JSON.stringify({ levels }),
+          body: JSON.stringify({ levels, patterns }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Save failed');
         levels = data.levels;
+        if (Array.isArray(data.patterns)) patterns = data.patterns;
         renderAll();
-        showBanner('Saved ' + levels.length + ' campaign level(s) to campaign-config.json!', false);
+        showBanner('Saved ' + levels.length + ' level(s) and ' + patterns.length + ' pattern(s) to campaign-config.json!', false);
       } catch (err) {
         showBanner('Error saving config: ' + err.message, true);
       }
@@ -468,8 +540,117 @@ export function renderCampaignAdminPage(adminToken: string): string {
       if (field === 'name') renderTabs();
     }
 
+    function addPattern() {
+      const nextNum = patterns.length + 1;
+      patterns.push({
+        id: 'pattern-' + Date.now(),
+        name: 'Custom Pattern ' + nextNum,
+        description: 'Reusable wave combo',
+        waves: [
+          {
+            id: 'pw-' + Date.now(),
+            order: 1,
+            delayAfterPrev: 0.4,
+            side: 'north',
+            patternType: 'single-gap-wall',
+            speed: 175,
+            gapCenter: 0,
+            gapSize: 125,
+            barThickness: 18,
+            attachedGates: [],
+          },
+        ],
+      });
+      currentPatternIdx = patterns.length - 1;
+      selectedWaveIdx = 0;
+      selectedWaveIds.clear();
+      resetPlayback();
+      renderAll();
+    }
+
+    function deleteCurrentPattern() {
+      const pat = curPattern();
+      if (!pat) return;
+      if (!confirm('Delete pattern "' + pat.name + '"?')) return;
+      patterns.splice(currentPatternIdx, 1);
+      currentPatternIdx = Math.max(0, currentPatternIdx - 1);
+      selectedWaveIdx = 0;
+      selectedWaveIds.clear();
+      resetPlayback();
+      renderAll();
+    }
+
+    function updatePatternMeta(field, val) {
+      const pat = curPattern();
+      if (!pat) return;
+      pat[field] = val;
+      if (field === 'name') {
+        renderTabs();
+        renderBundledPatternSelect();
+      }
+    }
+
+    function cloneWavesForInsert(sourceWaves, startOrder, nextGateOrdStart) {
+      const stamp = Date.now() + '-' + Math.floor(Math.random() * 10000);
+      let gOrd = nextGateOrdStart;
+      return (sourceWaves || []).slice().sort((a, b) => a.order - b.order).map((w, idx) => {
+        const cloned = JSON.parse(JSON.stringify(w));
+        cloned.id = 'wave-' + stamp + '-' + idx;
+        cloned.order = startOrder + idx;
+        cloned.attachedGates = (cloned.attachedGates || []).map((g, gIdx) => ({
+          ...g,
+          id: 'gate-' + stamp + '-' + idx + '-' + gIdx,
+          order: gOrd,
+          label: 'GATE ' + (gOrd++),
+        }));
+        return cloned;
+      });
+    }
+
+    function insertBundledPattern() {
+      const target = activeContainer();
+      if (!target) return;
+      const sel = document.getElementById('bundledPatternSelect');
+      const patId = sel ? sel.value : '';
+      const pat = patterns.find((p) => p.id === patId);
+      if (!pat || !pat.waves || pat.waves.length === 0) {
+        return showBanner('No waves in selected pattern.', true);
+      }
+      if (!target.waves) target.waves = [];
+      const maxOrd = target.waves.length ? Math.max(...target.waves.map((w) => Number(w.order || 1))) : 0;
+      const inserted = cloneWavesForInsert(pat.waves, maxOrd + 1, nextGateOrder(target));
+      target.waves.push(...inserted);
+      selectedWaveIdx = target.waves.length - inserted.length;
+      renderAll();
+      if (inserted[0]) jumpToWave(inserted[0].id);
+      showBanner('Inserted "' + pat.name + '" (' + inserted.length + ' waves).', false);
+    }
+
+    function saveSelectedOrAllAsPattern() {
+      const target = activeContainer();
+      if (!target || !target.waves || target.waves.length === 0) {
+        return showBanner('Current schedule has no waves to save.', true);
+      }
+      const ordered = getOrderedWaves(target);
+      const checked = ordered.filter((w) => selectedWaveIds.has(w.id));
+      const chosen = checked.length > 0 ? checked : ordered;
+      const defaultName = (target.name || 'Wave') + (checked.length > 0 ? ' Slice' : ' Pattern');
+      const name = prompt('Save ' + chosen.length + ' wave(s) as Pattern name:', defaultName);
+      if (!name || !name.trim()) return;
+      const clonedWaves = cloneWavesForInsert(chosen, 1, 1);
+      patterns.push({
+        id: 'pattern-' + Date.now(),
+        name: name.trim(),
+        description: 'Saved from ' + (target.name || 'schedule') + ' (' + clonedWaves.length + ' waves)',
+        waves: clonedWaves,
+      });
+      selectedWaveIds.clear();
+      renderAll();
+      showBanner('Saved pattern "' + name.trim() + '" (' + clonedWaves.length + ' waves). Click Save All Config to persist.', false);
+    }
+
     function addWaveFromBuilder() {
-      const lvl = curLevel();
+      const lvl = activeContainer();
       if (!lvl) return;
       if (!lvl.waves) lvl.waves = [];
       const pattern = document.getElementById('builderPattern').value;
@@ -493,7 +674,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
     }
 
     function jumpToWave(waveId) {
-      const lvl = curLevel();
+      const lvl = activeContainer();
       if (!lvl) return;
       const { items } = computeWaveSchedule(lvl);
       const item = items.find((it) => it.wave.id === waveId);
@@ -521,10 +702,8 @@ export function renderCampaignAdminPage(adminToken: string): string {
       isPlaying = false;
       simTime = 0;
       lastRafMs = null;
-      const lvl = curLevel();
-      if (lvl && lvl.spawn) {
-        dummyPos = { x: lvl.spawn.x, y: lvl.spawn.y };
-      }
+      const lvl = activeContainer();
+      dummyPos = (lvl && lvl.spawn) ? { x: lvl.spawn.x, y: lvl.spawn.y } : { x: 0, y: 120 };
       document.getElementById('btnPlayPause').innerHTML = '&#9654; Play';
       updateScrubberUI();
       drawCanvas();
@@ -537,7 +716,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
     }
 
     function updateScrubberUI() {
-      const lvl = curLevel();
+      const lvl = activeContainer();
       if (!lvl) return;
       const { totalDuration } = computeWaveSchedule(lvl);
       const scrub = document.getElementById('timeScrubber');
@@ -551,7 +730,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
       if (lastRafMs !== null) {
         const dt = Math.min(0.05, (nowMs - lastRafMs) / 1000);
         simTime += dt;
-        const lvl = curLevel();
+        const lvl = activeContainer();
         if (lvl) {
           const { totalDuration } = computeWaveSchedule(lvl);
           if (simTime > totalDuration) simTime = 0;
@@ -574,41 +753,102 @@ export function renderCampaignAdminPage(adminToken: string): string {
     }
 
     function renderAll() {
+      const isLvl = viewMode === 'levels';
+      const btnLvl = document.getElementById('viewTabLevels');
+      const btnPat = document.getElementById('viewTabPatterns');
+      if (btnLvl && btnPat) {
+        btnLvl.className = 'px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition ' +
+          (isLvl ? 'bg-cyan-500 text-black' : 'text-slate-300 hover:text-white');
+        btnPat.className = 'px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition ' +
+          (!isLvl ? 'bg-violet-500 text-black' : 'text-slate-300 hover:text-white');
+      }
+      document.getElementById('levelTabActions').classList.toggle('hidden', !isLvl);
+      document.getElementById('patternTabActions').classList.toggle('hidden', isLvl);
+      document.getElementById('levelMetaPanel').classList.toggle('hidden', !isLvl);
+      document.getElementById('patternMetaPanel').classList.toggle('hidden', isLvl);
+      document.getElementById('bundledPatternRow').classList.toggle('hidden', !isLvl);
+
       renderTabs();
       renderMeta();
+      renderBundledPatternSelect();
       renderWaveList();
       renderWaveInspector();
       updateScrubberUI();
       drawCanvas();
     }
 
+    function renderBundledPatternSelect() {
+      const sel = document.getElementById('bundledPatternSelect');
+      if (!sel) return;
+      const prev = sel.value;
+      sel.innerHTML = '';
+      if (!patterns.length) {
+        const o = document.createElement('option');
+        o.value = '';
+        o.textContent = 'No patterns saved yet';
+        sel.appendChild(o);
+        return;
+      }
+      patterns.forEach((p) => {
+        const o = document.createElement('option');
+        o.value = p.id;
+        o.textContent = p.name + ' (' + (p.waves ? p.waves.length : 0) + ' waves)';
+        sel.appendChild(o);
+      });
+      if (prev && patterns.some((p) => p.id === prev)) sel.value = prev;
+    }
+
     function renderTabs() {
       const c = document.getElementById('levelTabs');
       c.innerHTML = '';
-      levels.forEach((lvl, idx) => {
-        const b = document.createElement('button');
-        b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition border ' +
-          (idx === currentLevelIdx ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-cyan-500/50');
-        b.textContent = 'L' + (idx + 1) + ': ' + lvl.name;
-        b.onclick = () => { currentLevelIdx = idx; selectedWaveIdx = 0; resetPlayback(); renderAll(); };
-        c.appendChild(b);
-      });
+      if (viewMode === 'levels') {
+        levels.forEach((lvl, idx) => {
+          const b = document.createElement('button');
+          b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition border ' +
+            (idx === currentLevelIdx ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-cyan-500/50');
+          b.textContent = 'L' + (idx + 1) + ': ' + lvl.name;
+          b.onclick = () => { currentLevelIdx = idx; selectedWaveIdx = 0; selectedWaveIds.clear(); resetPlayback(); renderAll(); };
+          c.appendChild(b);
+        });
+      } else {
+        if (!patterns.length) {
+          c.innerHTML = '<span class="text-xs text-slate-400">No patterns yet. Click "+ New Pattern" or save from a Level schedule.</span>';
+          return;
+        }
+        patterns.forEach((pat, idx) => {
+          const b = document.createElement('button');
+          b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition border ' +
+            (idx === currentPatternIdx ? 'bg-violet-500 text-black border-violet-400' : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-violet-500/50');
+          b.textContent = pat.name + ' (' + (pat.waves ? pat.waves.length : 0) + ')';
+          b.onclick = () => { currentPatternIdx = idx; selectedWaveIdx = 0; selectedWaveIds.clear(); resetPlayback(); renderAll(); };
+          c.appendChild(b);
+        });
+      }
     }
 
     function renderMeta() {
-      const lvl = curLevel();
-      if (!lvl) return;
-      document.getElementById('metaName').value = lvl.name || '';
-      document.getElementById('metaDesc').value = lvl.description || '';
-      document.getElementById('metaClearBonus').value = lvl.clearBonusPoints ?? 500;
-      document.getElementById('metaParTime').value = lvl.parTimeSeconds ?? 20;
+      if (viewMode === 'levels') {
+        const lvl = curLevel();
+        if (!lvl) return;
+        document.getElementById('metaName').value = lvl.name || '';
+        document.getElementById('metaDesc').value = lvl.description || '';
+        document.getElementById('metaClearBonus').value = lvl.clearBonusPoints ?? 500;
+        document.getElementById('metaParTime').value = lvl.parTimeSeconds ?? 20;
+      } else {
+        const pat = curPattern();
+        document.getElementById('patMetaName').value = pat ? (pat.name || '') : '';
+        document.getElementById('patMetaDesc').value = pat ? (pat.description || '') : '';
+      }
     }
 
     function renderWaveList() {
-      const lvl = curLevel();
-      if (!lvl) return;
+      const lvl = activeContainer();
       const listEl = document.getElementById('waveList');
       listEl.innerHTML = '';
+      if (!lvl) {
+        document.getElementById('waveCountLabel').textContent = '0 waves';
+        return;
+      }
       const ordered = getOrderedWaves(lvl);
       document.getElementById('waveCountLabel').textContent = ordered.length + ' wave(s)';
 
@@ -617,12 +857,14 @@ export function renderCampaignAdminPage(adminToken: string): string {
         acc += Number(w.delayAfterPrev || 0);
         const origIdx = lvl.waves.indexOf(w);
         const isSel = origIdx === selectedWaveIdx;
+        const isChecked = selectedWaveIds.has(w.id);
         const row = document.createElement('div');
         row.className = 'flex items-center justify-between px-2.5 py-2 rounded-lg text-xs cursor-pointer border ' +
           (isSel ? 'bg-cyan-950/60 border-cyan-400 text-cyan-100' : 'bg-slate-900/80 border-slate-800 hover:border-slate-600');
         const gateCount = (w.attachedGates || []).length;
         row.innerHTML =
           '<div class="flex items-center gap-2">' +
+            '<input type="checkbox" class="accent-violet-400 cursor-pointer" ' + (isChecked ? 'checked' : '') + ' title="Select wave to save as pattern" />' +
             '<span class="px-1.5 py-0.5 rounded bg-slate-800 font-mono text-cyan-300 font-bold">#' + w.order + '</span>' +
             '<span class="uppercase font-bold text-rose-300">' + w.side + '</span>' +
             '<span class="text-slate-300">' + w.patternType + '</span>' +
@@ -631,6 +873,12 @@ export function renderCampaignAdminPage(adminToken: string): string {
             '<span class="text-slate-400">@' + acc.toFixed(1) + 's</span>' +
             '<span class="px-1.5 py-0.5 rounded ' + (gateCount ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500') + '">' + gateCount + ' gate</span>' +
           '</div>';
+        const cb = row.querySelector('input[type="checkbox"]');
+        cb.onclick = (ev) => {
+          ev.stopPropagation();
+          if (cb.checked) selectedWaveIds.add(w.id);
+          else selectedWaveIds.delete(w.id);
+        };
         row.onclick = () => {
           selectedWaveIdx = origIdx;
           renderWaveList();
@@ -646,7 +894,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
       const actionsEl = document.getElementById('waveInspectorActions');
       const bodyEl = document.getElementById('waveInspectorBody');
       actionsEl.innerHTML = '';
-      const lvl = curLevel();
+      const lvl = activeContainer();
       const w = lvl && lvl.waves ? lvl.waves[selectedWaveIdx] : null;
       if (!w) {
         titleEl.textContent = 'Wave Inspector';
@@ -798,7 +1046,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
       for (let x = -200; x <= 200; x += 50) { ctx.beginPath(); ctx.moveTo(x, -HALF_H); ctx.lineTo(x, HALF_H); ctx.stroke(); }
       for (let y = -350; y <= 350; y += 50) { ctx.beginPath(); ctx.moveTo(-HALF_W, y); ctx.lineTo(HALF_W, y); ctx.stroke(); }
 
-      const lvl = curLevel();
+      const lvl = activeContainer();
       if (!lvl) { ctx.restore(); return; }
 
       const { items } = computeWaveSchedule(lvl);
@@ -904,20 +1152,22 @@ export function renderCampaignAdminPage(adminToken: string): string {
         }
       }
 
-      // Player Spawn (dashed ring)
-      ctx.save();
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath();
-      ctx.arc(lvl.spawn.x, lvl.spawn.y, PLAYER_RADIUS + 3, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(34, 211, 238, 0.55)';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle = 'rgba(207, 250, 254, 0.75)';
-      ctx.font = 'bold 9px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText('SPAWN', lvl.spawn.x, lvl.spawn.y + 24);
-      ctx.restore();
+      // Player Spawn (dashed ring, levels only)
+      if (lvl.spawn) {
+        ctx.save();
+        ctx.setLineDash([4, 3]);
+        ctx.beginPath();
+        ctx.arc(lvl.spawn.x, lvl.spawn.y, PLAYER_RADIUS + 3, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.55)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = 'rgba(207, 250, 254, 0.75)';
+        ctx.font = 'bold 9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText('SPAWN', lvl.spawn.x, lvl.spawn.y + 24);
+        ctx.restore();
+      }
 
       // Dummy Test Ball collision check against active waves (never stops timeline)
       let dummyHit = false;
@@ -1010,7 +1260,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
     }
 
     function findHoveredWaveOpening(x, y) {
-      const lvl = curLevel();
+      const lvl = activeContainer();
       if (!lvl) return null;
       const { items } = computeWaveSchedule(lvl);
       for (const item of items) {
@@ -1031,7 +1281,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
     }
 
     canvas.addEventListener('pointerdown', (e) => {
-      const lvl = curLevel();
+      const lvl = activeContainer();
       if (!lvl) return;
       const { x, y } = getCanvasCoords(e);
 
@@ -1040,7 +1290,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
         return;
       }
 
-      if (Math.hypot(x - lvl.spawn.x, y - lvl.spawn.y) <= 18) {
+      if (lvl.spawn && Math.hypot(x - lvl.spawn.x, y - lvl.spawn.y) <= 18) {
         dragSpawn = true;
         return;
       }
@@ -1092,7 +1342,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
     canvas.addEventListener('pointermove', (e) => {
       const { x, y } = getCanvasCoords(e);
       document.getElementById('cursorCoords').textContent = 'X: ' + Math.round(x) + ', Y: ' + Math.round(y);
-      const lvl = curLevel();
+      const lvl = activeContainer();
       if (!lvl) return;
 
       if (dragDummy) {

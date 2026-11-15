@@ -13,7 +13,7 @@ import mikroOrmConfig from './mikro-orm.config.js';
 import { RoomManager } from './game/RoomManager.js';
 import { User } from './entities/User.js';
 import { MatchHistory } from './entities/MatchHistory.js';
-import { ClientInput, GameMode, CampaignLevelConfig } from '../../shared/types.js';
+import { ClientInput, GameMode, CampaignLevelConfig, CampaignWaveSpec, CampaignPatternTemplate } from '../../shared/types.js';
 import { GAME_CONFIG, ObstaclePatternType } from '../../shared/gameConfig.js';
 import { CAMPAIGN_CONFIG, DEFAULT_CAMPAIGN_LEVELS } from '../../shared/campaignConfig.js';
 import { renderCampaignAdminPage } from './campaignAdminHtml.js';
@@ -268,99 +268,115 @@ if (fs.existsSync(TUNING_CONFIG_PATH)) {
 
 const CAMPAIGN_CONFIG_PATH = path.resolve(__dirname, '../campaign-config.json');
 
+function sanitizeCampaignWaves(rawWaves: any[], idPrefix: string): CampaignWaveSpec[] {
+  const validPatterns = [
+    'single-gap-wall',
+    'double-gap-wall',
+    'sweeping-half-wall',
+    'staggered-blocks',
+    'orb-cluster',
+    'diagonal-spinner',
+  ];
+  return Array.isArray(rawWaves)
+    ? rawWaves.map((w: any, wIdx: number) => {
+        const side = ['north', 'south', 'east', 'west'].includes(w.side) ? w.side : 'north';
+        const isVert = side === 'north' || side === 'south';
+        const latLimit = isVert ? 225 : 400;
+        const patternType = validPatterns.includes(w.patternType) ? w.patternType : 'single-gap-wall';
+        return {
+          id: String(w.id || `${idPrefix}-w-${wIdx + 1}`),
+          order: Math.max(1, Math.round(Number(w.order ?? wIdx + 1))),
+          delayAfterPrev: Math.max(0, Math.min(30, Number(w.delayAfterPrev ?? 1.5))),
+          side,
+          patternType,
+          speed: Math.max(40, Math.min(600, Number(w.speed ?? 175))),
+          gapCenter: Math.max(-latLimit, Math.min(latLimit, Number(w.gapCenter ?? 0))),
+          gapSize: Math.max(60, Math.min(400, Number(w.gapSize ?? 120))),
+          barThickness: Math.max(8, Math.min(48, Number(w.barThickness ?? 18))),
+          color: w.color ? String(w.color).slice(0, 24) : undefined,
+          attachedGates: Array.isArray(w.attachedGates)
+            ? w.attachedGates.map((g: any, gIdx: number) => {
+                const s = Number(g.start ?? -60);
+                const e = Number(g.end ?? 60);
+                return {
+                  id: String(g.id || `${idPrefix}-g-${wIdx + 1}-${gIdx + 1}`),
+                  order: Math.max(1, Math.round(Number(g.order ?? wIdx + 1))),
+                  start: Math.max(-latLimit, Math.min(latLimit, Math.min(s, e))),
+                  end: Math.max(-latLimit, Math.min(latLimit, Math.max(s, e))),
+                  points: Math.max(0, Math.round(Number(g.points ?? 200))),
+                  label: g.label ? String(g.label).slice(0, 24) : undefined,
+                };
+              })
+            : [],
+        };
+      })
+    : [];
+}
+
 function applyCampaignConfig(body: any) {
-  if (!body || !Array.isArray(body.levels) || body.levels.length === 0) return;
-  const sanitized: CampaignLevelConfig[] = body.levels.map((lvl: any, idx: number) => ({
-    id: String(lvl.id || `level-${idx + 1}`),
-    levelNumber: idx + 1,
-    name: String(lvl.name || `Level ${idx + 1}`).slice(0, 60),
-    description: String(lvl.description || '').slice(0, 160),
-    spawn: {
-      x: Math.max(-210, Math.min(210, Number(lvl.spawn?.x ?? 0))),
-      y: Math.max(-385, Math.min(385, Number(lvl.spawn?.y ?? 340))),
-    },
-    clearBonusPoints: Math.max(0, Math.round(Number(lvl.clearBonusPoints ?? 500))),
-    parTimeSeconds: Math.max(5, Math.round(Number(lvl.parTimeSeconds ?? 25))),
-    waves: Array.isArray(lvl.waves)
-      ? lvl.waves.map((w: any, wIdx: number) => {
-          const side = ['north', 'south', 'east', 'west'].includes(w.side) ? w.side : 'north';
-          const isVert = side === 'north' || side === 'south';
-          const latLimit = isVert ? 225 : 400;
-          const validPatterns = [
-            'single-gap-wall',
-            'double-gap-wall',
-            'sweeping-half-wall',
-            'staggered-blocks',
-            'orb-cluster',
-            'diagonal-spinner',
-          ];
-          const patternType = validPatterns.includes(w.patternType) ? w.patternType : 'single-gap-wall';
-          return {
-            id: String(w.id || `wave-${idx + 1}-${wIdx + 1}`),
-            order: Math.max(1, Math.round(Number(w.order ?? wIdx + 1))),
-            delayAfterPrev: Math.max(0, Math.min(30, Number(w.delayAfterPrev ?? 1.5))),
-            side,
-            patternType,
-            speed: Math.max(40, Math.min(600, Number(w.speed ?? 175))),
-            gapCenter: Math.max(-latLimit, Math.min(latLimit, Number(w.gapCenter ?? 0))),
-            gapSize: Math.max(60, Math.min(400, Number(w.gapSize ?? 120))),
-            barThickness: Math.max(8, Math.min(48, Number(w.barThickness ?? 18))),
-            color: w.color ? String(w.color).slice(0, 24) : undefined,
-            attachedGates: Array.isArray(w.attachedGates)
-              ? w.attachedGates.map((g: any, gIdx: number) => {
-                  const s = Number(g.start ?? -60);
-                  const e = Number(g.end ?? 60);
-                  return {
-                    id: String(g.id || `gate-${idx + 1}-${wIdx + 1}-${gIdx + 1}`),
-                    order: Math.max(1, Math.round(Number(g.order ?? wIdx + 1))),
-                    start: Math.max(-latLimit, Math.min(latLimit, Math.min(s, e))),
-                    end: Math.max(-latLimit, Math.min(latLimit, Math.max(s, e))),
-                    points: Math.max(0, Math.round(Number(g.points ?? 200))),
-                    label: g.label ? String(g.label).slice(0, 24) : undefined,
-                  };
-                })
-              : [],
-          };
-        })
-      : [],
-    checkpoints: Array.isArray(lvl.checkpoints)
-      ? lvl.checkpoints.map((cp: any, cpIdx: number) => {
-          const axis = cp.axis === 'vertical' ? 'vertical' : 'horizontal';
-          const coordLimit = axis === 'horizontal' ? 400 : 225;
-          const spanLimit = axis === 'horizontal' ? 225 : 400;
-          const rawStart = Number(cp.start ?? -80);
-          const rawEnd = Number(cp.end ?? 80);
-          return {
-            id: String(cp.id || `cp-${idx + 1}-${cpIdx + 1}`),
-            order: Math.max(1, Math.round(Number(cp.order ?? cpIdx + 1))),
-            axis,
-            coord: Math.max(-coordLimit, Math.min(coordLimit, Number(cp.coord ?? 0))),
-            start: Math.max(-spanLimit, Math.min(spanLimit, Math.min(rawStart, rawEnd))),
-            end: Math.max(-spanLimit, Math.min(spanLimit, Math.max(rawStart, rawEnd))),
-            points: Math.max(0, Math.round(Number(cp.points ?? 100))),
-            label: cp.label ? String(cp.label).slice(0, 24) : undefined,
-          };
-        })
-      : [],
-    obstacles: Array.isArray(lvl.obstacles)
-      ? lvl.obstacles.map((obs: any, oIdx: number) => ({
-          id: String(obs.id || `obs-${idx + 1}-${oIdx + 1}`),
-          type: obs.type === 'circle' ? 'circle' : 'rectangle',
-          x: Math.max(-225, Math.min(225, Number(obs.x ?? 0))),
-          y: Math.max(-400, Math.min(400, Number(obs.y ?? 0))),
-          width: obs.width !== undefined ? Math.max(8, Math.min(450, Number(obs.width))) : undefined,
-          height: obs.height !== undefined ? Math.max(8, Math.min(450, Number(obs.height))) : undefined,
-          radius: obs.radius !== undefined ? Math.max(6, Math.min(120, Number(obs.radius))) : undefined,
-          rotation: Number(obs.rotation ?? 0),
-          rotationSpeed: Number(obs.rotationSpeed ?? 0),
-          patrolAxis: obs.patrolAxis === 'x' || obs.patrolAxis === 'y' ? obs.patrolAxis : 'none',
-          patrolRange: Math.max(0, Math.min(350, Number(obs.patrolRange ?? 0))),
-          patrolSpeed: Number(obs.patrolSpeed ?? 0),
-          color: obs.color ? String(obs.color).slice(0, 24) : '#ff2a6d',
-        }))
-      : [],
-  }));
-  CAMPAIGN_CONFIG.levels = sanitized;
+  if (!body) return;
+  if (Array.isArray(body.levels) && body.levels.length > 0) {
+    const sanitized: CampaignLevelConfig[] = body.levels.map((lvl: any, idx: number) => ({
+      id: String(lvl.id || `level-${idx + 1}`),
+      levelNumber: idx + 1,
+      name: String(lvl.name || `Level ${idx + 1}`).slice(0, 60),
+      description: String(lvl.description || '').slice(0, 160),
+      spawn: {
+        x: Math.max(-210, Math.min(210, Number(lvl.spawn?.x ?? 0))),
+        y: Math.max(-385, Math.min(385, Number(lvl.spawn?.y ?? 340))),
+      },
+      clearBonusPoints: Math.max(0, Math.round(Number(lvl.clearBonusPoints ?? 500))),
+      parTimeSeconds: Math.max(5, Math.round(Number(lvl.parTimeSeconds ?? 25))),
+      waves: sanitizeCampaignWaves(lvl.waves, `lvl-${idx + 1}`),
+      checkpoints: Array.isArray(lvl.checkpoints)
+        ? lvl.checkpoints.map((cp: any, cpIdx: number) => {
+            const axis = cp.axis === 'vertical' ? 'vertical' : 'horizontal';
+            const coordLimit = axis === 'horizontal' ? 400 : 225;
+            const spanLimit = axis === 'horizontal' ? 225 : 400;
+            const rawStart = Number(cp.start ?? -80);
+            const rawEnd = Number(cp.end ?? 80);
+            return {
+              id: String(cp.id || `cp-${idx + 1}-${cpIdx + 1}`),
+              order: Math.max(1, Math.round(Number(cp.order ?? cpIdx + 1))),
+              axis,
+              coord: Math.max(-coordLimit, Math.min(coordLimit, Number(cp.coord ?? 0))),
+              start: Math.max(-spanLimit, Math.min(spanLimit, Math.min(rawStart, rawEnd))),
+              end: Math.max(-spanLimit, Math.min(spanLimit, Math.max(rawStart, rawEnd))),
+              points: Math.max(0, Math.round(Number(cp.points ?? 100))),
+              label: cp.label ? String(cp.label).slice(0, 24) : undefined,
+            };
+          })
+        : [],
+      obstacles: Array.isArray(lvl.obstacles)
+        ? lvl.obstacles.map((obs: any, oIdx: number) => ({
+            id: String(obs.id || `obs-${idx + 1}-${oIdx + 1}`),
+            type: obs.type === 'circle' ? 'circle' : 'rectangle',
+            x: Math.max(-225, Math.min(225, Number(obs.x ?? 0))),
+            y: Math.max(-400, Math.min(400, Number(obs.y ?? 0))),
+            width: obs.width !== undefined ? Math.max(8, Math.min(450, Number(obs.width))) : undefined,
+            height: obs.height !== undefined ? Math.max(8, Math.min(450, Number(obs.height))) : undefined,
+            radius: obs.radius !== undefined ? Math.max(6, Math.min(120, Number(obs.radius))) : undefined,
+            rotation: Number(obs.rotation ?? 0),
+            rotationSpeed: Number(obs.rotationSpeed ?? 0),
+            patrolAxis: obs.patrolAxis === 'x' || obs.patrolAxis === 'y' ? obs.patrolAxis : 'none',
+            patrolRange: Math.max(0, Math.min(350, Number(obs.patrolRange ?? 0))),
+            patrolSpeed: Number(obs.patrolSpeed ?? 0),
+            color: obs.color ? String(obs.color).slice(0, 24) : '#ff2a6d',
+          }))
+        : [],
+    }));
+    CAMPAIGN_CONFIG.levels = sanitized;
+  }
+
+  if (Array.isArray(body.patterns)) {
+    const sanitizedPatterns: CampaignPatternTemplate[] = body.patterns.map((pat: any, pIdx: number) => ({
+      id: String(pat.id || `pat-${pIdx + 1}`),
+      name: String(pat.name || `Pattern ${pIdx + 1}`).slice(0, 60),
+      description: pat.description ? String(pat.description).slice(0, 160) : '',
+      waves: sanitizeCampaignWaves(pat.waves, `pat-${pIdx + 1}`),
+    }));
+    CAMPAIGN_CONFIG.patterns = sanitizedPatterns;
+  }
 }
 
 function saveCampaignConfigToDisk() {

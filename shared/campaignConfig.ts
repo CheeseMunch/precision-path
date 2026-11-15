@@ -1,4 +1,4 @@
-import type { CampaignLevelConfig } from './types.js';
+import type { CampaignLevelConfig, CampaignPatternTemplate } from './types.js';
 
 export const DEFAULT_CAMPAIGN_LEVELS: CampaignLevelConfig[] = [
   {
@@ -165,8 +165,78 @@ export const DEFAULT_CAMPAIGN_LEVELS: CampaignLevelConfig[] = [
   },
 ];
 
-export const CAMPAIGN_CONFIG: { levels: CampaignLevelConfig[] } = {
+export const DEFAULT_CAMPAIGN_PATTERNS: CampaignPatternTemplate[] = [
+  {
+    id: 'pat-crossfire-slalom',
+    name: 'Crossfire Slalom',
+    description: 'Alternating North + West single-gap walls with 1.4s spacing.',
+    waves: [
+      {
+        id: 'pat1-w1',
+        order: 1,
+        delayAfterPrev: 0.4,
+        side: 'north',
+        patternType: 'single-gap-wall',
+        speed: 185,
+        gapCenter: -95,
+        gapSize: 120,
+        barThickness: 18,
+        color: '#ff2a6d',
+        attachedGates: [{ id: 'pat1-g1', order: 1, start: -155, end: -35, points: 200, label: 'GATE 1' }],
+      },
+      {
+        id: 'pat1-w2',
+        order: 2,
+        delayAfterPrev: 1.4,
+        side: 'west',
+        patternType: 'single-gap-wall',
+        speed: 175,
+        gapCenter: 60,
+        gapSize: 120,
+        barThickness: 18,
+        color: '#05d5fa',
+        attachedGates: [{ id: 'pat1-g2', order: 2, start: 0, end: 120, points: 200, label: 'GATE 2' }],
+      },
+    ],
+  },
+  {
+    id: 'pat-orb-spinner-combo',
+    name: 'Orb & Spinner Combo',
+    description: 'Orb cluster followed closely by a sweeping diagonal spinner.',
+    waves: [
+      {
+        id: 'pat2-w1',
+        order: 1,
+        delayAfterPrev: 0.4,
+        side: 'north',
+        patternType: 'orb-cluster',
+        speed: 180,
+        gapCenter: 70,
+        gapSize: 115,
+        barThickness: 18,
+        color: '#ffea00',
+        attachedGates: [{ id: 'pat2-g1', order: 1, start: 0, end: 140, points: 250, label: 'GATE 1' }],
+      },
+      {
+        id: 'pat2-w2',
+        order: 2,
+        delayAfterPrev: 1.6,
+        side: 'south',
+        patternType: 'diagonal-spinner',
+        speed: 170,
+        gapCenter: -40,
+        gapSize: 120,
+        barThickness: 16,
+        color: '#b800ff',
+        attachedGates: [{ id: 'pat2-g2', order: 2, start: -225, end: -128, points: 250, label: 'GATE 2' }],
+      },
+    ],
+  },
+];
+
+export const CAMPAIGN_CONFIG: { levels: CampaignLevelConfig[]; patterns: CampaignPatternTemplate[] } = {
   levels: JSON.parse(JSON.stringify(DEFAULT_CAMPAIGN_LEVELS)),
+  patterns: JSON.parse(JSON.stringify(DEFAULT_CAMPAIGN_PATTERNS)),
 };
 
 export function getCampaignLevel(levelNumber: number): CampaignLevelConfig {

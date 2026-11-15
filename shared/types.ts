@@ -105,6 +105,13 @@ export interface CampaignObstacleSpec {
   color: string;
 }
 
+export interface CampaignPatternTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  waves: CampaignWaveSpec[];
+}
+
 export interface CampaignLevelConfig {
   id: string;
   levelNumber: number;
