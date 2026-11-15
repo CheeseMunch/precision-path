@@ -44,10 +44,12 @@ export type GameMode = 'endless' | 'campaign';
 export interface CampaignCheckpoint {
   id: string;
   order: number;
-  x: number;
-  y: number;
-  radius: number;
+  axis: 'horizontal' | 'vertical';
+  coord: number;
+  start: number;
+  end: number;
   points: number;
+  label?: string;
   reached?: boolean;
 }
 

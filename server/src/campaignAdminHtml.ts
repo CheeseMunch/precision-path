@@ -1,6 +1,8 @@
 /**
  * HTML/JS renderer for the Campaign Level Admin visual editor (/campaign-admin).
  * Uses center-relative arena coordinates (-225..225 x -400..400) matching GameEngine & GameCanvas.
+ * Checkpoints are axis-aligned gates with automatic opening detection (treating arena walls as endgates)
+ * and explicit Gate Numbering (order: 1, 2, 3...).
  */
 
 export function renderCampaignAdminPage(adminToken: string): string {
@@ -31,9 +33,9 @@ export function renderCampaignAdminPage(adminToken: string): string {
       <div>
         <div class="flex items-center gap-2">
           <span class="text-xs font-mono uppercase tracking-widest px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Campaign Admin</span>
-          <h1 class="text-xl font-black tracking-wide text-white">Structured Path &amp; Obstacle Designer</h1>
+          <h1 class="text-xl font-black tracking-wide text-white">Structured Gate Path Designer</h1>
         </div>
-        <p class="text-xs text-slate-400 mt-1">Design deterministic 450&times;800 gate paths (center-origin -225..225 &times; -400..400), sequential glowing checkpoints, and moving/rotating hazards.</p>
+        <p class="text-xs text-slate-400 mt-1">Place obstacles, scan horizontal/vertical lines to pick any gate opening (walls act as endgates), and number gates (1, 2, 3...) to define the path.</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <a href="/db-admin" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold rounded-lg text-xs uppercase tracking-wider border border-gray-700 transition">
@@ -79,7 +81,8 @@ export function renderCampaignAdminPage(adminToken: string): string {
         <div class="flex flex-wrap gap-1.5" id="toolPalette">
           <button class="tool-btn active" data-tool="select" onclick="setTool('select')">Select / Drag</button>
           <button class="tool-btn" data-tool="spawn" onclick="setTool('spawn')">Set Spawn</button>
-          <button class="tool-btn" data-tool="checkpoint" onclick="setTool('checkpoint')">+ Checkpoint</button>
+          <button class="tool-btn" data-tool="gate-h" onclick="setTool('gate-h')">+ Gate (Horiz)</button>
+          <button class="tool-btn" data-tool="gate-v" onclick="setTool('gate-v')">+ Gate (Vert)</button>
           <button class="tool-btn" data-tool="wall" onclick="setTool('wall')">+ Gate Wall</button>
           <button class="tool-btn" data-tool="spinner" onclick="setTool('spinner')">+ Spinner</button>
           <button class="tool-btn" data-tool="orb" onclick="setTool('orb')">+ Orb</button>
@@ -91,7 +94,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
         <div class="flex items-center justify-between text-[11px] text-slate-400">
           <span id="cursorCoords">X: 0, Y: 0</span>
-          <span>Dashed cyan ring = 13px player ball clearance</span>
+          <span>Hover with + Gate (Horiz/Vert) to pick any opening (walls = endgates)</span>
         </div>
       </div>
 
@@ -135,7 +138,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
             <div class="flex gap-2" id="inspectorActions"></div>
           </div>
           <div id="inspectorBody" class="text-xs text-slate-400">
-            Click a checkpoint or obstacle on the canvas (or in the lists below) to edit its properties.
+            Click a checkpoint gate or obstacle on the canvas (or in the lists below) to edit its properties.
           </div>
         </div>
 
@@ -143,8 +146,8 @@ export function renderCampaignAdminPage(adminToken: string): string {
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div class="cyber-panel rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider text-emerald-300">Checkpoints (Order)</span>
-              <button onclick="addQuickCheckpoint()" class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30">+ Add</button>
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-300">Checkpoint Gates (Path Order)</span>
+              <button onclick="addQuickGate()" class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30">+ Gate</button>
             </div>
             <div id="checkpointList" class="space-y-1 max-h-60 overflow-y-auto pr-1"></div>
           </div>
@@ -174,6 +177,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
     let activeTool = 'select';
     let selected = null;
     let dragState = null;
+    let hoverPointer = null; // { x, y }
 
     const canvas = document.getElementById('editorCanvas');
     const ctx = canvas.getContext('2d');
@@ -201,6 +205,99 @@ export function renderCampaignAdminPage(adminToken: string): string {
       document.querySelectorAll('#toolPalette .tool-btn').forEach((b) => {
         b.classList.toggle('active', b.dataset.tool === tool);
       });
+      drawCanvas();
+    }
+
+    function gateMidpoint(cp) {
+      const mid = (cp.start + cp.end) / 2;
+      return cp.axis === 'vertical' ? { x: cp.coord, y: mid } : { x: mid, y: cp.coord };
+    }
+
+    function nextGateOrder(lvl) {
+      if (!lvl.checkpoints.length) return 1;
+      return Math.max(...lvl.checkpoints.map((c) => Number(c.order || 1))) + 1;
+    }
+
+    /**
+     * Scans a horizontal (Y = coord) or vertical (X = coord) line across the arena,
+     * treating the outer arena walls (-225/+225 or -400/+400) as endgates and returning
+     * all open intervals not blocked by any obstacle.
+     */
+    function computeLineOpenings(lvl, axis, coord) {
+      const spanLimit = axis === 'horizontal' ? HALF_W : HALF_H;
+      const blocked = [];
+
+      for (const obs of lvl.obstacles) {
+        if (obs.type === 'circle') {
+          const r = obs.radius || 20;
+          const centerLine = axis === 'horizontal' ? obs.y : obs.x;
+          const centerPerp = axis === 'horizontal' ? obs.x : obs.y;
+          const d = Math.abs(coord - centerLine);
+          if (d < r) {
+            const hc = Math.sqrt(r * r - d * d);
+            blocked.push([centerPerp - hc, centerPerp + hc]);
+          }
+        } else {
+          const hw = (obs.width || 180) / 2;
+          const hh = (obs.height || 20) / 2;
+          const ang = obs.rotation || 0;
+          const cos = Math.cos(ang);
+          const sin = Math.sin(ang);
+          const corners = [
+            [-hw, -hh],
+            [hw, -hh],
+            [hw, hh],
+            [-hw, hh],
+          ].map(([lx, ly]) => ({
+            x: obs.x + lx * cos - ly * sin,
+            y: obs.y + lx * sin + ly * cos,
+          }));
+
+          const hits = [];
+          for (let i = 0; i < 4; i++) {
+            const a = corners[i];
+            const b = corners[(i + 1) % 4];
+            const aLine = axis === 'horizontal' ? a.y : a.x;
+            const bLine = axis === 'horizontal' ? b.y : b.x;
+            const aPerp = axis === 'horizontal' ? a.x : a.y;
+            const bPerp = axis === 'horizontal' ? b.x : b.y;
+            if ((aLine <= coord && bLine >= coord) || (bLine <= coord && aLine >= coord)) {
+              if (Math.abs(bLine - aLine) < 1e-6) {
+                hits.push(aPerp, bPerp);
+              } else {
+                const t = (coord - aLine) / (bLine - aLine);
+                hits.push(aPerp + t * (bPerp - aPerp));
+              }
+            }
+          }
+          if (hits.length >= 2) {
+            blocked.push([Math.min(...hits), Math.max(...hits)]);
+          }
+        }
+      }
+
+      blocked.sort((a, b) => a[0] - b[0]);
+      const merged = [];
+      for (const iv of blocked) {
+        if (!merged.length || iv[0] > merged[merged.length - 1][1]) {
+          merged.push([iv[0], iv[1]]);
+        } else {
+          merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], iv[1]);
+        }
+      }
+
+      const openings = [];
+      let cursor = -spanLimit;
+      for (const [bStart, bEnd] of merged) {
+        const s = Math.max(-spanLimit, cursor);
+        const e = Math.min(spanLimit, bStart);
+        if (e - s >= 18) openings.push({ start: Math.round(s), end: Math.round(e) });
+        cursor = Math.max(cursor, bEnd);
+      }
+      if (spanLimit - cursor >= 18) {
+        openings.push({ start: Math.round(cursor), end: spanLimit });
+      }
+      return openings;
     }
 
     async function loadConfig() {
@@ -223,7 +320,6 @@ export function renderCampaignAdminPage(adminToken: string): string {
       levels.forEach((lvl, idx) => {
         lvl.levelNumber = idx + 1;
         if (!lvl.id) lvl.id = 'level-' + (idx + 1);
-        lvl.checkpoints.forEach((cp, cpIdx) => { cp.order = cpIdx + 1; });
       });
       try {
         const res = await fetch('/api/campaign-config', {
@@ -274,11 +370,11 @@ export function renderCampaignAdminPage(adminToken: string): string {
         clearBonusPoints: 500,
         parTimeSeconds: 25,
         checkpoints: [
-          { id: 'cp-' + nextNum + '-1', order: 1, x: 0, y: 100, radius: 22, points: 100, label: 'CP 1' },
-          { id: 'cp-' + nextNum + '-2', order: 2, x: 0, y: -250, radius: 24, points: 150, label: 'FINISH' },
+          { id: 'cp-' + nextNum + '-1', order: 1, axis: 'horizontal', coord: -40, start: 50, end: 225, points: 200, label: 'GATE 1' },
+          { id: 'cp-' + nextNum + '-2', order: 2, axis: 'horizontal', coord: -360, start: -140, end: 140, points: 300, label: 'FINISH' },
         ],
         obstacles: [
-          { id: 'obs-' + nextNum + '-1', type: 'rectangle', x: -60, y: -40, width: 220, height: 20, rotation: 0, rotationSpeed: 0, patrolAxis: 'none', patrolRange: 0, patrolSpeed: 0, color: '#ff2a6d' },
+          { id: 'obs-' + nextNum + '-1', type: 'rectangle', x: -85, y: -40, width: 270, height: 20, rotation: 0, rotationSpeed: 0, patrolAxis: 'none', patrolRange: 0, patrolSpeed: 0, color: '#ff2a6d' },
         ],
       });
       currentLevelIdx = levels.length - 1;
@@ -313,18 +409,19 @@ export function renderCampaignAdminPage(adminToken: string): string {
       drawCanvas();
     }
 
-    function addQuickCheckpoint() {
+    function addQuickGate() {
       const lvl = curLevel();
       if (!lvl) return;
-      const idx = lvl.checkpoints.length + 1;
+      const ord = nextGateOrder(lvl);
       lvl.checkpoints.push({
         id: 'cp-' + Date.now(),
-        order: idx,
-        x: 0,
-        y: Math.max(-320, 300 - idx * 110),
-        radius: 22,
-        points: 100,
-        label: 'CP ' + idx,
+        order: ord,
+        axis: 'horizontal',
+        coord: Math.max(-360, 260 - ord * 110),
+        start: -100,
+        end: 100,
+        points: 200,
+        label: 'GATE ' + ord,
       });
       selected = { kind: 'checkpoint', index: lvl.checkpoints.length - 1 };
       renderAll();
@@ -338,9 +435,9 @@ export function renderCampaignAdminPage(adminToken: string): string {
         type: isOrb ? 'circle' : 'rectangle',
         x,
         y,
-        width: isOrb ? undefined : isSpinner ? 180 : 220,
-        height: isOrb ? undefined : isSpinner ? 16 : 20,
-        radius: isOrb ? 20 : undefined,
+        width: isOrb ? 36 : isSpinner ? 180 : 220,
+        height: isOrb ? 36 : isSpinner ? 16 : 20,
+        radius: isOrb ? 18 : undefined,
         rotation: 0,
         rotationSpeed: isSpinner ? 1.4 : 0,
         patrolAxis: 'none',
@@ -402,15 +499,19 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
       const cpList = document.getElementById('checkpointList');
       cpList.innerHTML = '';
-      lvl.checkpoints.forEach((cp, idx) => {
-        const isSel = selected && selected.kind === 'checkpoint' && selected.index === idx;
-        const row = document.createElement('div');
-        row.className = 'flex items-center justify-between px-2 py-1.5 rounded text-xs cursor-pointer border ' +
-          (isSel ? 'bg-emerald-950/60 border-emerald-400 text-emerald-200' : 'bg-slate-900/80 border-slate-800 hover:border-slate-600');
-        row.innerHTML = '<span><strong>#' + (idx + 1) + '</strong> ' + (cp.label || cp.id) + ' (' + Math.round(cp.x) + ',' + Math.round(cp.y) + ')</span><span class="text-emerald-400 font-mono">+' + cp.points + '</span>';
-        row.onclick = () => { selected = { kind: 'checkpoint', index: idx }; renderAll(); };
-        cpList.appendChild(row);
-      });
+      lvl.checkpoints
+        .map((cp, idx) => ({ cp, idx }))
+        .sort((a, b) => a.cp.order - b.cp.order)
+        .forEach(({ cp, idx }) => {
+          const isSel = selected && selected.kind === 'checkpoint' && selected.index === idx;
+          const row = document.createElement('div');
+          row.className = 'flex items-center justify-between px-2 py-1.5 rounded text-xs cursor-pointer border ' +
+            (isSel ? 'bg-emerald-950/60 border-emerald-400 text-emerald-200' : 'bg-slate-900/80 border-slate-800 hover:border-slate-600');
+          const axLabel = cp.axis === 'vertical' ? 'V@X=' + cp.coord : 'H@Y=' + cp.coord;
+          row.innerHTML = '<span><strong class="text-emerald-300">#' + cp.order + '</strong> ' + (cp.label || 'GATE') + ' <span class="text-slate-400 font-mono">(' + axLabel + ')</span></span><span class="text-emerald-400 font-mono">+' + cp.points + '</span>';
+          row.onclick = () => { selected = { kind: 'checkpoint', index: idx }; renderAll(); };
+          cpList.appendChild(row);
+        });
 
       const obsList = document.getElementById('obstacleList');
       obsList.innerHTML = '';
@@ -435,33 +536,48 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
       if (!lvl || !selected) {
         titleEl.textContent = 'Inspector (Nothing Selected)';
-        bodyEl.innerHTML = 'Click a checkpoint or obstacle on the canvas (or in the lists below) to edit its properties.';
+        bodyEl.innerHTML = 'Click a checkpoint gate or obstacle on the canvas (or in the lists below) to edit its properties.';
         return;
       }
 
       if (selected.kind === 'checkpoint') {
         const cp = lvl.checkpoints[selected.index];
         if (!cp) return;
-        titleEl.textContent = 'Checkpoint #' + (selected.index + 1);
+        titleEl.textContent = 'Checkpoint Gate #' + cp.order;
 
-        const btnUp = makeActionBtn('Up', () => moveCheckpoint(-1));
-        const btnDown = makeActionBtn('Down', () => moveCheckpoint(1));
         const btnDel = makeActionBtn('Delete', () => {
           lvl.checkpoints.splice(selected.index, 1);
           selected = null;
           renderAll();
         }, true);
-        actionsEl.append(btnUp, btnDown, btnDel);
+        actionsEl.append(btnDel);
 
         bodyEl.innerHTML = '';
         const grid = document.createElement('div');
         grid.className = 'grid grid-cols-2 gap-2';
+
+        const axDiv = document.createElement('div');
+        axDiv.innerHTML = '<label class="block text-[11px] text-slate-400 mb-1">Axis</label>';
+        const axSel = document.createElement('select');
+        axSel.className = 'input-dark';
+        ['horizontal', 'vertical'].forEach((ax) => {
+          const o = document.createElement('option');
+          o.value = ax;
+          o.textContent = ax;
+          o.selected = cp.axis === ax;
+          axSel.appendChild(o);
+        });
+        axSel.onchange = () => { cp.axis = axSel.value; renderLists(); drawCanvas(); };
+        axDiv.appendChild(axSel);
+
         grid.append(
+          makeField('Gate Number (Order)', 'number', cp.order, (v) => { cp.order = Math.max(1, Math.round(Number(v))); renderLists(); drawCanvas(); }),
           makeField('Label', 'text', cp.label || '', (v) => { cp.label = v; renderLists(); drawCanvas(); }),
+          axDiv,
           makeField('Points', 'number', cp.points, (v) => { cp.points = Number(v); renderLists(); }),
-          makeField('X (-225..225)', 'number', cp.x, (v) => { cp.x = Number(v); drawCanvas(); }),
-          makeField('Y (-400..400)', 'number', cp.y, (v) => { cp.y = Number(v); drawCanvas(); }),
-          makeField('Radius', 'number', cp.radius, (v) => { cp.radius = Math.max(8, Number(v)); drawCanvas(); })
+          makeField(cp.axis === 'horizontal' ? 'Y Coord (-400..400)' : 'X Coord (-225..225)', 'number', cp.coord, (v) => { cp.coord = Number(v); renderLists(); drawCanvas(); }),
+          makeField('Span Start', 'number', cp.start, (v) => { cp.start = Number(v); drawCanvas(); }),
+          makeField('Span End', 'number', cp.end, (v) => { cp.end = Number(v); drawCanvas(); })
         );
         bodyEl.appendChild(grid);
         return;
@@ -547,20 +663,6 @@ export function renderCampaignAdminPage(adminToken: string): string {
       }
     }
 
-    function moveCheckpoint(delta) {
-      const lvl = curLevel();
-      if (!lvl || !selected || selected.kind !== 'checkpoint') return;
-      const i = selected.index;
-      const target = i + delta;
-      if (target < 0 || target >= lvl.checkpoints.length) return;
-      const tmp = lvl.checkpoints[i];
-      lvl.checkpoints[i] = lvl.checkpoints[target];
-      lvl.checkpoints[target] = tmp;
-      lvl.checkpoints.forEach((cp, idx) => { cp.order = idx + 1; });
-      selected.index = target;
-      renderAll();
-    }
-
     function makeActionBtn(label, onClick, isDanger) {
       const b = document.createElement('button');
       b.textContent = label;
@@ -593,6 +695,11 @@ export function renderCampaignAdminPage(adminToken: string): string {
       ctx.save();
       ctx.translate(HALF_W, HALF_H);
 
+      // Arena boundary walls (endgates)
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.35)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(-HALF_W + 1, -HALF_H + 1, ARENA_W - 2, ARENA_H - 2);
+
       // Center-aligned 50px grid
       ctx.strokeStyle = 'rgba(148, 163, 184, 0.08)';
       ctx.lineWidth = 1;
@@ -603,27 +710,24 @@ export function renderCampaignAdminPage(adminToken: string): string {
         ctx.beginPath(); ctx.moveTo(-HALF_W, y); ctx.lineTo(HALF_W, y); ctx.stroke();
       }
 
-      // Center crosshair
-      ctx.strokeStyle = 'rgba(34, 211, 238, 0.2)';
-      ctx.beginPath();
-      ctx.moveTo(-12, 0); ctx.lineTo(12, 0);
-      ctx.moveTo(0, -12); ctx.lineTo(0, 12);
-      ctx.stroke();
-
       const lvl = curLevel();
       if (!lvl) {
         ctx.restore();
         return;
       }
 
-      // Structured path lines: Spawn -> CP1 -> CP2 ...
+      // Structured numbered path lines: Spawn -> Gate #1 -> Gate #2 ...
+      const ordered = [...lvl.checkpoints].sort((a, b) => a.order - b.order);
       ctx.save();
       ctx.strokeStyle = 'rgba(34, 211, 238, 0.35)';
       ctx.lineWidth = 2;
       ctx.setLineDash([6, 6]);
       ctx.beginPath();
       ctx.moveTo(lvl.spawn.x, lvl.spawn.y);
-      lvl.checkpoints.forEach((cp) => ctx.lineTo(cp.x, cp.y));
+      ordered.forEach((cp) => {
+        const m = gateMidpoint(cp);
+        ctx.lineTo(m.x, m.y);
+      });
       ctx.stroke();
       ctx.restore();
 
@@ -680,25 +784,86 @@ export function renderCampaignAdminPage(adminToken: string): string {
         ctx.restore();
       });
 
-      // Checkpoints
+      // Checkpoint Gates
       lvl.checkpoints.forEach((cp, idx) => {
         const isSel = selected && selected.kind === 'checkpoint' && selected.index === idx;
+        const x1 = cp.axis === 'horizontal' ? cp.start : cp.coord;
+        const y1 = cp.axis === 'horizontal' ? cp.coord : cp.start;
+        const x2 = cp.axis === 'horizontal' ? cp.end : cp.coord;
+        const y2 = cp.axis === 'horizontal' ? cp.coord : cp.end;
+        const mid = gateMidpoint(cp);
+
         ctx.save();
+        ctx.strokeStyle = isSel ? '#ffffff' : '#34d399';
+        ctx.shadowColor = '#10b981';
+        ctx.shadowBlur = isSel ? 16 : 10;
+        ctx.lineWidth = isSel ? 5 : 4;
         ctx.beginPath();
-        ctx.arc(cp.x, cp.y, cp.radius, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(16, 185, 129, 0.22)';
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // End-posts
+        ctx.fillStyle = isSel ? '#ffffff' : '#6ee7b7';
+        ctx.beginPath(); ctx.arc(x1, y1, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(x2, y2, 4, 0, Math.PI * 2); ctx.fill();
+
+        // Gate Number badge
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.arc(mid.x, mid.y, 12, 0, Math.PI * 2);
+        ctx.fillStyle = '#064e3b';
         ctx.fill();
-        ctx.lineWidth = isSel ? 3 : 2;
-        ctx.strokeStyle = isSel ? '#fff' : '#34d399';
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = isSel ? '#ffffff' : '#34d399';
         ctx.stroke();
 
         ctx.fillStyle = '#ecfdf5';
         ctx.font = 'bold 11px monospace';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(String(idx + 1), cp.x, cp.y);
+        ctx.fillText(String(cp.order), mid.x, mid.y);
         ctx.restore();
       });
+
+      // Live Gate Scan-Line Preview
+      if ((activeTool === 'gate-h' || activeTool === 'gate-v') && hoverPointer) {
+        const axis = activeTool === 'gate-h' ? 'horizontal' : 'vertical';
+        const scanCoord = snap(axis === 'horizontal' ? hoverPointer.y : hoverPointer.x);
+        const perpVal = axis === 'horizontal' ? hoverPointer.x : hoverPointer.y;
+        const openings = computeLineOpenings(lvl, axis, scanCoord);
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.25)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        if (axis === 'horizontal') {
+          ctx.moveTo(-HALF_W, scanCoord);
+          ctx.lineTo(HALF_W, scanCoord);
+        } else {
+          ctx.moveTo(scanCoord, -HALF_H);
+          ctx.lineTo(scanCoord, HALF_H);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        openings.forEach((op) => {
+          const hovered = perpVal >= op.start && perpVal <= op.end;
+          ctx.strokeStyle = hovered ? '#a7f3d0' : 'rgba(52, 211, 153, 0.5)';
+          ctx.lineWidth = hovered ? 6 : 3;
+          ctx.beginPath();
+          if (axis === 'horizontal') {
+            ctx.moveTo(op.start, scanCoord);
+            ctx.lineTo(op.end, scanCoord);
+          } else {
+            ctx.moveTo(scanCoord, op.start);
+            ctx.lineTo(scanCoord, op.end);
+          }
+          ctx.stroke();
+        });
+        ctx.restore();
+      }
 
       // Spawn + 13px ball clearance ring
       ctx.save();
@@ -728,6 +893,15 @@ export function renderCampaignAdminPage(adminToken: string): string {
       };
     }
 
+    function distToSegment(px, py, x1, y1, x2, y2) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+      const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
+      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    }
+
     function hitTest(x, y) {
       const lvl = curLevel();
       if (!lvl) return null;
@@ -737,7 +911,11 @@ export function renderCampaignAdminPage(adminToken: string): string {
       }
       for (let i = lvl.checkpoints.length - 1; i >= 0; i--) {
         const cp = lvl.checkpoints[i];
-        if (Math.hypot(x - cp.x, y - cp.y) <= cp.radius + 6) {
+        const x1 = cp.axis === 'horizontal' ? cp.start : cp.coord;
+        const y1 = cp.axis === 'horizontal' ? cp.coord : cp.start;
+        const x2 = cp.axis === 'horizontal' ? cp.end : cp.coord;
+        const y2 = cp.axis === 'horizontal' ? cp.coord : cp.end;
+        if (distToSegment(x, y, x1, y1, x2, y2) <= 14) {
           return { kind: 'checkpoint', index: i };
         }
       }
@@ -778,9 +956,27 @@ export function renderCampaignAdminPage(adminToken: string): string {
         drawCanvas();
         return;
       }
-      if (activeTool === 'checkpoint') {
-        const idx = lvl.checkpoints.length + 1;
-        lvl.checkpoints.push({ id: 'cp-' + Date.now(), order: idx, x: sx, y: sy, radius: 22, points: 100, label: 'CP ' + idx });
+      if (activeTool === 'gate-h' || activeTool === 'gate-v') {
+        const axis = activeTool === 'gate-h' ? 'horizontal' : 'vertical';
+        const scanCoord = axis === 'horizontal' ? sy : sx;
+        const perpVal = axis === 'horizontal' ? x : y;
+        const openings = computeLineOpenings(lvl, axis, scanCoord);
+        const picked = openings.find((op) => perpVal >= op.start && perpVal <= op.end) || openings[0];
+        if (!picked) {
+          showBanner('No open gate segment detected on that line.', true);
+          return;
+        }
+        const ord = nextGateOrder(lvl);
+        lvl.checkpoints.push({
+          id: 'cp-' + Date.now(),
+          order: ord,
+          axis,
+          coord: scanCoord,
+          start: picked.start,
+          end: picked.end,
+          points: 200,
+          label: 'GATE ' + ord,
+        });
         selected = { kind: 'checkpoint', index: lvl.checkpoints.length - 1 };
         setTool('select');
         renderAll();
@@ -797,16 +993,14 @@ export function renderCampaignAdminPage(adminToken: string): string {
       const hit = hitTest(x, y);
       selected = hit;
       if (hit) {
-        let objX = lvl.spawn.x;
-        let objY = lvl.spawn.y;
-        if (hit.kind === 'checkpoint') {
-          objX = lvl.checkpoints[hit.index].x;
-          objY = lvl.checkpoints[hit.index].y;
+        if (hit.kind === 'spawn') {
+          dragState = { kind: 'spawn', offsetX: lvl.spawn.x - x, offsetY: lvl.spawn.y - y };
         } else if (hit.kind === 'obstacle') {
-          objX = lvl.obstacles[hit.index].x;
-          objY = lvl.obstacles[hit.index].y;
+          dragState = { kind: 'obstacle', index: hit.index, offsetX: lvl.obstacles[hit.index].x - x, offsetY: lvl.obstacles[hit.index].y - y };
+        } else if (hit.kind === 'checkpoint') {
+          const cp = lvl.checkpoints[hit.index];
+          dragState = { kind: 'checkpoint', index: hit.index, offsetCoord: cp.coord - (cp.axis === 'horizontal' ? y : x) };
         }
-        dragState = { kind: hit.kind, index: hit.index, offsetX: objX - x, offsetY: objY - y };
       }
       renderLists();
       renderInspector();
@@ -815,28 +1009,37 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
     canvas.addEventListener('pointermove', (e) => {
       const { x, y } = getCanvasCoords(e);
+      hoverPointer = { x, y };
       document.getElementById('cursorCoords').textContent = 'X: ' + Math.round(x) + ', Y: ' + Math.round(y);
-      if (!dragState) return;
+      if (!dragState) {
+        if (activeTool === 'gate-h' || activeTool === 'gate-v') drawCanvas();
+        return;
+      }
       const lvl = curLevel();
       if (!lvl) return;
-      const nx = Math.max(-HALF_W, Math.min(HALF_W, snap(x + dragState.offsetX)));
-      const ny = Math.max(-HALF_H, Math.min(HALF_H, snap(y + dragState.offsetY)));
       if (dragState.kind === 'spawn') {
-        lvl.spawn.x = nx;
-        lvl.spawn.y = ny;
+        lvl.spawn.x = Math.max(-HALF_W, Math.min(HALF_W, snap(x + dragState.offsetX)));
+        lvl.spawn.y = Math.max(-HALF_H, Math.min(HALF_H, snap(y + dragState.offsetY)));
         renderMeta();
       } else if (dragState.kind === 'checkpoint') {
-        lvl.checkpoints[dragState.index].x = nx;
-        lvl.checkpoints[dragState.index].y = ny;
+        const cp = lvl.checkpoints[dragState.index];
+        const limit = cp.axis === 'horizontal' ? HALF_H : HALF_W;
+        const raw = (cp.axis === 'horizontal' ? y : x) + dragState.offsetCoord;
+        cp.coord = Math.max(-limit, Math.min(limit, snap(raw)));
         renderInspector();
         renderLists();
       } else if (dragState.kind === 'obstacle') {
-        lvl.obstacles[dragState.index].x = nx;
-        lvl.obstacles[dragState.index].y = ny;
+        lvl.obstacles[dragState.index].x = Math.max(-HALF_W, Math.min(HALF_W, snap(x + dragState.offsetX)));
+        lvl.obstacles[dragState.index].y = Math.max(-HALF_H, Math.min(HALF_H, snap(y + dragState.offsetY)));
         renderInspector();
         renderLists();
       }
       drawCanvas();
+    });
+
+    canvas.addEventListener('pointerleave', () => {
+      hoverPointer = null;
+      if (activeTool === 'gate-h' || activeTool === 'gate-v') drawCanvas();
     });
 
     window.addEventListener('pointerup', () => {

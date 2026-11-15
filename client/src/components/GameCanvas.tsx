@@ -278,56 +278,88 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // 2b. Campaign Mode: Draw structured gate guide path & glowing sequential checkpoints
       if (currentState.gameMode === 'campaign' && currentState.checkpoints && currentState.checkpoints.length > 0) {
         const cps = currentState.checkpoints;
-        const nextIdx = currentState.nextCheckpointIndex ?? 0;
+        const unreachedOrders = cps.filter((c) => !c.reached).map((c) => c.order);
+        const activeOrder = unreachedOrders.length > 0 ? Math.min(...unreachedOrders) : Infinity;
+
+        const ordered = [...cps].sort((a, b) => a.order - b.order);
+        const gateMid = (cp: (typeof cps)[number]) => {
+          const mid = (cp.start + cp.end) / 2;
+          return cp.axis === 'vertical' ? { x: cp.coord, y: mid } : { x: mid, y: cp.coord };
+        };
 
         ctx.save();
-        ctx.strokeStyle = 'rgba(34, 211, 238, 0.25)';
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.22)';
         ctx.lineWidth = 2;
         ctx.setLineDash([6, 6]);
         ctx.beginPath();
         if (currentState.campaignSpawn) {
           ctx.moveTo(currentState.campaignSpawn.x, currentState.campaignSpawn.y);
         } else {
-          ctx.moveTo(cps[0].x, cps[0].y);
+          const firstMid = gateMid(ordered[0]);
+          ctx.moveTo(firstMid.x, firstMid.y);
         }
-        for (const cp of cps) {
-          ctx.lineTo(cp.x, cp.y);
+        for (const cp of ordered) {
+          const m = gateMid(cp);
+          ctx.lineTo(m.x, m.y);
         }
         ctx.stroke();
         ctx.restore();
 
         const pulse = 0.5 + 0.5 * Math.sin(now * 0.006);
-        cps.forEach((cp, idx) => {
-          const isCleared = idx < nextIdx;
-          const isCurrent = idx === nextIdx;
+        ordered.forEach((cp) => {
+          const isCleared = Boolean(cp.reached);
+          const isCurrent = !isCleared && cp.order === activeOrder;
+          const x1 = cp.axis === 'horizontal' ? cp.start : cp.coord;
+          const y1 = cp.axis === 'horizontal' ? cp.coord : cp.start;
+          const x2 = cp.axis === 'horizontal' ? cp.end : cp.coord;
+          const y2 = cp.axis === 'horizontal' ? cp.coord : cp.end;
+          const mid = gateMid(cp);
 
           ctx.save();
-          ctx.beginPath();
-          ctx.arc(cp.x, cp.y, cp.radius, 0, Math.PI * 2);
-
           if (isCleared) {
-            ctx.fillStyle = 'rgba(16, 185, 129, 0.14)';
-            ctx.strokeStyle = 'rgba(16, 185, 129, 0.45)';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.35)';
+            ctx.lineWidth = 2;
           } else if (isCurrent) {
             ctx.shadowColor = '#10b981';
             ctx.shadowBlur = 16 + pulse * 10;
-            ctx.fillStyle = `rgba(16, 185, 129, ${0.24 + pulse * 0.16})`;
-            ctx.strokeStyle = '#34d399';
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = `rgba(52, 211, 153, ${0.75 + pulse * 0.25})`;
+            ctx.lineWidth = 4.5;
           } else {
-            ctx.fillStyle = 'rgba(148, 163, 184, 0.08)';
-            ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 5]);
           }
+
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Gate end-posts
+          ctx.fillStyle = isCleared ? 'rgba(16, 185, 129, 0.45)' : isCurrent ? '#6ee7b7' : 'rgba(148, 163, 184, 0.5)';
+          ctx.beginPath();
+          ctx.arc(x1, y1, isCurrent ? 4.5 : 3, 0, Math.PI * 2);
           ctx.fill();
+          ctx.beginPath();
+          ctx.arc(x2, y2, isCurrent ? 4.5 : 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Gate Number badge
+          ctx.shadowBlur = 0;
+          ctx.beginPath();
+          ctx.arc(mid.x, mid.y, isCurrent ? 13 : 11, 0, Math.PI * 2);
+          ctx.fillStyle = isCleared ? 'rgba(6, 78, 59, 0.7)' : isCurrent ? '#065f46' : 'rgba(15, 23, 42, 0.85)';
+          ctx.fill();
+          ctx.lineWidth = isCurrent ? 2.5 : 1.5;
+          ctx.strokeStyle = isCleared ? 'rgba(16, 185, 129, 0.5)' : isCurrent ? '#34d399' : 'rgba(148, 163, 184, 0.45)';
           ctx.stroke();
 
-          ctx.fillStyle = isCleared ? 'rgba(110, 231, 183, 0.65)' : isCurrent ? '#ffffff' : 'rgba(203, 213, 225, 0.65)';
+          ctx.fillStyle = isCleared ? 'rgba(110, 231, 183, 0.8)' : isCurrent ? '#ffffff' : 'rgba(203, 213, 225, 0.75)';
           ctx.font = 'bold 11px Orbitron, monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(isCleared ? '✓' : String(idx + 1), cp.x, cp.y);
+          ctx.fillText(isCleared ? '✓' : String(cp.order), mid.x, mid.y);
           ctx.restore();
         });
       }

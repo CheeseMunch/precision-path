@@ -60,7 +60,7 @@ export const HUD: React.FC<HUDProps> = ({
       {/* 3. Checkpoints (Campaign) or Players (Endless) */}
       {isCampaign ? (
         <div className="px-2.5 py-1 rounded bg-emerald-950/60 border border-emerald-500/40 text-xs font-mono text-emerald-300 font-bold">
-          CP: {nextCheckpoint}/{totalCheckpoints}
+          GATES: {nextCheckpoint}/{totalCheckpoints}
         </div>
       ) : (
         <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyber-panel/90 border border-cyber-border text-xs font-mono text-gray-200">

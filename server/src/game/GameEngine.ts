@@ -285,6 +285,8 @@ export class GameEngine {
       // Substep movement along segment so players cannot drag or teleport across walls
       const dist = Math.hypot(newX - oldX, newY - oldY);
       const steps = Math.max(1, Math.ceil(dist / 6));
+      let prevStepX = oldX;
+      let prevStepY = oldY;
       for (let s = 1; s <= steps; s++) {
         const t = s / steps;
         player.x = oldX + (newX - oldX) * t;
@@ -302,9 +304,11 @@ export class GameEngine {
           }
         }
 
-        if (this.checkCampaignCheckpointForPlayer(player)) {
+        if (this.checkCampaignCheckpointForPlayer(player, prevStepX, prevStepY)) {
           return;
         }
+        prevStepX = player.x;
+        prevStepY = player.y;
       }
       return;
     }
@@ -512,32 +516,75 @@ export class GameEngine {
     }
   }
 
-  private checkCampaignCheckpointForPlayer(player: Player): boolean {
+  private checkCampaignCheckpointForPlayer(
+    player: Player,
+    prevX: number = player.x,
+    prevY: number = player.y
+  ): boolean {
     if (this.gameMode !== 'campaign' || !player.alive || this.state.status !== 'playing') {
       return false;
     }
     const checkpoints = this.state.checkpoints;
-    const idx = this.state.nextCheckpointIndex ?? 0;
-    if (!checkpoints || idx >= checkpoints.length) return false;
+    if (!checkpoints || checkpoints.length === 0) return false;
 
-    const cp = checkpoints[idx];
-    const dist = Math.hypot(player.x - cp.x, player.y - cp.y);
-    if (dist <= player.radius + cp.radius) {
-      cp.reached = true;
-      player.score += cp.points;
-      player.gatesCleared = (player.gatesCleared || 0) + 1;
-      const nextIdx = idx + 1;
-      this.state.nextCheckpointIndex = nextIdx;
+    const unreached = checkpoints.filter((c) => !c.reached);
+    if (unreached.length === 0) return false;
 
-      if (nextIdx >= checkpoints.length) {
-        const level = getCampaignLevel(this.campaignLevelNumber);
-        const timeBonus = Math.max(0, Math.round((level.parTimeSeconds - this.state.elapsedTime) * 25));
-        player.score += level.clearBonusPoints + timeBonus;
-        this.state.campaignClearBonus = level.clearBonusPoints;
-        this.state.campaignTimeBonus = timeBonus;
-        this.state.campaignResult = 'cleared';
-        this.endGame(player);
-        return true;
+    const activeOrder = Math.min(...unreached.map((c) => c.order));
+    const activeGates = unreached.filter((c) => c.order === activeOrder);
+
+    for (const cp of activeGates) {
+      const minSpan = Math.min(cp.start, cp.end);
+      const maxSpan = Math.max(cp.start, cp.end);
+      let passed = false;
+
+      if (cp.axis === 'horizontal') {
+        const crossed = (prevY - cp.coord) * (player.y - cp.coord) <= 0;
+        const touching = Math.abs(player.y - cp.coord) <= player.radius;
+        if (crossed || touching) {
+          let crossX = player.x;
+          if (crossed && player.y !== prevY) {
+            const ratio = (cp.coord - prevY) / (player.y - prevY);
+            crossX = prevX + (player.x - prevX) * ratio;
+          }
+          if (crossX >= minSpan && crossX <= maxSpan) {
+            passed = true;
+          }
+        }
+      } else {
+        const crossed = (prevX - cp.coord) * (player.x - cp.coord) <= 0;
+        const touching = Math.abs(player.x - cp.coord) <= player.radius;
+        if (crossed || touching) {
+          let crossY = player.y;
+          if (crossed && player.x !== prevX) {
+            const ratio = (cp.coord - prevX) / (player.x - prevX);
+            crossY = prevY + (player.y - prevY) * ratio;
+          }
+          if (crossY >= minSpan && crossY <= maxSpan) {
+            passed = true;
+          }
+        }
+      }
+
+      if (passed) {
+        for (const g of activeGates) {
+          g.reached = true;
+        }
+        player.score += cp.points;
+        player.gatesCleared = (player.gatesCleared || 0) + 1;
+        this.state.nextCheckpointIndex = checkpoints.filter((c) => c.reached).length;
+
+        if (checkpoints.every((c) => c.reached)) {
+          const level = getCampaignLevel(this.campaignLevelNumber);
+          const timeBonus = Math.max(0, Math.round((level.parTimeSeconds - this.state.elapsedTime) * 25));
+          player.score += level.clearBonusPoints + timeBonus;
+          this.state.campaignClearBonus = level.clearBonusPoints;
+          this.state.campaignTimeBonus = timeBonus;
+          this.state.campaignResult = 'cleared';
+          this.endGame(player);
+          return true;
+        }
+        return false;
       }
     }
     return false;

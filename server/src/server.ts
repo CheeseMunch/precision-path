@@ -282,15 +282,23 @@ function applyCampaignConfig(body: any) {
     clearBonusPoints: Math.max(0, Math.round(Number(lvl.clearBonusPoints ?? 500))),
     parTimeSeconds: Math.max(5, Math.round(Number(lvl.parTimeSeconds ?? 25))),
     checkpoints: Array.isArray(lvl.checkpoints)
-      ? lvl.checkpoints.map((cp: any, cpIdx: number) => ({
-          id: String(cp.id || `cp-${idx + 1}-${cpIdx + 1}`),
-          order: cpIdx + 1,
-          x: Math.max(-210, Math.min(210, Number(cp.x ?? 0))),
-          y: Math.max(-385, Math.min(385, Number(cp.y ?? 0))),
-          radius: Math.max(10, Math.min(60, Number(cp.radius ?? 22))),
-          points: Math.max(0, Math.round(Number(cp.points ?? 100))),
-          label: cp.label ? String(cp.label).slice(0, 24) : undefined,
-        }))
+      ? lvl.checkpoints.map((cp: any, cpIdx: number) => {
+          const axis = cp.axis === 'vertical' ? 'vertical' : 'horizontal';
+          const coordLimit = axis === 'horizontal' ? 400 : 225;
+          const spanLimit = axis === 'horizontal' ? 225 : 400;
+          const rawStart = Number(cp.start ?? -80);
+          const rawEnd = Number(cp.end ?? 80);
+          return {
+            id: String(cp.id || `cp-${idx + 1}-${cpIdx + 1}`),
+            order: Math.max(1, Math.round(Number(cp.order ?? cpIdx + 1))),
+            axis,
+            coord: Math.max(-coordLimit, Math.min(coordLimit, Number(cp.coord ?? 0))),
+            start: Math.max(-spanLimit, Math.min(spanLimit, Math.min(rawStart, rawEnd))),
+            end: Math.max(-spanLimit, Math.min(spanLimit, Math.max(rawStart, rawEnd))),
+            points: Math.max(0, Math.round(Number(cp.points ?? 100))),
+            label: cp.label ? String(cp.label).slice(0, 24) : undefined,
+          };
+        })
       : [],
     obstacles: Array.isArray(lvl.obstacles)
       ? lvl.obstacles.map((obs: any, oIdx: number) => ({

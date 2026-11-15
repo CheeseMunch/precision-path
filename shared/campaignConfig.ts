@@ -54,10 +54,10 @@ export const DEFAULT_CAMPAIGN_LEVELS: CampaignLevelConfig[] = [
       },
     ],
     checkpoints: [
-      { id: 'l1-cp-1', order: 1, x: -165, y: 200, radius: 24, points: 200 },
-      { id: 'l1-cp-2', order: 2, x: 165, y: 0, radius: 24, points: 200 },
-      { id: 'l1-cp-3', order: 3, x: -165, y: -200, radius: 24, points: 200 },
-      { id: 'l1-cp-4', order: 4, x: 0, y: -340, radius: 28, points: 300 },
+      { id: 'l1-cp-1', order: 1, axis: 'horizontal', coord: 200, start: -225, end: -115, points: 200, label: 'GATE 1' },
+      { id: 'l1-cp-2', order: 2, axis: 'horizontal', coord: 0, start: 115, end: 225, points: 200, label: 'GATE 2' },
+      { id: 'l1-cp-3', order: 3, axis: 'horizontal', coord: -200, start: -225, end: -115, points: 200, label: 'GATE 3' },
+      { id: 'l1-cp-4', order: 4, axis: 'horizontal', coord: -360, start: -140, end: 140, points: 300, label: 'FINISH' },
     ],
   },
   {
@@ -171,11 +171,12 @@ export const DEFAULT_CAMPAIGN_LEVELS: CampaignLevelConfig[] = [
       },
     ],
     checkpoints: [
-      { id: 'l2-cp-1', order: 1, x: 105, y: 225, radius: 22, points: 250 },
-      { id: 'l2-cp-2', order: 2, x: -135, y: 95, radius: 22, points: 250 },
-      { id: 'l2-cp-3', order: 3, x: 135, y: -45, radius: 22, points: 250 },
-      { id: 'l2-cp-4', order: 4, x: -155, y: -190, radius: 22, points: 250 },
-      { id: 'l2-cp-5', order: 5, x: 0, y: -345, radius: 28, points: 400 },
+      { id: 'l2-cp-1', order: 1, axis: 'horizontal', coord: 225, start: 45, end: 165, points: 250, label: 'GATE 1' },
+      { id: 'l2-cp-2a', order: 2, axis: 'horizontal', coord: 95, start: -225, end: -90, points: 250, label: 'GATE 2L' },
+      { id: 'l2-cp-2b', order: 2, axis: 'horizontal', coord: 95, start: 90, end: 225, points: 250, label: 'GATE 2R' },
+      { id: 'l2-cp-3', order: 3, axis: 'horizontal', coord: -45, start: 95, end: 225, points: 250, label: 'GATE 3' },
+      { id: 'l2-cp-4', order: 4, axis: 'horizontal', coord: -190, start: -225, end: -95, points: 250, label: 'GATE 4' },
+      { id: 'l2-cp-5', order: 5, axis: 'horizontal', coord: -360, start: -140, end: 140, points: 400, label: 'FINISH' },
     ],
   },
 ];
