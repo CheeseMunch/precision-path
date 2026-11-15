@@ -178,6 +178,8 @@ function applyTuningConfig(body: any) {
   if (body.obstacles) {
     const o = body.obstacles;
     if (typeof o.baseSpeed === 'number') GAME_CONFIG.obstacles.baseSpeed = Math.max(40, Math.min(500, o.baseSpeed));
+    if (typeof o.verticalLineSpeedMultiplier === 'number') GAME_CONFIG.obstacles.verticalLineSpeedMultiplier = Math.max(0.2, Math.min(2.5, o.verticalLineSpeedMultiplier));
+    if (typeof o.horizontalLineSpeedMultiplier === 'number') GAME_CONFIG.obstacles.horizontalLineSpeedMultiplier = Math.max(0.2, Math.min(2.5, o.horizontalLineSpeedMultiplier));
     if (typeof o.speedPerTier === 'number') GAME_CONFIG.obstacles.speedPerTier = Math.max(0, Math.min(100, o.speedPerTier));
     if (typeof o.endlessMaxBonusSpeed === 'number') GAME_CONFIG.obstacles.endlessMaxBonusSpeed = Math.max(0, Math.min(400, o.endlessMaxBonusSpeed));
     if (typeof o.endlessSpeedScaleRate === 'number') GAME_CONFIG.obstacles.endlessSpeedScaleRate = Math.max(0, Math.min(25, o.endlessSpeedScaleRate));
@@ -414,11 +416,23 @@ app.get('/db-admin', (req, res) => {
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-gray-400 mb-1">Base Obstacle Speed (px/s)</label>
-              <input id="inp_baseSpeed" type="number" min="50" max="450" step="5" class="w-full bg-[#07080d] border border-gray-700 rounded p-2 text-white" />
+              <input id="inp_baseSpeed" type="number" min="50" max="450" step="5" oninput="updateLabels()" class="w-full bg-[#07080d] border border-gray-700 rounded p-2 text-white" />
             </div>
             <div>
               <label class="block text-gray-400 mb-1">Speed Added Per Round (px/s)</label>
               <input id="inp_speedPerTier" type="number" min="0" max="80" step="1" class="w-full bg-[#07080d] border border-gray-700 rounded p-2 text-white" />
+            </div>
+            <div>
+              <label class="block text-gray-400 mb-1">
+                Vertical Lines | Speed Multiplier • <span id="val_vertSpeed" class="text-cyan-300 font-bold">75% (109 px/s)</span>
+              </label>
+              <input id="inp_vertMult" type="number" min="0.2" max="2.5" step="0.05" oninput="updateLabels()" class="w-full bg-[#07080d] border border-gray-700 rounded p-2 text-white" />
+            </div>
+            <div>
+              <label class="block text-gray-400 mb-1">
+                Horizontal Lines — Speed Multiplier • <span id="val_horizSpeed" class="text-cyan-300 font-bold">100% (145 px/s)</span>
+              </label>
+              <input id="inp_horizMult" type="number" min="0.2" max="2.5" step="0.05" oninput="updateLabels()" class="w-full bg-[#07080d] border border-gray-700 rounded p-2 text-white" />
             </div>
             <div>
               <label class="block text-gray-400 mb-1">Endless Max Bonus Speed</label>
@@ -547,6 +561,8 @@ app.get('/db-admin', (req, res) => {
       document.getElementById('inp_randR1').checked = Boolean(cfg.randomness.randomizeRound1Direction);
 
       document.getElementById('inp_baseSpeed').value = cfg.obstacles.baseSpeed;
+      document.getElementById('inp_vertMult').value = cfg.obstacles.verticalLineSpeedMultiplier ?? 0.75;
+      document.getElementById('inp_horizMult').value = cfg.obstacles.horizontalLineSpeedMultiplier ?? 1.0;
       document.getElementById('inp_speedPerTier').value = cfg.obstacles.speedPerTier;
       document.getElementById('inp_endlessMax').value = cfg.obstacles.endlessMaxBonusSpeed;
       document.getElementById('inp_endlessRate').value = cfg.obstacles.endlessSpeedScaleRate;
@@ -610,6 +626,16 @@ app.get('/db-admin', (req, res) => {
       const pct = Math.round((eff / pRad) * 100);
       const hbEl = document.getElementById('val_hitbox');
       if (hbEl) hbEl.textContent = 'Hitbox: ' + eff.toFixed(1) + 'px (' + pct + '%)';
+
+      const bSpeed = Number(document.getElementById('inp_baseSpeed').value) || 145;
+      const vMult = Number(document.getElementById('inp_vertMult').value) || 0.75;
+      const hMult = Number(document.getElementById('inp_horizMult').value) || 1.0;
+      const vEff = Math.round(bSpeed * vMult);
+      const hEff = Math.round(bSpeed * hMult);
+      const vEl = document.getElementById('val_vertSpeed');
+      if (vEl) vEl.textContent = Math.round(vMult * 100) + '% (' + vEff + ' px/s)';
+      const hEl = document.getElementById('val_horizSpeed');
+      if (hEl) hEl.textContent = Math.round(hMult * 100) + '% (' + hEff + ' px/s)';
     }
 
     function syncAllRounds() {
@@ -652,6 +678,8 @@ app.get('/db-admin', (req, res) => {
         },
         obstacles: {
           baseSpeed: Number(document.getElementById('inp_baseSpeed').value),
+          verticalLineSpeedMultiplier: Number(document.getElementById('inp_vertMult').value),
+          horizontalLineSpeedMultiplier: Number(document.getElementById('inp_horizMult').value),
           speedPerTier: Number(document.getElementById('inp_speedPerTier').value),
           endlessMaxBonusSpeed: Number(document.getElementById('inp_endlessMax').value),
           endlessSpeedScaleRate: Number(document.getElementById('inp_endlessRate').value),

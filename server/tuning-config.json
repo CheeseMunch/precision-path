@@ -52,6 +52,8 @@
   },
   "obstacles": {
     "baseSpeed": 145,
+    "verticalLineSpeedMultiplier": 0.75,
+    "horizontalLineSpeedMultiplier": 1,
     "speedPerTier": 14,
     "endlessMaxBonusSpeed": 120,
     "endlessSpeedScaleRate": 2.5,

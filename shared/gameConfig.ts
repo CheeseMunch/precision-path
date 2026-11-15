@@ -133,6 +133,12 @@ export const GAME_CONFIG = {
     /** Base obstacle travel speed in pixels/sec (takes ~3.5s to cross the 520px arena) */
     baseSpeed: 145,
 
+    /** Speed multiplier for vertical lines (East/West walls moving across the 450px width) */
+    verticalLineSpeedMultiplier: 0.75,
+
+    /** Speed multiplier for horizontal lines (North/South walls moving across the 800px height) */
+    horizontalLineSpeedMultiplier: 1.0,
+
     /** Speed added per round/tier (pixels/sec) */
     speedPerTier: 14,
 

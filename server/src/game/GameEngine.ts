@@ -531,7 +531,12 @@ export class GameEngine {
     let accumulatedDelayMs = 0;
     directions.forEach((dir, idx) => {
       const speedVar = GAME_CONFIG.randomness.speedVariance;
-      const dirSpeed = rawSpeed * (1 + this.randomRange(-speedVar, speedVar));
+      // Vertical lines spawn from East/West and cross the 450px width; horizontal lines spawn from North/South and cross the 800px height
+      const isVerticalLine = dir === 'west' || dir === 'east';
+      const lineMultiplier = isVerticalLine
+        ? GAME_CONFIG.obstacles.verticalLineSpeedMultiplier ?? 0.75
+        : GAME_CONFIG.obstacles.horizontalLineSpeedMultiplier ?? 1.0;
+      const dirSpeed = rawSpeed * lineMultiplier * (1 + this.randomRange(-speedVar, speedVar));
       const patternType = this.pickProceduralObstacleType(tier);
 
       if (idx === 0) {
