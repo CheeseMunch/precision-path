@@ -166,8 +166,8 @@ export const Lobby: React.FC<LobbyProps> = ({
       </div>
 
       {/* Core Rule Chip */}
-      <div className="mt-8 max-w-md w-full text-center">
-        <div className="p-3.5 bg-cyber-panel/50 border border-pink-500/40 rounded-lg">
+      <div className="mt-8 text-center">
+        <div className="inline-block px-4 py-2 bg-cyber-panel/50 border border-pink-500/40 rounded-lg">
           <div className="text-xs font-bold text-pink-400 font-mono">Don&apos;t get hit.</div>
         </div>
       </div>
