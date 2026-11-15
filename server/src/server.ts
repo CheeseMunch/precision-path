@@ -2,6 +2,7 @@ import express from 'express';
 import http from 'http';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import cors from 'cors';
@@ -22,12 +23,41 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const server = http.createServer(app);
-const PORT = process.env.PORT || 4000;
+const PORT = Number(process.env.PORT || 4000);
+const BIND_HOST = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
+
+// Per-boot secret CSRF token for the localhost-only /db-admin console
+const ADMIN_SESSION_TOKEN = crypto.randomBytes(24).toString('hex');
+
+/**
+ * Verifies a request originates directly from a local browser on the host machine
+ * (never forwarded through Cloudflare Tunnel or a remote proxy).
+ */
+function isDirectLocalhost(req: express.Request): boolean {
+  const isLocalHostHeader = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+  const hasProxyHeaders = Boolean(
+    req.headers['cf-ray'] ||
+      req.headers['cf-connecting-ip'] ||
+      req.headers['x-forwarded-for'] ||
+      req.headers['x-forwarded-host'] ||
+      req.headers['cf-visitor']
+  );
+  const remoteAddr = req.socket.remoteAddress || '';
+  const isLoopbackSocket =
+    remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+  return isLocalHostHeader && !hasProxyHeaders && isLoopbackSocket;
+}
+
+function hasValidAdminToken(req: express.Request): boolean {
+  const token = req.headers['x-admin-token'];
+  return typeof token === 'string' && token === ADMIN_SESSION_TOKEN;
+}
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '32kb' }));
 
 const io = new Server(server, {
+  maxHttpBufferSize: 16384, // 16KB max packet size against DoS
   cors: {
     origin: '*',
     methods: ['GET', 'POST'],
@@ -52,6 +82,9 @@ app.get('/api/leaderboard', async (req, res) => {
 });
 
 app.get('/api/db', async (req, res) => {
+  if (!isDirectLocalhost(req)) {
+    return res.status(403).json({ error: 'Database dump is restricted to direct localhost access.' });
+  }
   if (!orm) {
     return res.status(503).json({ status: 'offline', message: 'PostgreSQL is not connected' });
   }
@@ -161,9 +194,8 @@ if (fs.existsSync(TUNING_CONFIG_PATH)) {
 
 // Localhost-only interactive SQL execution endpoint for the DB Admin GUI
 app.post('/api/sql', async (req, res) => {
-  const isLocal = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-  if (!isLocal) {
-    return res.status(403).json({ error: 'SQL Studio is only accessible from localhost on the host PC.' });
+  if (!isDirectLocalhost(req) || !hasValidAdminToken(req)) {
+    return res.status(403).json({ error: 'SQL Studio is restricted to authenticated direct localhost access.' });
   }
   if (!orm) {
     return res.status(503).json({ error: 'PostgreSQL is not connected.' });
@@ -171,6 +203,14 @@ app.post('/api/sql', async (req, res) => {
   const query = String(req.body?.query || '').trim();
   if (!query) {
     return res.status(400).json({ error: 'Please enter a SQL query.' });
+  }
+  // Block dangerous OS/filesystem-level PostgreSQL superuser commands
+  if (
+    /\b(program|pg_read_server_files|pg_write_server_files|pg_execute_server_program|lo_import|lo_export|alter\s+system|copy\s+.*\s+to|copy\s+.*\s+from)\b/i.test(
+      query
+    )
+  ) {
+    return res.status(403).json({ error: 'Filesystem and OS-level SQL commands are disabled for security.' });
   }
   try {
     const start = performance.now();
@@ -184,9 +224,8 @@ app.post('/api/sql', async (req, res) => {
 
 // Localhost-only Admin Studio GUI: Game Tuning & PostgreSQL Studio (http://localhost:4000/db-admin)
 app.get('/db-admin', (req, res) => {
-  const isLocal = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-  if (!isLocal) {
-    return res.status(403).send('Admin Studio is restricted to localhost on the host PC.');
+  if (!isDirectLocalhost(req)) {
+    return res.status(403).send('Admin Studio is restricted to direct localhost access on the host PC.');
   }
   res.type('html').send(`<!doctype html>
 <html lang="en">
@@ -430,6 +469,7 @@ app.get('/db-admin', (req, res) => {
   </div>
 
   <script>
+    const ADMIN_TOKEN = "${ADMIN_SESSION_TOKEN}";
     let currentConfig = null;
 
     function switchTab(tab) {
@@ -607,7 +647,7 @@ app.get('/db-admin', (req, res) => {
         const payload = buildPayloadFromForm();
         const res = await fetch('/api/config', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
           body: JSON.stringify(payload),
         });
         const updated = await res.json();
@@ -622,7 +662,10 @@ app.get('/db-admin', (req, res) => {
     async function resetConfig() {
       if (!confirm('Reset all tuning settings back to factory defaults?')) return;
       const statusEl = document.getElementById('saveStatus');
-      const res = await fetch('/api/config/reset', { method: 'POST' });
+      const res = await fetch('/api/config/reset', {
+        method: 'POST',
+        headers: { 'X-Admin-Token': ADMIN_TOKEN },
+      });
       const updated = await res.json();
       populateForm(updated);
       statusEl.innerHTML = '<span class="text-cyan-400 font-bold">↺ Reset to default settings & saved to server/tuning-config.json</span>';
@@ -648,7 +691,7 @@ app.get('/db-admin', (req, res) => {
           const parsed = JSON.parse(e.target.result);
           const res = await fetch('/api/config', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
             body: JSON.stringify(parsed),
           });
           const updated = await res.json();
@@ -678,7 +721,7 @@ app.get('/db-admin', (req, res) => {
       try {
         const res = await fetch('/api/sql', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'X-Admin-Token': ADMIN_TOKEN },
           body: JSON.stringify({ query })
         });
         const data = await res.json();
@@ -710,9 +753,8 @@ app.get('/api/config', (req, res) => {
 });
 
 app.post('/api/config', (req, res) => {
-  const isLocal = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-  if (!isLocal) {
-    return res.status(403).json({ error: 'Tuning configuration is restricted to localhost admin access.' });
+  if (!isDirectLocalhost(req) || !hasValidAdminToken(req)) {
+    return res.status(403).json({ error: 'Tuning configuration is restricted to authenticated localhost admin access.' });
   }
   applyTuningConfig(req.body);
   saveTuningConfigToDisk();
@@ -720,9 +762,8 @@ app.post('/api/config', (req, res) => {
 });
 
 app.post('/api/config/reset', (req, res) => {
-  const isLocal = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
-  if (!isLocal) {
-    return res.status(403).json({ error: 'Tuning configuration is restricted to localhost admin access.' });
+  if (!isDirectLocalhost(req) || !hasValidAdminToken(req)) {
+    return res.status(403).json({ error: 'Tuning configuration is restricted to authenticated localhost admin access.' });
   }
   applyTuningConfig(DEFAULT_GAME_CONFIG);
   saveTuningConfigToDisk();
@@ -867,8 +908,8 @@ async function bootstrap() {
         execFileSync(pgCtl, ['-D', pgDataDir, 'status'], { stdio: 'ignore' });
         console.log('[PostgreSQL] Local PostgreSQL cluster is running on port 5432');
       } catch {
-        console.log('[PostgreSQL] Starting local PostgreSQL cluster on port 5432...');
-        const child = spawn(postgresExe, ['-D', pgDataDir, '-p', '5432'], {
+        console.log('[PostgreSQL] Starting local PostgreSQL cluster on 127.0.0.1:5432...');
+        const child = spawn(postgresExe, ['-D', pgDataDir, '-p', '5432', '-h', '127.0.0.1'], {
           detached: true,
           stdio: 'ignore',
         });
@@ -896,8 +937,8 @@ async function bootstrap() {
     console.warn(`[MikroORM] PostgreSQL connection skipped (${err.message}). Running with in-memory persistence.`);
   }
 
-  server.listen(PORT, () => {
-    console.log(`🎮 Precision Path dedicated game server running on port ${PORT}`);
+  server.listen(PORT, BIND_HOST, () => {
+    console.log(`🎮 Precision Path dedicated game server running on http://${BIND_HOST}:${PORT}`);
   });
 }
 
