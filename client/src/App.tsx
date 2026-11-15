@@ -147,8 +147,10 @@ export const App: React.FC = () => {
       if (state.status === 'gameover' && lastStatusRef.current !== 'gameover') {
         sound.stopMusic();
         setShowReadyGo(false);
-        // If local player was already eliminated earlier in multiplayer, play "GAME!" when the match finally ends
-        if (!me || !wasAliveRef.current) {
+        if (state.gameMode === 'campaign' && state.campaignResult === 'cleared') {
+          sound.playLevelComplete();
+        } else if (!me || !wasAliveRef.current) {
+          // If local player was already eliminated earlier in multiplayer, play "GAME!" when the match finally ends
           sound.playCollision();
         }
       }

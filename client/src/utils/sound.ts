@@ -9,6 +9,7 @@ class SoundSystem {
   private goAudio: HTMLAudioElement | null = null;
   private gameAudio: HTMLAudioElement | null = null;
   private failureAudio: HTMLAudioElement | null = null;
+  private levelCompleteAudio: HTMLAudioElement | null = null;
   private bgmAudio: HTMLAudioElement | null = null;
   private musicActive: boolean = false;
   private musicPaused: boolean = false;
@@ -29,6 +30,8 @@ class SoundSystem {
       this.gameAudio.preload = 'auto';
       this.failureAudio = new Audio('/sounds/failure.mp3');
       this.failureAudio.preload = 'auto';
+      this.levelCompleteAudio = new Audio('/sounds/level-complete.mp3');
+      this.levelCompleteAudio.preload = 'auto';
       this.bgmAudio = new Audio('/sounds/bgm.mp3');
       this.bgmAudio.preload = 'auto';
       this.bgmAudio.loop = true;
@@ -202,6 +205,12 @@ class SoundSystem {
     if (!this.enabled) return;
     // Play the announcer "Failure..." voice effect when a player is eliminated in multiplayer
     this.playClip(this.failureAudio);
+  }
+
+  public playLevelComplete() {
+    this.stopMusic();
+    if (!this.enabled) return;
+    this.playClip(this.levelCompleteAudio);
   }
 
   public playCollision() {
