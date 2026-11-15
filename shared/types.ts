@@ -39,8 +39,58 @@ export interface Obstacle {
   speed: number;
 }
 
+export type GameMode = 'endless' | 'campaign';
+
+export interface CampaignCheckpoint {
+  id: string;
+  order: number;
+  x: number;
+  y: number;
+  radius: number;
+  points: number;
+  reached?: boolean;
+}
+
+export interface CampaignObstacleSpec {
+  id: string;
+  type: 'rectangle' | 'circle';
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  radius?: number;
+  rotation?: number;
+  rotationSpeed?: number;
+  patrolAxis?: 'none' | 'x' | 'y';
+  patrolRange?: number;
+  patrolSpeed?: number;
+  color: string;
+}
+
+export interface CampaignLevelConfig {
+  id: string;
+  levelNumber: number;
+  name: string;
+  description: string;
+  spawn: { x: number; y: number };
+  clearBonusPoints: number;
+  parTimeSeconds: number;
+  obstacles: CampaignObstacleSpec[];
+  checkpoints: CampaignCheckpoint[];
+}
+
 export interface GameState {
   roomId: string;
+  gameMode?: GameMode;
+  campaignLevel?: number;
+  campaignLevelName?: string;
+  totalCampaignLevels?: number;
+  campaignSpawn?: { x: number; y: number };
+  checkpoints?: CampaignCheckpoint[];
+  nextCheckpointIndex?: number;
+  campaignResult?: 'cleared' | 'failed' | null;
+  campaignClearBonus?: number;
+  campaignTimeBonus?: number;
   status: 'lobby' | 'countdown' | 'playing' | 'paused' | 'gameover';
   pausedBy?: string | null;
   countdownTimer: number;

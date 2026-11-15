@@ -3,7 +3,7 @@ import { MikroORM } from '@mikro-orm/core';
 import { GameEngine } from './GameEngine.js';
 import { User } from '../entities/User.js';
 import { MatchHistory } from '../entities/MatchHistory.js';
-import { GameState, LeaderboardEntry } from '../../../shared/types.js';
+import { GameState, GameMode, LeaderboardEntry } from '../../../shared/types.js';
 
 export class RoomManager {
   private rooms: Map<string, GameEngine> = new Map();
@@ -22,9 +22,13 @@ export class RoomManager {
     this.orm = orm;
   }
 
-  public createRoom(hostSocketId: string, playerName: string): { roomId: string; engine: GameEngine } {
+  public createRoom(
+    hostSocketId: string,
+    playerName: string,
+    options?: { gameMode?: GameMode; campaignLevel?: number }
+  ): { roomId: string; engine: GameEngine } {
     const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
-    const engine = new GameEngine(roomId);
+    const engine = new GameEngine(roomId, options);
 
     engine.addPlayer(hostSocketId, playerName, true);
     this.rooms.set(roomId, engine);
@@ -113,12 +117,14 @@ export class RoomManager {
         this.io.to(roomId).emit('tierUp', { tier, message: `Reached Tier ${tier}!` });
       },
       onPlayerEliminated: async (player, tier) => {
+        if (engine.state.gameMode === 'campaign') return;
         if (persistedThisRound.has(player.id)) return;
         persistedThisRound.add(player.id);
         await this.persistSinglePlayerResult(player, tier);
       },
       onGameOver: async (state) => {
         this.io.to(roomId).emit('gameState', state);
+        if (state.gameMode === 'campaign') return;
         await this.persistGameResults(state, persistedThisRound);
       },
     });

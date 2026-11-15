@@ -13,8 +13,10 @@ import mikroOrmConfig from './mikro-orm.config.js';
 import { RoomManager } from './game/RoomManager.js';
 import { User } from './entities/User.js';
 import { MatchHistory } from './entities/MatchHistory.js';
-import { ClientInput } from '../../shared/types.js';
+import { ClientInput, GameMode, CampaignLevelConfig } from '../../shared/types.js';
 import { GAME_CONFIG, ObstaclePatternType } from '../../shared/gameConfig.js';
+import { CAMPAIGN_CONFIG, DEFAULT_CAMPAIGN_LEVELS } from '../../shared/campaignConfig.js';
+import { renderCampaignAdminPage } from './campaignAdminHtml.js';
 
 dotenv.config();
 
@@ -264,6 +266,73 @@ if (fs.existsSync(TUNING_CONFIG_PATH)) {
   saveTuningConfigToDisk();
 }
 
+const CAMPAIGN_CONFIG_PATH = path.resolve(__dirname, '../campaign-config.json');
+
+function applyCampaignConfig(body: any) {
+  if (!body || !Array.isArray(body.levels) || body.levels.length === 0) return;
+  const sanitized: CampaignLevelConfig[] = body.levels.map((lvl: any, idx: number) => ({
+    id: String(lvl.id || `level-${idx + 1}`),
+    levelNumber: idx + 1,
+    name: String(lvl.name || `Level ${idx + 1}`).slice(0, 60),
+    description: String(lvl.description || '').slice(0, 160),
+    spawn: {
+      x: Math.max(-210, Math.min(210, Number(lvl.spawn?.x ?? 0))),
+      y: Math.max(-385, Math.min(385, Number(lvl.spawn?.y ?? 340))),
+    },
+    clearBonusPoints: Math.max(0, Math.round(Number(lvl.clearBonusPoints ?? 500))),
+    parTimeSeconds: Math.max(5, Math.round(Number(lvl.parTimeSeconds ?? 25))),
+    checkpoints: Array.isArray(lvl.checkpoints)
+      ? lvl.checkpoints.map((cp: any, cpIdx: number) => ({
+          id: String(cp.id || `cp-${idx + 1}-${cpIdx + 1}`),
+          order: cpIdx + 1,
+          x: Math.max(-210, Math.min(210, Number(cp.x ?? 0))),
+          y: Math.max(-385, Math.min(385, Number(cp.y ?? 0))),
+          radius: Math.max(10, Math.min(60, Number(cp.radius ?? 22))),
+          points: Math.max(0, Math.round(Number(cp.points ?? 100))),
+          label: cp.label ? String(cp.label).slice(0, 24) : undefined,
+        }))
+      : [],
+    obstacles: Array.isArray(lvl.obstacles)
+      ? lvl.obstacles.map((obs: any, oIdx: number) => ({
+          id: String(obs.id || `obs-${idx + 1}-${oIdx + 1}`),
+          type: obs.type === 'circle' ? 'circle' : 'rectangle',
+          x: Math.max(-225, Math.min(225, Number(obs.x ?? 0))),
+          y: Math.max(-400, Math.min(400, Number(obs.y ?? 0))),
+          width: obs.width !== undefined ? Math.max(8, Math.min(450, Number(obs.width))) : undefined,
+          height: obs.height !== undefined ? Math.max(8, Math.min(450, Number(obs.height))) : undefined,
+          radius: obs.radius !== undefined ? Math.max(6, Math.min(120, Number(obs.radius))) : undefined,
+          rotation: Number(obs.rotation ?? 0),
+          rotationSpeed: Number(obs.rotationSpeed ?? 0),
+          patrolAxis: obs.patrolAxis === 'x' || obs.patrolAxis === 'y' ? obs.patrolAxis : 'none',
+          patrolRange: Math.max(0, Math.min(350, Number(obs.patrolRange ?? 0))),
+          patrolSpeed: Number(obs.patrolSpeed ?? 0),
+          color: obs.color ? String(obs.color).slice(0, 24) : '#ff2a6d',
+        }))
+      : [],
+  }));
+  CAMPAIGN_CONFIG.levels = sanitized;
+}
+
+function saveCampaignConfigToDisk() {
+  try {
+    fs.writeFileSync(CAMPAIGN_CONFIG_PATH, JSON.stringify(CAMPAIGN_CONFIG, null, 2), 'utf8');
+  } catch (err) {
+    console.warn('[Config] Failed to save campaign-config.json:', err);
+  }
+}
+
+if (fs.existsSync(CAMPAIGN_CONFIG_PATH)) {
+  try {
+    const savedCampaign = JSON.parse(fs.readFileSync(CAMPAIGN_CONFIG_PATH, 'utf8'));
+    applyCampaignConfig(savedCampaign);
+    console.log(`[Config] Loaded persisted campaign configuration from ${CAMPAIGN_CONFIG_PATH}`);
+  } catch (err) {
+    console.warn('[Config] Failed to parse saved campaign-config.json, using defaults:', err);
+  }
+} else {
+  saveCampaignConfigToDisk();
+}
+
 // Localhost-only interactive SQL execution endpoint for the DB Admin GUI
 app.post('/api/sql', async (req, res) => {
   if (!isDirectLocalhost(req) || !hasValidAdminToken(req)) {
@@ -324,6 +393,9 @@ app.get('/db-admin', (req, res) => {
         <button id="tabBtnSql" onclick="switchTab('sql')" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold rounded-lg text-xs uppercase tracking-wider border border-gray-700 transition">
           🗄 PostgreSQL Studio
         </button>
+        <a href="/campaign-admin" class="px-4 py-2 bg-emerald-900/60 hover:bg-emerald-800/80 text-emerald-200 font-bold rounded-lg text-xs uppercase tracking-wider border border-emerald-500/40 transition flex items-center">
+          🎯 Campaign Levels
+        </a>
       </div>
     </div>
 
@@ -1503,6 +1575,36 @@ app.post('/api/config/reset', (req, res) => {
   res.json(GAME_CONFIG);
 });
 
+app.get('/campaign-admin', (req, res) => {
+  if (!isDirectLocalhost(req)) {
+    return res.status(403).send('<h2>403 Forbidden</h2><p>Campaign Admin is only accessible directly from localhost.</p>');
+  }
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(renderCampaignAdminPage(ADMIN_SESSION_TOKEN));
+});
+
+app.get('/api/campaign-config', (req, res) => {
+  res.json(CAMPAIGN_CONFIG);
+});
+
+app.post('/api/campaign-config', (req, res) => {
+  if (!isDirectLocalhost(req) || !hasValidAdminToken(req)) {
+    return res.status(403).json({ error: 'Campaign configuration is restricted to authenticated localhost admin access.' });
+  }
+  applyCampaignConfig(req.body);
+  saveCampaignConfigToDisk();
+  res.json(CAMPAIGN_CONFIG);
+});
+
+app.post('/api/campaign-config/reset', (req, res) => {
+  if (!isDirectLocalhost(req) || !hasValidAdminToken(req)) {
+    return res.status(403).json({ error: 'Campaign configuration is restricted to authenticated localhost admin access.' });
+  }
+  applyCampaignConfig({ levels: JSON.parse(JSON.stringify(DEFAULT_CAMPAIGN_LEVELS)) });
+  saveCampaignConfigToDisk();
+  res.json(CAMPAIGN_CONFIG);
+});
+
 // Serve built React frontend in production / Docker / Coolify single-container mode
 const clientDistPath = path.resolve(__dirname, '../../client/dist');
 if (fs.existsSync(path.join(clientDistPath, 'index.html'))) {
@@ -1520,20 +1622,44 @@ io.on('connection', (socket) => {
   console.log(`[Socket] Client connected: ${socket.id}`);
 
   // Create Room
-  socket.on('createRoom', ({ playerName, autoStart }: { playerName: string; autoStart?: boolean }) => {
+  socket.on('createRoom', ({ playerName, autoStart, gameMode, campaignLevel }: { playerName: string; autoStart?: boolean; gameMode?: GameMode; campaignLevel?: number }) => {
     const prevRoom = roomManager.getRoomBySocketId(socket.id);
     if (prevRoom) {
       socket.leave(prevRoom.roomId);
       roomManager.leaveRoom(socket.id);
     }
 
-    const { roomId, engine } = roomManager.createRoom(socket.id, playerName || 'Player');
+    const { roomId, engine } = roomManager.createRoom(socket.id, playerName || 'Player', {
+      gameMode: gameMode === 'campaign' ? 'campaign' : 'endless',
+      campaignLevel: typeof campaignLevel === 'number' ? campaignLevel : 1,
+    });
     socket.join(roomId);
     socket.emit('roomCreated', { roomId, playerId: socket.id, state: engine.state });
-    console.log(`[Room] Created ${roomId} by ${playerName} (${socket.id})`);
+    console.log(`[Room] Created ${roomId} (${engine.state.gameMode}${engine.state.gameMode === 'campaign' ? ` L${engine.state.campaignLevel}` : ''}) by ${playerName} (${socket.id})`);
 
     if (autoStart) {
       engine.startCountdown();
+    }
+  });
+
+  // Switch & Start specific Campaign Level inside existing room
+  socket.on('startCampaignLevel', ({ levelNumber }: { levelNumber: number }) => {
+    const room = roomManager.getRoomBySocketId(socket.id);
+    if (!room) return;
+    if (room.engine.state.gameMode !== 'campaign') return;
+    room.engine.setCampaignLevel(Number(levelNumber) || 1);
+    room.engine.startCountdown();
+  });
+
+  // Advance to next Campaign Level inside existing room
+  socket.on('nextCampaignLevel', () => {
+    const room = roomManager.getRoomBySocketId(socket.id);
+    if (!room) return;
+    if (room.engine.state.gameMode !== 'campaign') return;
+    const nextLvl = (room.engine.state.campaignLevel || 1) + 1;
+    if (nextLvl <= (room.engine.state.totalCampaignLevels || CAMPAIGN_CONFIG.levels.length)) {
+      room.engine.setCampaignLevel(nextLvl);
+      room.engine.startCountdown();
     }
   });
 

@@ -1,11 +1,12 @@
 import React from 'react';
 import type { GameState } from '../../../shared/types';
-import { Trophy, RotateCcw, Home, Award, Users } from 'lucide-react';
+import { Trophy, RotateCcw, Home, Award, Users, ArrowRight } from 'lucide-react';
 
 interface GameOverModalProps {
   gameState: GameState;
   myPlayerId: string;
   onPlayAgain: () => void;
+  onNextCampaignLevel?: () => void;
   onReturnToWaitingRoom: () => void;
   onReturnToLobby: () => void;
 }
@@ -14,6 +15,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   gameState,
   myPlayerId,
   onPlayAgain,
+  onNextCampaignLevel,
   onReturnToWaitingRoom,
   onReturnToLobby,
 }) => {
@@ -24,6 +26,11 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
     (a, b) => b.score - a.score || b.survivedTime - a.survivedTime
   );
   const isSolo = playersList.length === 1;
+  const isCampaign = gameState.gameMode === 'campaign';
+  const isCampaignCleared = isCampaign && gameState.campaignResult === 'cleared';
+  const hasNextCampaignLevel =
+    isCampaignCleared &&
+    (gameState.campaignLevel || 1) < (gameState.totalCampaignLevels || 1);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
@@ -31,16 +38,29 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         {/* Banner */}
         <div>
           <div className="w-12 h-12 mx-auto rounded-full bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400 mb-2">
-            {isWinner || isSolo ? (
+            {isCampaignCleared || (!isCampaign && (isWinner || isSolo)) ? (
               <Trophy className="w-6 h-6 text-yellow-400" />
             ) : (
               <Award className="w-6 h-6 text-red-400" />
             )}
           </div>
           <h2 className="text-2xl md:text-3xl font-black font-display tracking-tight text-white uppercase">
-            {isSolo ? 'MISSION OVER' : isWinner ? 'VICTORY!' : 'DEFEAT'}
+            {isCampaign
+              ? isCampaignCleared
+                ? 'LEVEL CLEARED!'
+                : 'MISSION FAILED'
+              : isSolo
+              ? 'MISSION OVER'
+              : isWinner
+              ? 'VICTORY!'
+              : 'DEFEAT'}
           </h2>
-          {!isSolo && (
+          {isCampaign && (
+            <p className="text-xs font-mono text-emerald-300 mt-1">
+              Level {gameState.campaignLevel}: {gameState.campaignLevelName}
+            </p>
+          )}
+          {!isSolo && !isCampaign && (
             <p className="text-xs font-mono text-gray-400 mt-1">
               {gameState.winner ? `Winner: ${gameState.winner.name}` : 'Room Match Complete'} • Room{' '}
               <span className="text-cyan-400 font-bold">{gameState.roomId}</span>
@@ -57,14 +77,27 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-gray-500 uppercase">MAX ROUND</div>
-            <div className="text-sm font-bold text-pink-400">{gameState.isEndless ? 'Endless' : `Round ${gameState.currentTier}`}</div>
+            <div className="text-[10px] text-gray-500 uppercase">{isCampaign ? 'CHECKPOINTS' : 'MAX ROUND'}</div>
+            <div className="text-sm font-bold text-pink-400">
+              {isCampaign
+                ? `${gameState.nextCheckpointIndex || 0}/${gameState.checkpoints?.length || 0}`
+                : gameState.isEndless
+                ? 'Endless'
+                : `Round ${gameState.currentTier}`}
+            </div>
           </div>
           <div>
             <div className="text-[10px] text-gray-500 uppercase">SCORE</div>
             <div className="text-sm font-bold text-yellow-400">{myPlayer?.score || 0}</div>
           </div>
         </div>
+
+        {isCampaignCleared && (
+          <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-lg p-2.5 text-xs font-mono flex items-center justify-around text-emerald-300">
+            <span>Clear Bonus: +{gameState.campaignClearBonus || 0}</span>
+            <span>Time Bonus: +{gameState.campaignTimeBonus || 0}</span>
+          </div>
+        )}
 
         {/* Multiplayer Room Standings */}
         {!isSolo && (
@@ -100,11 +133,20 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 
         {/* Actions (Persistent Lobby) */}
         <div className="flex flex-col gap-2.5">
+          {hasNextCampaignLevel && onNextCampaignLevel && (
+            <button
+              onClick={onNextCampaignLevel}
+              className="w-full py-3 px-4 bg-gradient-to-r from-emerald-400 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition active:scale-[0.98]"
+            >
+              Next Level <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+
           <button
             onClick={onPlayAgain}
             className="w-full py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition active:scale-[0.98]"
           >
-            <RotateCcw className="w-4 h-4" /> Play Again {!isSolo && '(Same Lobby)'}
+            <RotateCcw className="w-4 h-4" /> {isCampaign ? 'Replay Level' : `Play Again ${!isSolo ? '(Same Lobby)' : ''}`}
           </button>
 
           {!isSolo && (

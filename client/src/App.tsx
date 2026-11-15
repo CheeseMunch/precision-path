@@ -10,6 +10,7 @@ import { LeaderboardModal } from './components/LeaderboardModal';
 import { ReadyGoOverlay } from './components/ReadyGoOverlay';
 import { sound } from './utils/sound';
 import { SERVER_URL } from './utils/api';
+import { markCampaignLevelCleared } from './utils/campaignProgress';
 import { Play, RotateCcw, Home, Pause, Volume2, VolumeX } from 'lucide-react';
 
 export const App: React.FC = () => {
@@ -87,10 +88,24 @@ export const App: React.FC = () => {
       // Only trigger a React state re-render when HUD/Modal-visible fields change
       const playersArr = Object.values(state.players);
       const aliveCount = playersArr.filter((p) => p.alive).length;
-      const uiSig = `${state.status}|${state.currentTier}|${me?.score ?? 0}|${me?.alive ?? true}|${aliveCount}/${playersArr.length}|${state.pausedBy ?? ''}|${state.winner?.id ?? ''}`;
+      const uiSig = `${state.status}|${state.gameMode}|${state.campaignLevel ?? 0}|${state.nextCheckpointIndex ?? 0}|${state.campaignResult ?? ''}|${state.currentTier}|${me?.score ?? 0}|${me?.alive ?? true}|${aliveCount}/${playersArr.length}|${state.pausedBy ?? ''}|${state.winner?.id ?? ''}`;
       if (uiSig !== lastUiSyncSignatureRef.current) {
         lastUiSyncSignatureRef.current = uiSig;
         setGameState(state);
+      }
+
+      if (
+        state.gameMode === 'campaign' &&
+        state.status === 'gameover' &&
+        lastStatusRef.current !== 'gameover' &&
+        state.campaignResult === 'cleared'
+      ) {
+        markCampaignLevelCleared(
+          me?.name || 'Player',
+          state.campaignLevel || 1,
+          me?.score ?? 0,
+          me?.survivedTime ?? state.elapsedTime
+        );
       }
 
       // Trigger green-screen "Ready... Go!" video overlay when entering countdown
@@ -192,7 +207,22 @@ export const App: React.FC = () => {
 
   const handleCreateRoom = (solo: boolean = false) => {
     if (!socket) return;
-    socket.emit('createRoom', { playerName, autoStart: solo });
+    socket.emit('createRoom', { playerName, autoStart: solo, gameMode: 'endless' });
+  };
+
+  const handlePlayCampaign = (levelNumber: number) => {
+    if (!socket) return;
+    socket.emit('createRoom', {
+      playerName,
+      autoStart: true,
+      gameMode: 'campaign',
+      campaignLevel: levelNumber,
+    });
+  };
+
+  const handleNextCampaignLevel = () => {
+    if (!socket) return;
+    socket.emit('nextCampaignLevel');
   };
 
   const handleJoinRoom = (roomCode: string) => {
@@ -252,6 +282,7 @@ export const App: React.FC = () => {
           playerName={playerName}
           setPlayerName={setPlayerName}
           onCreateRoom={handleCreateRoom}
+          onPlayCampaign={handlePlayCampaign}
           onJoinRoom={handleJoinRoom}
           onOpenLeaderboard={() => setShowLeaderboard(true)}
         />
@@ -388,6 +419,7 @@ export const App: React.FC = () => {
               gameState={gameState}
               myPlayerId={myPlayerId}
               onPlayAgain={handleStartGame}
+              onNextCampaignLevel={handleNextCampaignLevel}
               onReturnToWaitingRoom={handleReturnToWaitingRoom}
               onReturnToLobby={handleLeaveRoom}
             />

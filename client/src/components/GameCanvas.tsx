@@ -121,7 +121,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       if (isInitialTapOrClick) {
-        const isTeleport = distFromPlayer > 38;
+        const isTeleport = currentState.gameMode !== 'campaign' && distFromPlayer > 38;
         inputThrottleRef.current = performance.now();
         onSendInput({ x: clampedX, y: clampedY, isTeleport });
 
@@ -275,7 +275,64 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineTo(0, 16);
       ctx.stroke();
 
-      // 3. Draw Obstacles using Hardware VSync Linear Equation (100% Immune to Network Jitter)
+      // 2b. Campaign Mode: Draw structured gate guide path & glowing sequential checkpoints
+      if (currentState.gameMode === 'campaign' && currentState.checkpoints && currentState.checkpoints.length > 0) {
+        const cps = currentState.checkpoints;
+        const nextIdx = currentState.nextCheckpointIndex ?? 0;
+
+        ctx.save();
+        ctx.strokeStyle = 'rgba(34, 211, 238, 0.25)';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 6]);
+        ctx.beginPath();
+        if (currentState.campaignSpawn) {
+          ctx.moveTo(currentState.campaignSpawn.x, currentState.campaignSpawn.y);
+        } else {
+          ctx.moveTo(cps[0].x, cps[0].y);
+        }
+        for (const cp of cps) {
+          ctx.lineTo(cp.x, cp.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+
+        const pulse = 0.5 + 0.5 * Math.sin(now * 0.006);
+        cps.forEach((cp, idx) => {
+          const isCleared = idx < nextIdx;
+          const isCurrent = idx === nextIdx;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.arc(cp.x, cp.y, cp.radius, 0, Math.PI * 2);
+
+          if (isCleared) {
+            ctx.fillStyle = 'rgba(16, 185, 129, 0.14)';
+            ctx.strokeStyle = 'rgba(16, 185, 129, 0.45)';
+            ctx.lineWidth = 1.5;
+          } else if (isCurrent) {
+            ctx.shadowColor = '#10b981';
+            ctx.shadowBlur = 16 + pulse * 10;
+            ctx.fillStyle = `rgba(16, 185, 129, ${0.24 + pulse * 0.16})`;
+            ctx.strokeStyle = '#34d399';
+            ctx.lineWidth = 3;
+          } else {
+            ctx.fillStyle = 'rgba(148, 163, 184, 0.08)';
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+            ctx.lineWidth = 1.5;
+          }
+          ctx.fill();
+          ctx.stroke();
+
+          ctx.fillStyle = isCleared ? 'rgba(110, 231, 183, 0.65)' : isCurrent ? '#ffffff' : 'rgba(203, 213, 225, 0.65)';
+          ctx.font = 'bold 11px Orbitron, monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(isCleared ? '✓' : String(idx + 1), cp.x, cp.y);
+          ctx.restore();
+        });
+      }
+
+      // 3. Draw Obstacles using Hardware VSync Linear Equation (Endless) or Server Patrol State (Campaign)
       ctx.save();
       ctx.beginPath();
       ctx.rect(-halfW, -halfH, arenaWidth, arenaHeight);
@@ -312,14 +369,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           spawnPerfMap.set(obs.id, spawnPerfMs);
         }
 
+        const isCampaign = currentState.gameMode === 'campaign';
         const ageSec = Math.max(0, (now - spawnPerfMs) / 1000);
         const baseX = obs.spawnX !== undefined ? obs.spawnX : obs.x;
         const baseY = obs.spawnY !== undefined ? obs.spawnY : obs.y;
-        const drawX = baseX + obs.vx * ageSec;
-        const drawY = baseY + obs.vy * ageSec;
+        const drawX = isCampaign ? obs.x : baseX + obs.vx * ageSec;
+        const drawY = isCampaign ? obs.y : baseY + obs.vy * ageSec;
 
         const baseRot = obs.spawnRotation !== undefined ? obs.spawnRotation : (obs.rotation || 0);
-        const currentRot = baseRot + (obs.rotationSpeed || 0) * ageSec;
+        const currentRot = isCampaign ? (obs.rotation || 0) : baseRot + (obs.rotationSpeed || 0) * ageSec;
 
         // Frame-exact local collision check against the exact drawn wall coordinates (zero desync)
         if (

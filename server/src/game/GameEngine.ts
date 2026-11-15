@@ -1,4 +1,13 @@
-import { GameState, GameTier, Player, Obstacle, ObstacleDirection, ClientInput } from '../../../shared/types.js';
+import {
+  GameState,
+  GameTier,
+  GameMode,
+  Player,
+  Obstacle,
+  ObstacleDirection,
+  ClientInput,
+  CampaignObstacleSpec,
+} from '../../../shared/types.js';
 import {
   GAME_CONFIG,
   getTierDuration,
@@ -9,6 +18,7 @@ import {
   RoundDirectionMode,
   ObstaclePatternType,
 } from '../../../shared/gameConfig.js';
+import { CAMPAIGN_CONFIG, getCampaignLevel } from '../../../shared/campaignConfig.js';
 
 export class GameEngine {
   public state: GameState;
@@ -37,6 +47,9 @@ export class GameEngine {
   private rngState: number | null = null;
   private matchDirections: ObstacleDirection[] = ['north', 'east', 'south', 'west'];
   private currentRoundAxis: 'vertical' | 'horizontal' = 'vertical';
+  private gameMode: GameMode = 'endless';
+  private campaignLevelNumber = 1;
+  private campaignObstacleSpecs: Map<string, CampaignObstacleSpec> = new Map();
 
   private onGameOverCallback?: (state: GameState) => void;
   private onTierUpCallback?: (tier: GameTier) => void;
@@ -49,16 +62,22 @@ export class GameEngine {
   public readonly ARENA_RADIUS = GAME_CONFIG.arena.radius;
   public readonly PLAYER_RADIUS = GAME_CONFIG.arena.playerRadius;
 
-  constructor(roomId: string) {
+  constructor(roomId: string, options?: { gameMode?: GameMode; campaignLevel?: number }) {
     this.initRng();
+    this.gameMode = options?.gameMode ?? 'endless';
+    this.campaignLevelNumber = options?.campaignLevel ?? 1;
     this.state = {
       roomId,
+      gameMode: this.gameMode,
+      campaignLevel: this.campaignLevelNumber,
+      totalCampaignLevels: CAMPAIGN_CONFIG.levels.length,
+      campaignResult: null,
       status: 'lobby',
       countdownTimer: GAME_CONFIG.rounds.startCountdownDuration,
       currentTier: 1,
       totalRoundsBeforeEndless: GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4,
       isEndless: false,
-      activeDirections: ['north'],
+      activeDirections: this.gameMode === 'campaign' ? [] : ['north'],
       tierTimeRemaining: getTierDuration(1),
       elapsedTime: 0,
       arenaRadius: this.ARENA_RADIUS,
@@ -68,6 +87,14 @@ export class GameEngine {
       obstacles: [],
       winner: null,
     };
+  }
+
+  public setCampaignLevel(levelNumber: number) {
+    this.gameMode = 'campaign';
+    this.campaignLevelNumber = levelNumber;
+    this.state.gameMode = 'campaign';
+    this.state.campaignLevel = levelNumber;
+    this.state.totalCampaignLevels = CAMPAIGN_CONFIG.levels.length;
   }
 
   /**
@@ -250,6 +277,38 @@ export class GameEngine {
     const newX = Math.max(-maxX, Math.min(maxX, input.x));
     const newY = Math.max(-maxY, Math.min(maxY, input.y));
 
+    if (this.gameMode === 'campaign') {
+      if (this.state.status === 'countdown') {
+        // Keep player anchored near spawn during countdown in campaign
+        return;
+      }
+      // Substep movement along segment so players cannot drag or teleport across walls
+      const dist = Math.hypot(newX - oldX, newY - oldY);
+      const steps = Math.max(1, Math.ceil(dist / 6));
+      for (let s = 1; s <= steps; s++) {
+        const t = s / steps;
+        player.x = oldX + (newX - oldX) * t;
+        player.y = oldY + (newY - oldY) * t;
+
+        for (const obs of this.state.obstacles) {
+          if (this.isColliding(player, obs)) {
+            player.alive = false;
+            this.state.campaignResult = 'failed';
+            if (this.onPlayerEliminatedCallback) {
+              this.onPlayerEliminatedCallback(player, this.state.currentTier);
+            }
+            this.checkPlayerStatus();
+            return;
+          }
+        }
+
+        if (this.checkCampaignCheckpointForPlayer(player)) {
+          return;
+        }
+      }
+      return;
+    }
+
     const jumpDist = Math.hypot(newX - oldX, newY - oldY);
     const didTeleport = Boolean(input.isTeleport) || jumpDist > 52;
 
@@ -355,11 +414,16 @@ export class GameEngine {
     this.state.status = 'countdown';
     this.state.countdownTimer = 1;
 
+    const spawnPos =
+      this.gameMode === 'campaign'
+        ? getCampaignLevel(this.campaignLevelNumber).spawn
+        : { x: 0, y: 0 };
+
     for (const id in this.state.players) {
       const p = this.state.players[id];
       p.alive = true;
-      p.x = 0;
-      p.y = 0;
+      p.x = spawnPos.x;
+      p.y = spawnPos.y;
       p.radius = GAME_CONFIG.arena.playerRadius;
       p.hitboxRadius = Math.max(2, GAME_CONFIG.arena.playerRadius - GAME_CONFIG.arena.hitboxForgiveness);
       p.score = 0;
@@ -382,16 +446,143 @@ export class GameEngine {
     }, 2050);
   }
 
+  private loadCampaignLevelState() {
+    const level = getCampaignLevel(this.campaignLevelNumber);
+    this.state.gameMode = 'campaign';
+    this.state.campaignLevel = level.levelNumber;
+    this.state.campaignLevelName = level.name;
+    this.state.totalCampaignLevels = CAMPAIGN_CONFIG.levels.length;
+    this.state.campaignSpawn = { ...level.spawn };
+    this.state.campaignResult = null;
+    this.state.campaignClearBonus = 0;
+    this.state.campaignTimeBonus = 0;
+    this.state.activeDirections = [];
+    this.state.currentTier = level.levelNumber;
+    this.state.isEndless = false;
+    this.state.tierTimeRemaining = 0;
+
+    const orderedCheckpoints = [...level.checkpoints]
+      .sort((a, b) => a.order - b.order)
+      .map((cp) => ({ ...cp, reached: false }));
+    this.state.checkpoints = orderedCheckpoints;
+    this.state.nextCheckpointIndex = 0;
+
+    this.campaignObstacleSpecs.clear();
+    this.state.obstacles = level.obstacles.map((spec) => {
+      this.campaignObstacleSpecs.set(spec.id, spec);
+      return {
+        id: spec.id,
+        type: spec.type,
+        x: spec.x,
+        y: spec.y,
+        width: spec.width,
+        height: spec.height,
+        radius: spec.radius,
+        rotation: spec.rotation || 0,
+        rotationSpeed: spec.rotationSpeed || 0,
+        vx: 0,
+        vy: 0,
+        color: spec.color,
+        direction: 'diagonal',
+        speed: spec.patrolSpeed || 0,
+      };
+    });
+  }
+
+  private updateCampaignObstacles() {
+    const t = this.state.elapsedTime;
+    for (const obs of this.state.obstacles) {
+      const spec = this.campaignObstacleSpecs.get(obs.id);
+      if (!spec) continue;
+      const range = spec.patrolRange || 0;
+      const speed = spec.patrolSpeed || 0;
+      if (spec.patrolAxis === 'x' && range > 0 && speed > 0) {
+        const freq = speed / Math.max(1, range);
+        obs.x = spec.x + Math.sin(t * freq) * range;
+        obs.y = spec.y;
+      } else if (spec.patrolAxis === 'y' && range > 0 && speed > 0) {
+        const freq = speed / Math.max(1, range);
+        obs.x = spec.x;
+        obs.y = spec.y + Math.sin(t * freq) * range;
+      } else {
+        obs.x = spec.x;
+        obs.y = spec.y;
+      }
+      obs.rotation = (spec.rotation || 0) + (spec.rotationSpeed || 0) * t;
+    }
+  }
+
+  private checkCampaignCheckpointForPlayer(player: Player): boolean {
+    if (this.gameMode !== 'campaign' || !player.alive || this.state.status !== 'playing') {
+      return false;
+    }
+    const checkpoints = this.state.checkpoints;
+    const idx = this.state.nextCheckpointIndex ?? 0;
+    if (!checkpoints || idx >= checkpoints.length) return false;
+
+    const cp = checkpoints[idx];
+    const dist = Math.hypot(player.x - cp.x, player.y - cp.y);
+    if (dist <= player.radius + cp.radius) {
+      cp.reached = true;
+      player.score += cp.points;
+      player.gatesCleared = (player.gatesCleared || 0) + 1;
+      const nextIdx = idx + 1;
+      this.state.nextCheckpointIndex = nextIdx;
+
+      if (nextIdx >= checkpoints.length) {
+        const level = getCampaignLevel(this.campaignLevelNumber);
+        const timeBonus = Math.max(0, Math.round((level.parTimeSeconds - this.state.elapsedTime) * 25));
+        player.score += level.clearBonusPoints + timeBonus;
+        this.state.campaignClearBonus = level.clearBonusPoints;
+        this.state.campaignTimeBonus = timeBonus;
+        this.state.campaignResult = 'cleared';
+        this.endGame(player);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private checkCampaignCheckpointsForAll() {
+    for (const id in this.state.players) {
+      const p = this.state.players[id];
+      if (p.alive) {
+        if (this.checkCampaignCheckpointForPlayer(p)) {
+          return;
+        }
+      }
+    }
+  }
+
   public startGame() {
     this.initRng();
+    this.state.status = 'playing';
+    this.state.elapsedTime = 0;
+
+    if (this.gameMode === 'campaign') {
+      this.loadCampaignLevelState();
+      const spawn = this.state.campaignSpawn || { x: 0, y: 340 };
+      for (const id in this.state.players) {
+        const p = this.state.players[id];
+        p.alive = true;
+        p.x = spawn.x;
+        p.y = spawn.y;
+        p.score = 0;
+        p.gatesCleared = 0;
+        p.survivedTime = 0;
+      }
+      if (this.intervalId) clearInterval(this.intervalId);
+      this.lastTickTime = performance.now();
+      this.intervalId = setInterval(() => this.tick(), 1000 / this.tickRate);
+      return;
+    }
+
     const allDirs: ObstacleDirection[] = ['north', 'east', 'south', 'west'];
     this.matchDirections = GAME_CONFIG.randomness.randomizeRound1Direction
       ? this.shuffle(allDirs)
       : allDirs;
     this.rollRoundAxis();
 
-    this.state.status = 'playing';
-    this.state.elapsedTime = 0;
     this.state.currentTier = 1;
     this.state.isEndless = false;
     this.state.totalRoundsBeforeEndless = GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4;
@@ -430,15 +621,21 @@ export class GameEngine {
     this.state.obstacles = [];
     this.state.winner = null;
     this.state.pausedBy = null;
+    this.state.elapsedTime = 0;
+    this.scheduledSpawns = [];
+    this.gateWaves = [];
+
+    if (this.gameMode === 'campaign') {
+      this.loadCampaignLevelState();
+      return;
+    }
+
     this.state.currentTier = 1;
     this.state.isEndless = false;
     this.state.totalRoundsBeforeEndless = GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4;
     this.rollRoundAxis();
     this.state.activeDirections = this.getActiveSidesForTier(1);
     this.state.tierTimeRemaining = getTierDuration(1);
-    this.state.elapsedTime = 0;
-    this.scheduledSpawns = [];
-    this.gateWaves = [];
   }
 
   private tick() {
@@ -452,21 +649,33 @@ export class GameEngine {
     this.lastTickTime = now;
     this.state.elapsedTime += dt;
 
-    // Process any staggered directional spawns scheduled on the game clock
-    if (this.scheduledSpawns.length > 0) {
-      const due = this.scheduledSpawns.filter((s) => this.state.elapsedTime >= s.triggerAtElapsed);
-      this.scheduledSpawns = this.scheduledSpawns.filter((s) => this.state.elapsedTime < s.triggerAtElapsed);
-      for (const item of due) {
-        item.execute();
-      }
-    }
-
     for (const id in this.state.players) {
       const p = this.state.players[id];
       p.radius = GAME_CONFIG.arena.playerRadius;
       p.hitboxRadius = Math.max(2, GAME_CONFIG.arena.playerRadius - GAME_CONFIG.arena.hitboxForgiveness);
       if (p.alive) {
         p.survivedTime += dt;
+      }
+    }
+
+    if (this.gameMode === 'campaign') {
+      this.updateCampaignObstacles();
+      this.checkCollisions();
+      if ((this.state.status as string) === 'playing') {
+        this.checkCampaignCheckpointsForAll();
+      }
+      if (this.onStateUpdateCallback) {
+        this.onStateUpdateCallback(this.state);
+      }
+      return;
+    }
+
+    // Process any staggered directional spawns scheduled on the game clock
+    if (this.scheduledSpawns.length > 0) {
+      const due = this.scheduledSpawns.filter((s) => this.state.elapsedTime >= s.triggerAtElapsed);
+      this.scheduledSpawns = this.scheduledSpawns.filter((s) => this.state.elapsedTime < s.triggerAtElapsed);
+      for (const item of due) {
+        item.execute();
       }
     }
 
@@ -1343,6 +1552,9 @@ export class GameEngine {
       for (const obs of this.state.obstacles) {
         if (this.isColliding(p, obs)) {
           p.alive = false;
+          if (this.gameMode === 'campaign') {
+            this.state.campaignResult = 'failed';
+          }
           if (this.onPlayerEliminatedCallback) {
             this.onPlayerEliminatedCallback(p, this.state.currentTier);
           }

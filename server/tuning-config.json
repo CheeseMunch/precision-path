@@ -1,42 +1,93 @@
 {
   "rounds": {
-    "totalRoundsBeforeEndless": 4,
+    "totalRoundsBeforeEndless": 7,
     "defaultRoundDurationSeconds": 7,
     "tierDurations": {
       "1": 7,
       "2": 7,
-      "3": 7,
-      "4": 7
+      "3": 5,
+      "4": 5,
+      "5": 10,
+      "6": 7,
+      "7": 7
     },
     "tierDirections": {
       "1": {
-        "mode": "custom",
-        "directions": ["north"]
+        "mode": "random-single",
+        "directions": [
+          "north",
+          "south",
+          "west",
+          "east"
+        ]
       },
       "2": {
-        "mode": "custom",
-        "directions": ["north", "south"]
+        "mode": "all",
+        "directions": [
+          "north",
+          "south",
+          "west",
+          "east"
+        ]
       },
       "3": {
-        "mode": "custom",
-        "directions": ["north", "south", "east"]
+        "mode": "random-vertical",
+        "directions": [
+          "north",
+          "south"
+        ]
       },
       "4": {
+        "mode": "random-horizontal",
+        "directions": [
+          "west",
+          "east"
+        ]
+      },
+      "5": {
         "mode": "all",
-        "directions": ["north", "south", "east", "west"]
+        "directions": [
+          "north",
+          "south",
+          "west",
+          "east"
+        ]
+      },
+      "6": {
+        "mode": "all",
+        "directions": [
+          "north",
+          "south",
+          "west",
+          "east"
+        ]
+      },
+      "7": {
+        "mode": "all",
+        "directions": [
+          "north",
+          "south",
+          "west",
+          "east"
+        ]
       }
     },
     "endlessDirections": {
       "mode": "all",
-      "directions": ["north", "south", "east", "west"]
+      "directions": [
+        "north",
+        "south",
+        "west",
+        "east"
+      ]
     },
     "startCountdownDuration": 1
   },
   "randomness": {
     "seed": null,
-    "gapPositionVariance": 0.74,
+    "gapPositionVariance": 0.7,
     "gapSizeVariance": 0.3,
-    "speedVariance": 0.24,
+    "speedVariance": 0.14,
     "waveIntervalJitter": 0.1,
     "staggerVariance": 0.26,
     "randomizeRound1Direction": true
@@ -51,7 +102,10 @@
         "3": 20,
         "4": 15,
         "5": 10,
-        "endless": 10
+        "6": 30,
+        "7": 15,
+        "8": 15,
+        "endless": 15
       },
       "minTier": 3,
       "label": "Single-Gap Gate"
@@ -64,7 +118,10 @@
         "2": 0,
         "3": 25,
         "4": 25,
-        "5": 30,
+        "5": 50,
+        "6": 15,
+        "7": 30,
+        "8": 30,
         "endless": 30
       },
       "minTier": 1,
@@ -79,6 +136,9 @@
         "3": 20,
         "4": 20,
         "5": 20,
+        "6": 20,
+        "7": 20,
+        "8": 20,
         "endless": 20
       },
       "minTier": 2,
@@ -93,6 +153,9 @@
         "3": 20,
         "4": 30,
         "5": 30,
+        "6": 20,
+        "7": 20,
+        "8": 30,
         "endless": 30
       },
       "minTier": 1,
@@ -103,10 +166,13 @@
       "weight": 15,
       "tierWeights": {
         "1": 0,
-        "2": 15,
+        "2": 75,
         "3": 0,
         "4": 20,
         "5": 30,
+        "6": 15,
+        "7": 50,
+        "8": 30,
         "endless": 30
       },
       "minTier": 2,
@@ -117,10 +183,13 @@
       "weight": 20,
       "tierWeights": {
         "1": 0,
-        "2": 15,
+        "2": 25,
         "3": 20,
         "4": 25,
         "5": 25,
+        "6": 20,
+        "7": 25,
+        "8": 25,
         "endless": 25
       },
       "minTier": 2,
@@ -129,7 +198,7 @@
   },
   "obstacles": {
     "baseSpeed": 145,
-    "verticalLineSpeedMultiplier": 0.75,
+    "verticalLineSpeedMultiplier": 0.7,
     "horizontalLineSpeedMultiplier": 1,
     "speedPerTier": 14,
     "endlessMaxBonusSpeed": 120,

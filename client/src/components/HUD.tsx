@@ -28,19 +28,28 @@ export const HUD: React.FC<HUDProps> = ({
   const alivePlayers = Object.values(gameState.players).filter((p) => p.alive);
   const totalPlayers = Object.keys(gameState.players).length;
   const isPaused = gameState.status === 'paused';
-  const isEndless = Boolean(gameState.isEndless || (gameState.totalRoundsBeforeEndless ? gameState.currentTier > gameState.totalRoundsBeforeEndless : gameState.currentTier === 5));
+  const isCampaign = gameState.gameMode === 'campaign';
+  const isEndless = !isCampaign && Boolean(gameState.isEndless || (gameState.totalRoundsBeforeEndless ? gameState.currentTier > gameState.totalRoundsBeforeEndless : gameState.currentTier === 5));
+  const totalCheckpoints = gameState.checkpoints?.length || 0;
+  const nextCheckpoint = Math.min(gameState.nextCheckpointIndex || 0, totalCheckpoints);
 
   return (
     <header className="w-full h-11 px-3 bg-[#090b12] border-b border-cyber-border/70 flex items-center justify-between shrink-0 z-20 select-none">
       {/* 1. Level */}
       <div
         className={`px-2.5 py-1 rounded border text-xs font-bold font-display tracking-wider uppercase ${
-          isEndless
+          isCampaign
+            ? 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+            : isEndless
             ? 'bg-red-500/20 border-red-500 text-red-400'
             : 'bg-cyan-500/15 border-cyan-400/60 text-cyan-300'
         }`}
       >
-        {isEndless ? 'ENDLESS' : (TIER_LABELS[gameState.currentTier] || `ROUND ${gameState.currentTier}`)}
+        {isCampaign
+          ? `LEVEL ${gameState.campaignLevel || 1}`
+          : isEndless
+          ? 'ENDLESS'
+          : (TIER_LABELS[gameState.currentTier] || `ROUND ${gameState.currentTier}`)}
       </div>
 
       {/* 2. Score */}
@@ -48,13 +57,19 @@ export const HUD: React.FC<HUDProps> = ({
         SCORE: {myPlayer?.score || 0}
       </div>
 
-      {/* 3. Players */}
-      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyber-panel/90 border border-cyber-border text-xs font-mono text-gray-200">
-        <Users className="w-3.5 h-3.5 text-cyan-400" />
-        <span>
-          {alivePlayers.length}/{totalPlayers}
-        </span>
-      </div>
+      {/* 3. Checkpoints (Campaign) or Players (Endless) */}
+      {isCampaign ? (
+        <div className="px-2.5 py-1 rounded bg-emerald-950/60 border border-emerald-500/40 text-xs font-mono text-emerald-300 font-bold">
+          CP: {nextCheckpoint}/{totalCheckpoints}
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-cyber-panel/90 border border-cyber-border text-xs font-mono text-gray-200">
+          <Users className="w-3.5 h-3.5 text-cyan-400" />
+          <span>
+            {alivePlayers.length}/{totalPlayers}
+          </span>
+        </div>
+      )}
 
       {/* 4. Pause Button */}
       <button

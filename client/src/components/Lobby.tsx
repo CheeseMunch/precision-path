@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import { Play, Users, Trophy, Zap } from 'lucide-react';
+import { Play, Users, Trophy, Zap, Flag, Lock, CheckCircle2, X } from 'lucide-react';
+import type { CampaignLevelConfig } from '../../../shared/types';
+import { getCampaignProgress } from '../utils/campaignProgress';
 
 interface LobbyProps {
   playerName: string;
   setPlayerName: (name: string) => void;
   onCreateRoom: (solo?: boolean) => void;
+  onPlayCampaign: (levelNumber: number) => void;
   onJoinRoom: (roomCode: string) => void;
   onOpenLeaderboard: () => void;
 }
@@ -13,10 +16,32 @@ export const Lobby: React.FC<LobbyProps> = ({
   playerName,
   setPlayerName,
   onCreateRoom,
+  onPlayCampaign,
   onJoinRoom,
   onOpenLeaderboard,
 }) => {
   const [joinCode, setJoinCode] = useState('');
+  const [showCampaignModal, setShowCampaignModal] = useState(false);
+  const [campaignLevels, setCampaignLevels] = useState<CampaignLevelConfig[]>([]);
+  const [loadingCampaign, setLoadingCampaign] = useState(false);
+
+  const openCampaignSelect = async () => {
+    setShowCampaignModal(true);
+    setLoadingCampaign(true);
+    try {
+      const res = await fetch('/api/campaign-config');
+      const data = await res.json();
+      if (Array.isArray(data.levels)) {
+        setCampaignLevels(data.levels);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingCampaign(false);
+    }
+  };
+
+  const progress = getCampaignProgress(playerName);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8 relative z-10">
@@ -56,10 +81,17 @@ export const Lobby: React.FC<LobbyProps> = ({
         {/* Action Buttons */}
         <div className="flex flex-col gap-3">
           <button
+            onClick={openCampaignSelect}
+            className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-400 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
+          >
+            <Flag className="w-4 h-4 fill-black" /> Play Campaign
+          </button>
+
+          <button
             onClick={() => onCreateRoom(true)}
             className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition shadow-lg shadow-cyan-500/20 active:scale-[0.98]"
           >
-            <Play className="w-4 h-4 fill-black" /> Play Solo
+            <Play className="w-4 h-4 fill-black" /> Play Solo Endless
           </button>
 
           <button
@@ -123,6 +155,94 @@ export const Lobby: React.FC<LobbyProps> = ({
           <Zap className="w-3.5 h-3.5 animate-pulse" /> Precision Arcade Survival
         </div>
       </div>
+
+      {/* Campaign Level Select Modal */}
+      {showCampaignModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#0d121d] border border-emerald-500/30 rounded-2xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="font-display text-xl font-black text-white tracking-wider uppercase flex items-center gap-2">
+                  <Flag className="w-5 h-5 text-emerald-400" /> Campaign Sectors
+                </h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Clear each structured path without hitting obstacles to unlock the next level.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowCampaignModal(false)}
+                className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {loadingCampaign ? (
+              <div className="py-10 text-center text-xs font-mono text-cyan-400 animate-pulse">
+                LOADING CAMPAIGN SECTORS...
+              </div>
+            ) : (
+              <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
+                {campaignLevels.map((lvl) => {
+                  const unlocked = lvl.levelNumber <= progress.highestUnlockedLevel;
+                  const record = progress.completedLevels[lvl.levelNumber];
+                  return (
+                    <button
+                      key={lvl.levelNumber}
+                      disabled={!unlocked}
+                      onClick={() => {
+                        setShowCampaignModal(false);
+                        onPlayCampaign(lvl.levelNumber);
+                      }}
+                      className={`w-full text-left p-4 rounded-xl border transition flex items-center justify-between gap-3 ${
+                        unlocked
+                          ? 'bg-slate-900/90 hover:bg-slate-800/90 border-emerald-500/30 hover:border-emerald-400 cursor-pointer'
+                          : 'bg-slate-950/60 border-slate-800/70 opacity-60 cursor-not-allowed'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            LEVEL {lvl.levelNumber}
+                          </span>
+                          <span className="font-display font-bold text-white text-sm">{lvl.name}</span>
+                        </div>
+                        {lvl.description && (
+                          <div className="text-xs text-slate-400">{lvl.description}</div>
+                        )}
+                        <div className="text-[11px] font-mono text-slate-500">
+                          {lvl.checkpoints.length} Checkpoints &bull; Par {lvl.parTimeSeconds}s &bull; +{lvl.clearBonusPoints} Clear Bonus
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {!unlocked ? (
+                          <div className="flex items-center gap-1 text-xs font-mono text-slate-500">
+                            <Lock className="w-4 h-4" /> Locked
+                          </div>
+                        ) : record ? (
+                          <>
+                            <div className="flex items-center gap-1 text-xs font-mono text-emerald-400 font-bold">
+                              <CheckCircle2 className="w-4 h-4" /> Cleared
+                            </div>
+                            <div className="text-[11px] font-mono text-cyan-300">
+                              Best: {record.bestScore}
+                            </div>
+                          </>
+                        ) : (
+                          <span className="text-xs font-mono font-bold text-cyan-400 uppercase">
+                            Play &rarr;
+                          </span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
