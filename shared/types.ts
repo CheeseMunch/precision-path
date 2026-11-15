@@ -25,6 +25,7 @@ export interface Obstacle {
   spawnX?: number;
   spawnY?: number;
   spawnTime?: number;
+  spawnRotation?: number;
   vx: number;
   vy: number;
   width: number;

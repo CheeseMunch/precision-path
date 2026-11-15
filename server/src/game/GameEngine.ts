@@ -774,6 +774,44 @@ export class GameEngine {
         this.registerGateWave(direction, safeSpeed, tier, orbGaps);
         break;
       }
+
+      case 'diagonal-spinner': {
+        const spinnerLength = 152;
+        const spinnerThickness = 16;
+        const rotSpeed = this.randomRange(1.8, 2.5) * (this.random() > 0.5 ? 1 : -1);
+        const initialRotation = this.randomRange(0, Math.PI * 2);
+        // Vibrant Neon Purple/Violet color for diagonal spinning blades
+        const spinnerColor = '#b800ff';
+
+        // Diagonal drift across the lateral axis giving the obstacle its diagonal trajectory
+        const driftSign = this.random() > 0.5 ? 1 : -1;
+        const lateralDrift = safeSpeed * this.randomRange(0.45, 0.7) * driftSign;
+
+        this.addLocalSpinningObstacle(
+          direction,
+          gapCenter,
+          0,
+          spinnerLength,
+          spinnerThickness,
+          safeSpeed,
+          lateralDrift,
+          initialRotation,
+          rotSpeed,
+          spinnerColor
+        );
+
+        // Score gate openings on both sides of the spinning blade
+        const bladeRadius = spinnerLength / 2 + 12;
+        const gaps = [
+          { start: -lateralHalfSpan, end: gapCenter - bladeRadius },
+          { start: gapCenter + bladeRadius, end: lateralHalfSpan },
+        ].filter((g) => g.end - g.start >= 24);
+
+        if (gaps.length > 0) {
+          this.registerGateWave(direction, safeSpeed, tier, gaps);
+        }
+        break;
+      }
     }
   }
 
@@ -1032,6 +1070,79 @@ export class GameEngine {
     });
   }
 
+  /**
+   * Maps a spinning bar defined in the wave's local coordinate space with lateral drift
+   * and rotational velocity into arena coordinates.
+   */
+  private addLocalSpinningObstacle(
+    direction: ObstacleDirection,
+    lateral: number,
+    depthOffset: number,
+    length: number,
+    thickness: number,
+    speed: number,
+    lateralDrift: number,
+    initialRotation: number,
+    rotationSpeed: number,
+    color: string
+  ) {
+    const isVerticalTravel = direction === 'north' || direction === 'south';
+    const halfBound = isVerticalTravel ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
+    const spawnDist = halfBound + GAME_CONFIG.obstacles.spawnDistanceOffset + depthOffset;
+
+    let x = 0;
+    let y = 0;
+    let vx = 0;
+    let vy = 0;
+
+    switch (direction) {
+      case 'north':
+        x = lateral;
+        y = -spawnDist;
+        vx = lateralDrift;
+        vy = speed;
+        break;
+      case 'south':
+        x = lateral;
+        y = spawnDist;
+        vx = lateralDrift;
+        vy = -speed;
+        break;
+      case 'west':
+        x = -spawnDist;
+        y = lateral;
+        vx = speed;
+        vy = lateralDrift;
+        break;
+      case 'east':
+        x = spawnDist;
+        y = lateral;
+        vx = -speed;
+        vy = lateralDrift;
+        break;
+    }
+
+    this.state.obstacles.push({
+      id: crypto.randomUUID(),
+      type: 'rectangle',
+      x,
+      y,
+      spawnX: x,
+      spawnY: y,
+      spawnTime: this.state.elapsedTime,
+      spawnRotation: initialRotation,
+      vx,
+      vy,
+      width: length,
+      height: thickness,
+      rotation: initialRotation,
+      rotationSpeed,
+      color,
+      direction,
+      speed: Math.hypot(vx, vy),
+    });
+  }
+
   private updateObstacles(dt: number) {
     const despawnLimitX = this.ARENA_WIDTH / 2 + 90;
     const despawnLimitY = this.ARENA_HEIGHT / 2 + 90;
@@ -1042,22 +1153,25 @@ export class GameEngine {
         const age = Math.max(0, this.state.elapsedTime - obs.spawnTime);
         obs.x = obs.spawnX + obs.vx * age;
         obs.y = obs.spawnY + obs.vy * age;
+        if (obs.rotationSpeed) {
+          const spawnRot = obs.spawnRotation !== undefined ? obs.spawnRotation : 0;
+          obs.rotation = spawnRot + obs.rotationSpeed * age;
+        }
       } else {
         obs.x += obs.vx * dt;
         obs.y += obs.vy * dt;
-      }
-
-      if (obs.rotationSpeed) {
-        obs.rotation += obs.rotationSpeed * dt;
+        if (obs.rotationSpeed) {
+          obs.rotation += obs.rotationSpeed * dt;
+        }
       }
 
       let outOfBounds = false;
-      if (obs.direction === 'north' && obs.y > despawnLimitY) outOfBounds = true;
-      else if (obs.direction === 'south' && obs.y < -despawnLimitY) outOfBounds = true;
-      else if (obs.direction === 'west' && obs.x > despawnLimitX) outOfBounds = true;
-      else if (obs.direction === 'east' && obs.x < -despawnLimitX) outOfBounds = true;
-      else if (obs.direction === 'radial' && Math.hypot(obs.x, obs.y) > despawnLimitY + 40)
-        outOfBounds = true;
+      if (obs.direction === 'north' && (obs.y > despawnLimitY || Math.abs(obs.x) > despawnLimitX + 80)) outOfBounds = true;
+      else if (obs.direction === 'south' && (obs.y < -despawnLimitY || Math.abs(obs.x) > despawnLimitX + 80)) outOfBounds = true;
+      else if (obs.direction === 'west' && (obs.x > despawnLimitX || Math.abs(obs.y) > despawnLimitY + 80)) outOfBounds = true;
+      else if (obs.direction === 'east' && (obs.x < -despawnLimitX || Math.abs(obs.y) > despawnLimitY + 80)) outOfBounds = true;
+      else if (obs.direction === 'diagonal' && (Math.abs(obs.x) > despawnLimitX + 80 || Math.abs(obs.y) > despawnLimitY + 80)) outOfBounds = true;
+      else if (obs.direction === 'radial' && Math.hypot(obs.x, obs.y) > despawnLimitY + 40) outOfBounds = true;
 
       if (!outOfBounds) {
         remaining.push(obs);
@@ -1170,11 +1284,23 @@ export class GameEngine {
     const halfW = obs.width / 2;
     const halfH = obs.height / 2;
 
-    const closestX = Math.max(obs.x - halfW, Math.min(player.x, obs.x + halfW));
-    const closestY = Math.max(obs.y - halfH, Math.min(player.y, obs.y + halfH));
+    let pX = player.x - obs.x;
+    let pY = player.y - obs.y;
 
-    const distanceX = player.x - closestX;
-    const distanceY = player.y - closestY;
+    if (obs.rotation) {
+      const cos = Math.cos(-obs.rotation);
+      const sin = Math.sin(-obs.rotation);
+      const rx = pX * cos - pY * sin;
+      const ry = pX * sin + pY * cos;
+      pX = rx;
+      pY = ry;
+    }
+
+    const closestX = Math.max(-halfW, Math.min(pX, halfW));
+    const closestY = Math.max(-halfH, Math.min(pY, halfH));
+
+    const distanceX = pX - closestX;
+    const distanceY = pY - closestY;
 
     return distanceX * distanceX + distanceY * distanceY < effectiveRadius * effectiveRadius;
   }

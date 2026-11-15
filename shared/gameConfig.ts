@@ -5,7 +5,8 @@ export type ObstaclePatternType =
   | 'double-gap-wall'
   | 'sweeping-half-wall'
   | 'staggered-blocks'
-  | 'orb-cluster';
+  | 'orb-cluster'
+  | 'diagonal-spinner';
 
 export interface ObstacleTypeConfig {
   /** Whether this obstacle archetype is active in procedural generation */
@@ -140,6 +141,13 @@ export const GAME_CONFIG = {
       tierWeights: { 1: 0, 2: 10, 3: 15, 4: 20, 5: 25 },
       minTier: 3,
       label: 'Pulse Orb Barrage',
+    },
+    'diagonal-spinner': {
+      enabled: true,
+      weight: 20,
+      tierWeights: { 1: 0, 2: 15, 3: 20, 4: 25, 5: 25 },
+      minTier: 2,
+      label: 'Diagonal Spinning Blade',
     },
   } as Record<ObstaclePatternType, ObstacleTypeConfig>,
 

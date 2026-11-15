@@ -318,6 +318,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const drawX = baseX + obs.vx * ageSec;
         const drawY = baseY + obs.vy * ageSec;
 
+        const baseRot = obs.spawnRotation !== undefined ? obs.spawnRotation : (obs.rotation || 0);
+        const currentRot = baseRot + (obs.rotationSpeed || 0) * ageSec;
+
         // Frame-exact local collision check against the exact drawn wall coordinates (zero desync)
         if (
           isPlaying &&
@@ -334,10 +337,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           } else {
             const hw = obs.width / 2;
             const hh = obs.height / 2;
-            const closestX = Math.max(drawX - hw, Math.min(mePos.x, drawX + hw));
-            const closestY = Math.max(drawY - hh, Math.min(mePos.y, drawY + hh));
-            const dx = mePos.x - closestX;
-            const dy = mePos.y - closestY;
+            let pX = mePos.x - drawX;
+            let pY = mePos.y - drawY;
+
+            if (currentRot !== 0) {
+              const cos = Math.cos(-currentRot);
+              const sin = Math.sin(-currentRot);
+              const rx = pX * cos - pY * sin;
+              const ry = pX * sin + pY * cos;
+              pX = rx;
+              pY = ry;
+            }
+
+            const closestX = Math.max(-hw, Math.min(pX, hw));
+            const closestY = Math.max(-hh, Math.min(pY, hh));
+            const dx = pX - closestX;
+            const dy = pY - closestY;
             hit = dx * dx + dy * dy < meHitboxRadius * meHitboxRadius;
           }
 
@@ -364,10 +379,29 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         } else {
           const w = obs.width;
           const h = obs.height;
-          ctx.beginPath();
-          ctx.roundRect(drawX - w / 2, drawY - h / 2, w, h, 4);
-          ctx.fill();
-          ctx.stroke();
+          if (currentRot !== 0) {
+            ctx.save();
+            ctx.translate(drawX, drawY);
+            ctx.rotate(currentRot);
+            ctx.beginPath();
+            ctx.roundRect(-w / 2, -h / 2, w, h, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            // Glowing center pivot dot for spinning obstacles
+            if (obs.rotationSpeed) {
+              ctx.fillStyle = '#ffffff';
+              ctx.beginPath();
+              ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            ctx.restore();
+          } else {
+            ctx.beginPath();
+            ctx.roundRect(drawX - w / 2, drawY - h / 2, w, h, 4);
+            ctx.fill();
+            ctx.stroke();
+          }
         }
       }
 
