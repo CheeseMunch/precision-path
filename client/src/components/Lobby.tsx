@@ -110,10 +110,10 @@ export const Lobby: React.FC<LobbyProps> = ({
       {/* Core Rules Chips */}
       <div className="mt-8 grid grid-cols-2 gap-3 max-w-md w-full text-center">
         <div className="p-3.5 bg-cyber-panel/50 border border-cyber-border/40 rounded-lg">
-          <div className="text-xs font-bold text-cyan-400 font-mono">1. PASS THROUGH THE GATES.</div>
+          <div className="text-xs font-bold text-cyan-400 font-mono">PASS THROUGH THE GATES.</div>
         </div>
         <div className="p-3.5 bg-cyber-panel/50 border border-pink-500/40 rounded-lg">
-          <div className="text-xs font-bold text-pink-400 font-mono">2. SURVIVE.</div>
+          <div className="text-xs font-bold text-pink-400 font-mono">SURVIVE.</div>
         </div>
       </div>
     </div>
