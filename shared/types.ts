@@ -139,6 +139,13 @@ export interface GameState {
   campaignResult?: 'cleared' | 'failed' | null;
   campaignClearBonus?: number;
   campaignTimeBonus?: number;
+  campaignTransitionBanner?: {
+    clearedLevel: number;
+    clearedName: string;
+    nextLevel: number;
+    nextName: string;
+    bonusPoints: number;
+  } | null;
   status: 'lobby' | 'countdown' | 'playing' | 'paused' | 'gameover';
   pausedBy?: string | null;
   countdownTimer: number;

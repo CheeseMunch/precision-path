@@ -29,6 +29,7 @@ export const App: React.FC = () => {
   const lastTierRef = useRef<number>(1);
   const wasAliveRef = useRef<boolean>(true);
   const lastStatusRef = useRef<string>('lobby');
+  const lastTransitionClearedLevelRef = useRef<number>(0);
   const liveGameStateRef = useRef<GameState | null>(null);
   const lastUiSyncSignatureRef = useRef<string>('');
 
@@ -88,10 +89,28 @@ export const App: React.FC = () => {
       // Only trigger a React state re-render when HUD/Modal-visible fields change
       const playersArr = Object.values(state.players);
       const aliveCount = playersArr.filter((p) => p.alive).length;
-      const uiSig = `${state.status}|${state.gameMode}|${state.campaignLevel ?? 0}|${state.nextCheckpointIndex ?? 0}|${state.campaignResult ?? ''}|${state.currentTier}|${me?.score ?? 0}|${me?.alive ?? true}|${aliveCount}/${playersArr.length}|${state.pausedBy ?? ''}|${state.winner?.id ?? ''}`;
+      const transLvl = state.campaignTransitionBanner?.clearedLevel ?? 0;
+      const uiSig = `${state.status}|${state.gameMode}|${state.campaignLevel ?? 0}|${transLvl}|${state.nextCheckpointIndex ?? 0}|${state.campaignResult ?? ''}|${state.currentTier}|${me?.score ?? 0}|${me?.alive ?? true}|${aliveCount}/${playersArr.length}|${state.pausedBy ?? ''}|${state.winner?.id ?? ''}`;
       if (uiSig !== lastUiSyncSignatureRef.current) {
         lastUiSyncSignatureRef.current = uiSig;
         setGameState(state);
+      }
+
+      if (
+        state.gameMode === 'campaign' &&
+        state.campaignTransitionBanner &&
+        state.campaignTransitionBanner.clearedLevel !== lastTransitionClearedLevelRef.current
+      ) {
+        lastTransitionClearedLevelRef.current = state.campaignTransitionBanner.clearedLevel;
+        sound.playLevelComplete(true);
+        markCampaignLevelCleared(
+          me?.name || 'Player',
+          state.campaignTransitionBanner.clearedLevel,
+          me?.score ?? 0,
+          me?.survivedTime ?? state.elapsedTime
+        );
+      } else if (!state.campaignTransitionBanner) {
+        lastTransitionClearedLevelRef.current = 0;
       }
 
       if (

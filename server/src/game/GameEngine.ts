@@ -52,6 +52,7 @@ export class GameEngine {
   private campaignLevelNumber = 1;
   private campaignObstacleSpecs: Map<string, CampaignObstacleSpec> = new Map();
   private campaignWaveQueue: Array<{ triggerAt: number; wave: CampaignWaveSpec }> = [];
+  private campaignTransitionTimer: number | null = null;
 
   private onGameOverCallback?: (state: GameState) => void;
   private onTierUpCallback?: (tier: GameTier) => void;
@@ -462,6 +463,8 @@ export class GameEngine {
     this.state.campaignResult = null;
     this.state.campaignClearBonus = 0;
     this.state.campaignTimeBonus = 0;
+    this.state.campaignTransitionBanner = null;
+    this.campaignTransitionTimer = null;
     this.state.activeDirections = [];
     this.state.currentTier = level.levelNumber;
     this.state.isEndless = false;
@@ -694,6 +697,39 @@ export class GameEngine {
     }
   }
 
+  private triggerCampaignLevelClear(winner?: Player): boolean {
+    const level = getCampaignLevel(this.campaignLevelNumber);
+    const timeBonus = Math.max(0, Math.round((level.parTimeSeconds - this.state.elapsedTime) * 25));
+    const bonusPoints = level.clearBonusPoints + timeBonus;
+    if (winner) {
+      winner.score += bonusPoints;
+    }
+    this.campaignWaveQueue = [];
+    this.state.campaignClearBonus = level.clearBonusPoints;
+    this.state.campaignTimeBonus = timeBonus;
+
+    const totalLevels = CAMPAIGN_CONFIG.levels.length;
+    if (this.campaignLevelNumber < totalLevels) {
+      const nextLevel = getCampaignLevel(this.campaignLevelNumber + 1);
+      this.campaignTransitionTimer = 2.2;
+      this.state.campaignTransitionBanner = {
+        clearedLevel: level.levelNumber,
+        clearedName: level.name,
+        nextLevel: nextLevel.levelNumber,
+        nextName: nextLevel.name,
+        bonusPoints,
+      };
+      return false;
+    }
+
+    if (this.state.obstacles.length === 0) {
+      this.state.campaignResult = 'cleared';
+      this.endGame(winner ?? null);
+      return true;
+    }
+    return false;
+  }
+
   private checkCampaignCheckpointForPlayer(
     player: Player,
     prevX: number = player.x,
@@ -756,15 +792,8 @@ export class GameEngine {
         player.gatesCleared = (player.gatesCleared || 0) + 1;
         this.state.nextCheckpointIndex = checkpoints.filter((c) => c.reached).length;
 
-        if (checkpoints.every((c) => c.reached) && this.campaignWaveQueue.length === 0 && this.state.obstacles.length === 0) {
-          const level = getCampaignLevel(this.campaignLevelNumber);
-          const timeBonus = Math.max(0, Math.round((level.parTimeSeconds - this.state.elapsedTime) * 25));
-          player.score += level.clearBonusPoints + timeBonus;
-          this.state.campaignClearBonus = level.clearBonusPoints;
-          this.state.campaignTimeBonus = timeBonus;
-          this.state.campaignResult = 'cleared';
-          this.endGame(player);
-          return true;
+        if (checkpoints.every((c) => c.reached) && this.campaignTransitionTimer === null) {
+          return this.triggerCampaignLevelClear(player);
         }
         return false;
       }
@@ -920,7 +949,7 @@ export class GameEngine {
       }
 
       // Fail if any unreached moving gate exited the arena completely
-      if ((this.state.status as string) === 'playing' && this.state.checkpoints) {
+      if ((this.state.status as string) === 'playing' && this.campaignTransitionTimer === null && this.state.checkpoints) {
         for (const cp of this.state.checkpoints) {
           if (!cp.reached && cp.spawnTime !== undefined && cp.travelSign) {
             const halfBound = cp.axis === 'horizontal' ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
@@ -937,24 +966,27 @@ export class GameEngine {
         }
       }
 
-      // Clear level once all scheduled waves have spawned, all gates are cleared, and arena is clear
-      if (
+      // Seamless lull between levels, or end campaign on final level clear
+      if ((this.state.status as string) === 'playing' && this.campaignTransitionTimer !== null) {
+        this.campaignTransitionTimer -= dt;
+        if (
+          this.campaignTransitionTimer <= 0 &&
+          (this.state.obstacles.length === 0 || this.campaignTransitionTimer <= -1.5)
+        ) {
+          this.campaignLevelNumber += 1;
+          this.state.elapsedTime = 0;
+          this.state.obstacles = [];
+          this.loadCampaignLevelState();
+        }
+      } else if (
         (this.state.status as string) === 'playing' &&
         this.campaignWaveQueue.length === 0 &&
         this.state.obstacles.length === 0 &&
         this.state.checkpoints &&
         this.state.checkpoints.every((c) => c.reached)
       ) {
-        const level = getCampaignLevel(this.campaignLevelNumber);
         const aliveWinner = Object.values(this.state.players).find((p) => p.alive) || Object.values(this.state.players)[0];
-        const timeBonus = Math.max(0, Math.round((level.parTimeSeconds - this.state.elapsedTime) * 25));
-        if (aliveWinner) {
-          aliveWinner.score += level.clearBonusPoints + timeBonus;
-        }
-        this.state.campaignClearBonus = level.clearBonusPoints;
-        this.state.campaignTimeBonus = timeBonus;
-        this.state.campaignResult = 'cleared';
-        this.endGame(aliveWinner);
+        this.triggerCampaignLevelClear(aliveWinner);
       }
 
       if (this.onStateUpdateCallback) {

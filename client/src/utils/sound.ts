@@ -207,8 +207,8 @@ class SoundSystem {
     this.playClip(this.failureAudio);
   }
 
-  public playLevelComplete() {
-    this.stopMusic();
+  public playLevelComplete(keepMusic: boolean = false) {
+    if (!keepMusic) this.stopMusic();
     if (!this.enabled) return;
     this.playClip(this.levelCompleteAudio, 0.9);
   }

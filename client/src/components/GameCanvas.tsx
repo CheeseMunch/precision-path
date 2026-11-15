@@ -701,6 +701,35 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
       popupsRef.current = remainingPopups;
 
+      // 9. Non-blocking Campaign Level-Cleared Seamless Transition Banner
+      const trans = currentState.campaignTransitionBanner;
+      if (trans) {
+        ctx.save();
+        const boxW = Math.min(340, arenaWidth - 36);
+        const boxH = 62;
+        const boxY = -halfH + 22;
+        ctx.fillStyle = 'rgba(6, 15, 28, 0.86)';
+        ctx.strokeStyle = 'rgba(52, 211, 153, 0.85)';
+        ctx.lineWidth = 2;
+        ctx.shadowColor = '#10b981';
+        ctx.shadowBlur = 16;
+        ctx.beginPath();
+        ctx.roundRect(-boxW / 2, boxY, boxW, boxH, 10);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.shadowBlur = 0;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#34d399';
+        ctx.font = 'bold 13px Orbitron, sans-serif';
+        ctx.fillText(`LEVEL ${trans.clearedLevel} CLEARED!  +${trans.bonusPoints}`, 0, boxY + 21);
+        ctx.fillStyle = '#e2e8f0';
+        ctx.font = 'bold 11px Orbitron, monospace';
+        ctx.fillText(`NEXT: LEVEL ${trans.nextLevel} — ${trans.nextName.toUpperCase()}`, 0, boxY + 43);
+        ctx.restore();
+      }
+
       ctx.restore(); // Restore center translate
       animFrameRef.current = requestAnimationFrame(render);
     };
