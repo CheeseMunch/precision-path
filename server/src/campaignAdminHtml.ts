@@ -137,6 +137,10 @@ export function renderCampaignAdminPage(adminToken: string): string {
               <input id="metaName" type="text" class="input-dark" oninput="updateLevelMeta('name', this.value)" />
             </div>
             <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Story / Chapter (groups sectors)</label>
+              <input id="metaStoryName" type="text" class="input-dark" placeholder="Story 1" oninput="updateLevelMeta('storyName', this.value)" />
+            </div>
+            <div class="col-span-2">
               <label class="block text-[11px] text-slate-400 mb-1">Description</label>
               <input id="metaDesc" type="text" class="input-dark" oninput="updateLevelMeta('description', this.value)" />
             </div>
@@ -533,6 +537,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
         id: 'level-' + Date.now(),
         levelNumber: nextNum,
         name: 'Level ' + nextNum + ' Sector',
+        storyName: (curLevel() && curLevel().storyName) ? curLevel().storyName : 'Story 1',
         description: 'Custom wave sequence',
         spawn: { x: 0, y: 120 },
         clearBonusPoints: 500,
@@ -1057,6 +1062,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
         const lvl = curLevel();
         if (!lvl) return;
         document.getElementById('metaName').value = lvl.name || '';
+        document.getElementById('metaStoryName').value = lvl.storyName || 'Story 1';
         document.getElementById('metaDesc').value = lvl.description || '';
         document.getElementById('metaClearBonus').value = lvl.clearBonusPoints ?? 500;
         document.getElementById('metaParTime').value = lvl.parTimeSeconds ?? 20;

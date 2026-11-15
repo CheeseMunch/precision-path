@@ -320,6 +320,7 @@ function sanitizeCampaignLevel(lvl: any, idx: number): CampaignLevelConfig {
     id: String(lvl?.id || `level-${idx + 1}`),
     levelNumber: idx + 1,
     name: String(lvl?.name || `Level ${idx + 1}`).slice(0, 60),
+    storyName: lvl?.storyName ? String(lvl.storyName).slice(0, 60) : 'Story 1',
     description: String(lvl?.description || '').slice(0, 160),
     spawn: {
       x: Math.max(-210, Math.min(210, Number(lvl?.spawn?.x ?? 0))),

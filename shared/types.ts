@@ -118,6 +118,7 @@ export interface CampaignLevelConfig {
   id: string;
   levelNumber: number;
   name: string;
+  storyName?: string;
   description: string;
   spawn: { x: number; y: number };
   clearBonusPoints: number;
@@ -132,6 +133,8 @@ export interface GameState {
   gameMode?: GameMode;
   campaignLevel?: number;
   campaignLevelName?: string;
+  campaignStoryName?: string;
+  campaignStoryCompleted?: boolean;
   totalCampaignLevels?: number;
   campaignSpawn?: { x: number; y: number };
   checkpoints?: CampaignCheckpoint[];

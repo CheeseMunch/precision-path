@@ -10,6 +10,7 @@ class SoundSystem {
   private gameAudio: HTMLAudioElement | null = null;
   private failureAudio: HTMLAudioElement | null = null;
   private levelCompleteAudio: HTMLAudioElement | null = null;
+  private storyCompleteAudio: HTMLAudioElement | null = null;
   private bgmAudio: HTMLAudioElement | null = null;
   private musicActive: boolean = false;
   private musicPaused: boolean = false;
@@ -32,6 +33,8 @@ class SoundSystem {
       this.failureAudio.preload = 'auto';
       this.levelCompleteAudio = new Audio('/sounds/level-complete.mp3');
       this.levelCompleteAudio.preload = 'auto';
+      this.storyCompleteAudio = new Audio('/sounds/story-complete.mp3');
+      this.storyCompleteAudio.preload = 'auto';
       this.bgmAudio = new Audio('/sounds/bgm.mp3');
       this.bgmAudio.preload = 'auto';
       this.bgmAudio.loop = true;
@@ -211,6 +214,12 @@ class SoundSystem {
     if (!keepMusic) this.stopMusic();
     if (!this.enabled) return;
     this.playClip(this.levelCompleteAudio, 0.9);
+  }
+
+  public playStoryComplete() {
+    this.stopMusic();
+    if (!this.enabled) return;
+    this.playClip(this.storyCompleteAudio, 0.9);
   }
 
   public playCollision() {

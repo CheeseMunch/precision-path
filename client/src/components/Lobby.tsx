@@ -182,62 +182,86 @@ export const Lobby: React.FC<LobbyProps> = ({
                 LOADING CAMPAIGN SECTORS...
               </div>
             ) : (
-              <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1">
-                {campaignLevels.map((lvl) => {
-                  const unlocked = lvl.levelNumber <= progress.highestUnlockedLevel;
-                  const record = progress.completedLevels[lvl.levelNumber];
-                  return (
-                    <button
-                      key={lvl.levelNumber}
-                      disabled={!unlocked}
-                      onClick={() => {
-                        setShowCampaignModal(false);
-                        onPlayCampaign(lvl.levelNumber);
-                      }}
-                      className={`w-full text-left p-4 rounded-xl border transition flex items-center justify-between gap-3 ${
-                        unlocked
-                          ? 'bg-slate-900/90 hover:bg-slate-800/90 border-emerald-500/30 hover:border-emerald-400 cursor-pointer'
-                          : 'bg-slate-950/60 border-slate-800/70 opacity-60 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                            LEVEL {lvl.levelNumber}
-                          </span>
-                          <span className="font-display font-bold text-white text-sm">{lvl.name}</span>
-                        </div>
-                        {lvl.description && (
-                          <div className="text-xs text-slate-400">{lvl.description}</div>
-                        )}
-                        <div className="text-[11px] font-mono text-slate-500">
-                          {lvl.checkpoints.length} Checkpoints &bull; Par {lvl.parTimeSeconds}s &bull; +{lvl.clearBonusPoints} Clear Bonus
-                        </div>
+              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                {(() => {
+                  const groups: Array<{ storyName: string; levels: CampaignLevelConfig[] }> = [];
+                  for (const lvl of campaignLevels) {
+                    const sName = (lvl.storyName || 'Story 1').trim();
+                    const last = groups[groups.length - 1];
+                    if (last && last.storyName === sName) {
+                      last.levels.push(lvl);
+                    } else {
+                      groups.push({ storyName: sName, levels: [lvl] });
+                    }
+                  }
+                  return groups.map((grp, gIdx) => (
+                    <div key={`${grp.storyName}-${gIdx}`} className="space-y-2">
+                      <div className="flex items-center justify-between px-1 pt-1">
+                        <span className="text-xs font-display font-bold uppercase tracking-wider text-cyan-300">
+                          {grp.storyName}
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-500">
+                          {grp.levels.length} sector{grp.levels.length === 1 ? '' : 's'}
+                        </span>
                       </div>
+                      {grp.levels.map((lvl) => {
+                        const unlocked = lvl.levelNumber <= progress.highestUnlockedLevel;
+                        const record = progress.completedLevels[lvl.levelNumber];
+                        return (
+                          <button
+                            key={lvl.levelNumber}
+                            disabled={!unlocked}
+                            onClick={() => {
+                              setShowCampaignModal(false);
+                              onPlayCampaign(lvl.levelNumber);
+                            }}
+                            className={`w-full text-left p-4 rounded-xl border transition flex items-center justify-between gap-3 ${
+                              unlocked
+                                ? 'bg-slate-900/90 hover:bg-slate-800/90 border-emerald-500/30 hover:border-emerald-400 cursor-pointer'
+                                : 'bg-slate-950/60 border-slate-800/70 opacity-60 cursor-not-allowed'
+                            }`}
+                          >
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                  LEVEL {lvl.levelNumber}
+                                </span>
+                                <span className="font-display font-bold text-white text-sm">{lvl.name}</span>
+                              </div>
+                              {lvl.description && (
+                                <div className="text-xs text-slate-400">{lvl.description}</div>
+                              )}
+                              <div className="text-[11px] font-mono text-slate-500">
+                                {lvl.checkpoints.length} Checkpoints &bull; Par {lvl.parTimeSeconds}s &bull; +{lvl.clearBonusPoints} Clear Bonus
+                              </div>
+                            </div>
 
-                      <div className="flex flex-col items-end gap-1 shrink-0">
-                        {!unlocked ? (
-                          <div className="flex items-center gap-1 text-xs font-mono text-slate-500">
-                            <Lock className="w-4 h-4" /> Locked
-                          </div>
-                        ) : record ? (
-                          <>
-                            <div className="flex items-center gap-1 text-xs font-mono text-emerald-400 font-bold">
-                              <CheckCircle2 className="w-4 h-4" /> Cleared
+                            <div className="flex flex-col items-end gap-1 shrink-0">
+                              {!unlocked ? (
+                                <div className="flex items-center gap-1 text-xs font-mono text-slate-500">
+                                  <Lock className="w-4 h-4" /> Locked
+                                </div>
+                              ) : record ? (
+                                <>
+                                  <div className="flex items-center gap-1 text-xs font-mono text-emerald-400 font-bold">
+                                    <CheckCircle2 className="w-4 h-4" /> Cleared
+                                  </div>
+                                  <div className="text-[11px] font-mono text-cyan-300">
+                                    Best: {record.bestScore}
+                                  </div>
+                                </>
+                              ) : (
+                                <span className="text-xs font-mono font-bold text-cyan-400 uppercase">
+                                  Play &rarr;
+                                </span>
+                              )}
                             </div>
-                            <div className="text-[11px] font-mono text-cyan-300">
-                              Best: {record.bestScore}
-                            </div>
-                          </>
-                        ) : (
-                          <span className="text-xs font-mono font-bold text-cyan-400 uppercase">
-                            Play &rarr;
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ));
+                })()}
               </div>
             )}
           </div>

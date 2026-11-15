@@ -458,6 +458,8 @@ export class GameEngine {
     this.state.gameMode = 'campaign';
     this.state.campaignLevel = level.levelNumber;
     this.state.campaignLevelName = level.name;
+    this.state.campaignStoryName = level.storyName || 'Story 1';
+    this.state.campaignStoryCompleted = false;
     this.state.totalCampaignLevels = CAMPAIGN_CONFIG.levels.length;
     this.state.campaignSpawn = { ...level.spawn };
     this.state.campaignResult = null;
@@ -709,21 +711,27 @@ export class GameEngine {
     this.state.campaignTimeBonus = timeBonus;
 
     const totalLevels = CAMPAIGN_CONFIG.levels.length;
+    const curStory = (level.storyName || 'Story 1').trim();
     if (this.campaignLevelNumber < totalLevels) {
       const nextLevel = getCampaignLevel(this.campaignLevelNumber + 1);
-      this.campaignTransitionTimer = 2.2;
-      this.state.campaignTransitionBanner = {
-        clearedLevel: level.levelNumber,
-        clearedName: level.name,
-        nextLevel: nextLevel.levelNumber,
-        nextName: nextLevel.name,
-        bonusPoints,
-      };
-      return false;
+      const nextStory = (nextLevel.storyName || 'Story 1').trim();
+      if (curStory === nextStory) {
+        this.campaignTransitionTimer = 2.2;
+        this.state.campaignTransitionBanner = {
+          clearedLevel: level.levelNumber,
+          clearedName: level.name,
+          nextLevel: nextLevel.levelNumber,
+          nextName: nextLevel.name,
+          bonusPoints,
+        };
+        return false;
+      }
     }
 
+    this.state.campaignStoryName = curStory;
     if (this.state.obstacles.length === 0) {
       this.state.campaignResult = 'cleared';
+      this.state.campaignStoryCompleted = true;
       this.endGame(winner ?? null);
       return true;
     }

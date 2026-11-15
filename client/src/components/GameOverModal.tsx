@@ -47,7 +47,9 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           <h2 className="text-2xl md:text-3xl font-black font-display tracking-tight text-white uppercase">
             {isCampaign
               ? isCampaignCleared
-                ? 'LEVEL CLEARED!'
+                ? gameState.campaignStoryCompleted
+                  ? 'STORY COMPLETE!'
+                  : 'LEVEL CLEARED!'
                 : 'MISSION FAILED'
               : isSolo
               ? 'MISSION OVER'
@@ -57,6 +59,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
           </h2>
           {isCampaign && (
             <p className="text-xs font-mono text-emerald-300 mt-1">
+              {gameState.campaignStoryName ? `${gameState.campaignStoryName} • ` : ''}
               Level {gameState.campaignLevel}: {gameState.campaignLevelName}
             </p>
           )}

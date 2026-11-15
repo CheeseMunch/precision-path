@@ -167,7 +167,11 @@ export const App: React.FC = () => {
         sound.stopMusic();
         setShowReadyGo(false);
         if (state.gameMode === 'campaign' && state.campaignResult === 'cleared') {
-          sound.playLevelComplete();
+          if (state.campaignStoryCompleted) {
+            sound.playStoryComplete();
+          } else {
+            sound.playLevelComplete();
+          }
         } else if (!me || !wasAliveRef.current) {
           // If local player was already eliminated earlier in multiplayer, play "GAME!" when the match finally ends
           sound.playCollision();
