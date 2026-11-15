@@ -294,8 +294,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       const mePlayer = currentState.players[currentMyId];
       const mePos = localPlayerPosRef.current || (mePlayer ? { x: mePlayer.x, y: mePlayer.y } : null);
-      // Hitbox is slightly smaller than the visual 13px ball sprite (3.5px forgiveness)
-      const meHitboxRadius = mePlayer ? Math.max(4, mePlayer.radius - 3.5) : 9.5;
+      // Uses live admin-configured hitboxRadius (default 6.5px = half of the 13px visual ball sprite)
+      const meHitboxRadius = mePlayer
+        ? mePlayer.hitboxRadius ?? mePlayer.radius * 0.5
+        : 6.5;
 
       for (const obs of currentState.obstacles) {
         activeIds.add(obs.id);

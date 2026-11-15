@@ -21,8 +21,8 @@
   "obstacleTypes": {
     "single-gap-wall": {
       "enabled": true,
-      "weight": 40,
-      "minTier": 1,
+      "weight": 15,
+      "minTier": 3,
       "label": "Single-Gap Gate"
     },
     "double-gap-wall": {
@@ -76,7 +76,7 @@
     "height": 800,
     "radius": 325,
     "playerRadius": 13,
-    "hitboxForgiveness": 3.5
+    "hitboxForgiveness": 6.5
   },
   "engine": {
     "serverTickRate": 60,

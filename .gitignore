@@ -17,6 +17,8 @@ client/.env
 
 # Logs, DB & OS files
 .pgdata/
+*.admin-token
+.admin-token
 *.log
 npm-debug.log*
 .DS_Store

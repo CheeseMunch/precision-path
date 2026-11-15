@@ -146,6 +146,7 @@ export class GameEngine {
       x: 0,
       y: 0,
       radius: GAME_CONFIG.arena.playerRadius,
+      hitboxRadius: Math.max(2, GAME_CONFIG.arena.playerRadius - GAME_CONFIG.arena.hitboxForgiveness),
       alive: !isMatchActive,
       score: 0,
       survivedTime: 0,
@@ -300,6 +301,7 @@ export class GameEngine {
       p.x = 0;
       p.y = 0;
       p.radius = GAME_CONFIG.arena.playerRadius;
+      p.hitboxRadius = Math.max(2, GAME_CONFIG.arena.playerRadius - GAME_CONFIG.arena.hitboxForgiveness);
       p.score = 0;
       p.gatesCleared = 0;
       p.survivedTime = 0;
@@ -395,6 +397,8 @@ export class GameEngine {
 
     for (const id in this.state.players) {
       const p = this.state.players[id];
+      p.radius = GAME_CONFIG.arena.playerRadius;
+      p.hitboxRadius = Math.max(2, GAME_CONFIG.arena.playerRadius - GAME_CONFIG.arena.hitboxForgiveness);
       if (p.alive) {
         p.survivedTime += dt;
       }

@@ -26,15 +26,37 @@ const server = http.createServer(app);
 const PORT = Number(process.env.PORT || 4000);
 const BIND_HOST = process.env.HOST || (process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1');
 
-// Per-boot secret CSRF token for the localhost-only /db-admin console
-const ADMIN_SESSION_TOKEN = crypto.randomBytes(24).toString('hex');
+// Persistent secret CSRF token for the localhost-only /db-admin console (stable across restarts)
+const ADMIN_TOKEN_FILE = path.resolve(__dirname, '../.admin-token');
+let ADMIN_SESSION_TOKEN = '';
+try {
+  if (fs.existsSync(ADMIN_TOKEN_FILE)) {
+    ADMIN_SESSION_TOKEN = fs.readFileSync(ADMIN_TOKEN_FILE, 'utf8').trim();
+  }
+} catch {}
+if (!ADMIN_SESSION_TOKEN || ADMIN_SESSION_TOKEN.length < 32) {
+  ADMIN_SESSION_TOKEN = crypto.randomBytes(24).toString('hex');
+  try {
+    fs.writeFileSync(ADMIN_TOKEN_FILE, ADMIN_SESSION_TOKEN, 'utf8');
+  } catch {}
+}
 
 /**
  * Verifies a request originates directly from a local browser on the host machine
  * (never forwarded through Cloudflare Tunnel or a remote proxy).
  */
 function isDirectLocalhost(req: express.Request): boolean {
-  const isLocalHostHeader = req.hostname === 'localhost' || req.hostname === '127.0.0.1';
+  const host = (req.hostname || '').toLowerCase();
+  const rawHostHeader = (String(req.headers.host || '')).toLowerCase();
+  const isLocalHostHeader =
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host === '::1' ||
+    host === '[::1]' ||
+    rawHostHeader.startsWith('localhost') ||
+    rawHostHeader.startsWith('127.0.0.1') ||
+    rawHostHeader.startsWith('[::1]');
+
   const hasProxyHeaders = Boolean(
     req.headers['cf-ray'] ||
       req.headers['cf-connecting-ip'] ||
@@ -42,15 +64,24 @@ function isDirectLocalhost(req: express.Request): boolean {
       req.headers['x-forwarded-host'] ||
       req.headers['cf-visitor']
   );
-  const remoteAddr = req.socket.remoteAddress || '';
+
+  const remoteAddr = String(req.socket.remoteAddress || '');
   const isLoopbackSocket =
-    remoteAddr === '127.0.0.1' || remoteAddr === '::1' || remoteAddr === '::ffff:127.0.0.1';
+    !remoteAddr ||
+    remoteAddr === '127.0.0.1' ||
+    remoteAddr === '::1' ||
+    remoteAddr === '::ffff:127.0.0.1';
+
   return isLocalHostHeader && !hasProxyHeaders && isLoopbackSocket;
 }
 
 function hasValidAdminToken(req: express.Request): boolean {
-  const token = req.headers['x-admin-token'];
-  return typeof token === 'string' && token === ADMIN_SESSION_TOKEN;
+  const headerToken = req.headers['x-admin-token'];
+  const cookieHeader = String(req.headers.cookie || '');
+  const cookieMatch = cookieHeader.match(/precision_admin_token=([a-f0-9]+)/);
+  const cookieToken = cookieMatch ? cookieMatch[1] : null;
+  const token = (typeof headerToken === 'string' && headerToken) || cookieToken;
+  return Boolean(token && token === ADMIN_SESSION_TOKEN);
 }
 
 app.use(cors());
@@ -167,7 +198,7 @@ function applyTuningConfig(body: any) {
   if (body.arena) {
     const a = body.arena;
     if (typeof a.playerRadius === 'number') GAME_CONFIG.arena.playerRadius = Math.max(6, Math.min(30, a.playerRadius));
-    if (typeof a.hitboxForgiveness === 'number') GAME_CONFIG.arena.hitboxForgiveness = Math.max(0, Math.min(8, a.hitboxForgiveness));
+    if (typeof a.hitboxForgiveness === 'number') GAME_CONFIG.arena.hitboxForgiveness = Math.max(0, Math.min(12, a.hitboxForgiveness));
   }
 }
 
@@ -227,6 +258,7 @@ app.get('/db-admin', (req, res) => {
   if (!isDirectLocalhost(req)) {
     return res.status(403).send('Admin Studio is restricted to direct localhost access on the host PC.');
   }
+  res.setHeader('Set-Cookie', `precision_admin_token=${ADMIN_SESSION_TOKEN}; Path=/; SameSite=Lax; HttpOnly`);
   res.type('html').send(`<!doctype html>
 <html lang="en">
 <head>
@@ -413,12 +445,14 @@ app.get('/db-admin', (req, res) => {
               <input id="inp_staggerMs" type="number" min="80" max="1000" step="10" class="w-full bg-[#07080d] border border-gray-700 rounded p-2 text-white" />
             </div>
             <div>
-              <label class="block text-gray-400 mb-1">Player Ball Radius (px)</label>
-              <input id="inp_playerRadius" type="number" min="6" max="28" step="1" class="w-full bg-[#07080d] border border-gray-700 rounded p-2 text-white" />
+              <label class="block text-gray-400 mb-1">Player Visual Radius (px)</label>
+              <input id="inp_playerRadius" type="number" min="6" max="28" step="0.5" oninput="updateLabels()" class="w-full bg-[#07080d] border border-gray-700 rounded p-2 text-white" />
             </div>
             <div>
-              <label class="block text-gray-400 mb-1">Hitbox Forgiveness (px)</label>
-              <input id="inp_forgiveness" type="number" min="0" max="6" step="0.5" class="w-full bg-[#07080d] border border-gray-700 rounded p-2 text-white" />
+              <label class="block text-gray-400 mb-1">
+                Hitbox Shrink / Forgiveness (px) • <span id="val_hitbox" class="text-cyan-300 font-bold">Hitbox: 6.5px (50%)</span>
+              </label>
+              <input id="inp_forgiveness" type="number" min="0" max="12" step="0.5" oninput="updateLabels()" class="w-full bg-[#07080d] border border-gray-700 rounded p-2 text-white" />
             </div>
           </div>
         </div>
@@ -569,6 +603,13 @@ app.get('/db-admin', (req, res) => {
       document.getElementById('val_speedVar').textContent = '±' + Math.round(Number(document.getElementById('inp_speedVar').value) * 100) + '%';
       document.getElementById('val_jitter').textContent = '±' + Math.round(Number(document.getElementById('inp_jitter').value) * 100) + '%';
       document.getElementById('val_stagVar').textContent = '±' + Math.round(Number(document.getElementById('inp_stagVar').value) * 100) + '%';
+
+      const pRad = Number(document.getElementById('inp_playerRadius').value) || 13;
+      const forg = Number(document.getElementById('inp_forgiveness').value) || 0;
+      const eff = Math.max(2, pRad - forg);
+      const pct = Math.round((eff / pRad) * 100);
+      const hbEl = document.getElementById('val_hitbox');
+      if (hbEl) hbEl.textContent = 'Hitbox: ' + eff.toFixed(1) + 'px (' + pct + '%)';
     }
 
     function syncAllRounds() {
@@ -725,6 +766,12 @@ app.get('/db-admin', (req, res) => {
           body: JSON.stringify({ query })
         });
         const data = await res.json();
+        if (res.status === 403 && data.error && data.error.includes('authenticated')) {
+          errEl.textContent = 'Session token was refreshed. Reloading page...';
+          errEl.classList.remove('hidden');
+          setTimeout(() => window.location.reload(), 1200);
+          return;
+        }
         if (!res.ok) throw new Error(data.error || 'Query failed');
         const rows = data.rows || [];
         meta.textContent = rows.length + ' row(s) • ' + data.durationMs + ' ms';

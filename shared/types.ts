@@ -7,6 +7,7 @@ export interface Player {
   x: number; // Position relative to arena center
   y: number;
   radius: number;
+  hitboxRadius?: number;
   alive: boolean;
   score: number;
   gatesCleared?: number;
