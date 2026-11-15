@@ -154,29 +154,6 @@ function applyTuningConfig(body: any) {
         }
       }
     }
-    if (body.rounds.tierDirections && typeof body.rounds.tierDirections === 'object') {
-      if (!GAME_CONFIG.rounds.tierDirections) {
-        GAME_CONFIG.rounds.tierDirections = {};
-      }
-      for (const t of Object.keys(body.rounds.tierDirections)) {
-        const numT = Number(t);
-        const item = body.rounds.tierDirections[t];
-        if (item && typeof item === 'object') {
-          GAME_CONFIG.rounds.tierDirections[numT] = {
-            mode: item.mode || 'custom',
-            directions: Array.isArray(item.directions) ? item.directions : ['north'],
-          };
-        }
-      }
-    }
-    if (body.rounds.endlessDirections && typeof body.rounds.endlessDirections === 'object') {
-      GAME_CONFIG.rounds.endlessDirections = {
-        mode: body.rounds.endlessDirections.mode || 'all',
-        directions: Array.isArray(body.rounds.endlessDirections.directions)
-          ? body.rounds.endlessDirections.directions
-          : ['north', 'south', 'east', 'west'],
-      };
-    }
   }
 
   if (body.randomness) {
@@ -355,79 +332,65 @@ app.get('/db-admin', (req, res) => {
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- 1. Round Durations, Intervals & Direction Waves -->
-        <div class="bg-[#121520] border border-gray-800 rounded-xl p-5 flex flex-col gap-4 lg:col-span-2">
-          <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-gray-800 pb-2 gap-2">
+        <!-- 1. Round Durations & Progression -->
+        <div class="bg-[#121520] border border-gray-800 rounded-xl p-5 flex flex-col gap-4">
+          <div class="flex items-center justify-between border-b border-gray-800 pb-2">
+            <span class="text-cyan-400 font-bold uppercase text-sm">1. Round Timing & Progression</span>
+            <button onclick="syncAllRounds()" class="text-[11px] text-cyan-300 hover:underline">Sync All to Round 1</button>
+          </div>
+
+          <!-- Total Rounds Before Endless Selector -->
+          <div class="bg-[#090b12] border border-gray-800 rounded-lg p-3 flex items-center justify-between">
             <div>
-              <span class="text-cyan-400 font-bold uppercase text-sm">1. Round Timing, Wave Intervals & Custom Direction Waves</span>
-              <span class="text-[11px] text-gray-400 block sm:inline sm:ml-2">Select cardinal wave directions (North, South, East, West) or random axis modes per round</span>
+              <div class="font-bold text-gray-200 text-xs">Total Rounds Before Endless</div>
+              <div class="text-[11px] text-gray-400">Number of timed rounds to clear before entering Endless Mode (1–10)</div>
             </div>
-            <button onclick="syncAllRounds()" class="text-[11px] text-cyan-300 hover:underline text-left sm:text-right">Sync All Durations to Round 1</button>
-          </div>
-
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <!-- Total Rounds Before Endless Selector -->
-            <div class="bg-[#090b12] border border-gray-800 rounded-lg p-3 flex items-center justify-between">
-              <div>
-                <div class="font-bold text-gray-200 text-xs">Total Rounds Before Endless</div>
-                <div class="text-[11px] text-gray-400">Number of timed rounds to clear before entering Endless Mode (1–10)</div>
-              </div>
-              <div class="flex items-center gap-2">
-                <span id="val_totalRounds" class="text-cyan-400 font-bold text-xs font-mono">4 Rounds</span>
-                <input
-                  id="inp_totalRounds"
-                  type="number"
-                  min="1"
-                  max="10"
-                  step="1"
-                  oninput="onTotalRoundsChange()"
-                  class="w-16 bg-[#121520] border border-cyan-500/50 rounded p-1 text-center font-bold text-cyan-300 text-xs focus:outline-none focus:border-cyan-400"
-                />
-              </div>
-            </div>
-
-            <!-- Wave Spawn Intervals -->
-            <div class="bg-[#090b12] border border-gray-800 rounded-lg p-3">
-              <div class="text-cyan-400 font-bold uppercase text-[10px] tracking-wider mb-2">Wave Spawn Intervals (Seconds Between Waves)</div>
-              <div class="grid grid-cols-5 gap-2 text-xs">
-                <div>
-                  <label class="block text-[10px] text-gray-400 mb-0.5">R1</label>
-                  <input id="inp_wi1" type="number" step="0.1" min="0.5" max="8" class="w-full bg-[#07080d] border border-gray-700 rounded p-1 text-center text-white text-xs" />
-                </div>
-                <div>
-                  <label class="block text-[10px] text-gray-400 mb-0.5">R2</label>
-                  <input id="inp_wi2" type="number" step="0.1" min="0.5" max="8" class="w-full bg-[#07080d] border border-gray-700 rounded p-1 text-center text-white text-xs" />
-                </div>
-                <div>
-                  <label class="block text-[10px] text-gray-400 mb-0.5">R3</label>
-                  <input id="inp_wi3" type="number" step="0.1" min="0.5" max="8" class="w-full bg-[#07080d] border border-gray-700 rounded p-1 text-center text-white text-xs" />
-                </div>
-                <div>
-                  <label class="block text-[10px] text-gray-400 mb-0.5">R4</label>
-                  <input id="inp_wi4" type="number" step="0.1" min="0.5" max="8" class="w-full bg-[#07080d] border border-gray-700 rounded p-1 text-center text-white text-xs" />
-                </div>
-                <div>
-                  <label class="block text-[10px] text-pink-400 mb-0.5">Endless</label>
-                  <input id="inp_wi5" type="number" step="0.1" min="0.5" max="8" class="w-full bg-[#07080d] border border-gray-700 rounded p-1 text-center text-white text-xs" />
-                </div>
-              </div>
+            <div class="flex items-center gap-2">
+              <span id="val_totalRounds" class="text-cyan-400 font-bold text-xs font-mono">4 Rounds</span>
+              <input
+                id="inp_totalRounds"
+                type="number"
+                min="1"
+                max="10"
+                step="1"
+                oninput="onTotalRoundsChange()"
+                class="w-16 bg-[#121520] border border-cyan-500/50 rounded p-1 text-center font-bold text-cyan-300 text-xs focus:outline-none focus:border-cyan-400"
+              />
             </div>
           </div>
 
-          <!-- Dynamic Round Configuration List -->
+          <!-- Dynamic Round Durations List -->
           <div>
-            <div class="flex items-center justify-between mb-2">
-              <div class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">
-                Round Configurations (<span id="lbl_totalRoundsInSec1">4</span> Rounds + Endless)
+            <div class="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-2">
+              Round Durations (Seconds)
+            </div>
+            <div id="roundDurationsList" class="grid grid-cols-2 gap-3 text-xs"></div>
+          </div>
+
+          <div class="border-t border-gray-800 pt-3 mt-1">
+            <div class="text-cyan-400 font-bold uppercase text-xs mb-3">Wave Spawn Intervals (Seconds Between Waves)</div>
+            <div class="grid grid-cols-5 gap-2 text-xs">
+              <div>
+                <label class="block text-[10px] text-gray-400 mb-1">R1 Interval</label>
+                <input id="inp_wi1" type="number" step="0.1" min="0.5" max="8" class="w-full bg-[#07080d] border border-gray-700 rounded p-1.5 text-center text-white" />
               </div>
-              <div class="hidden sm:flex items-center gap-3 text-[11px] text-gray-400">
-                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-[#ff2a6d]"></span> North (Top)</span>
-                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-[#ff7700]"></span> South (Btm)</span>
-                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-[#05d5fa]"></span> West (Left)</span>
-                <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-sm bg-[#d300c5]"></span> East (Right)</span>
+              <div>
+                <label class="block text-[10px] text-gray-400 mb-1">R2 Interval</label>
+                <input id="inp_wi2" type="number" step="0.1" min="0.5" max="8" class="w-full bg-[#07080d] border border-gray-700 rounded p-1.5 text-center text-white" />
+              </div>
+              <div>
+                <label class="block text-[10px] text-gray-400 mb-1">R3 Interval</label>
+                <input id="inp_wi3" type="number" step="0.1" min="0.5" max="8" class="w-full bg-[#07080d] border border-gray-700 rounded p-1.5 text-center text-white" />
+              </div>
+              <div>
+                <label class="block text-[10px] text-gray-400 mb-1">R4 Interval</label>
+                <input id="inp_wi4" type="number" step="0.1" min="0.5" max="8" class="w-full bg-[#07080d] border border-gray-700 rounded p-1.5 text-center text-white" />
+              </div>
+              <div>
+                <label class="block text-[10px] text-pink-400 mb-1">Endless</label>
+                <input id="inp_wi5" type="number" step="0.1" min="0.5" max="8" class="w-full bg-[#07080d] border border-gray-700 rounded p-1.5 text-center text-white" />
               </div>
             </div>
-            <div id="roundDurationsList" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 text-xs"></div>
           </div>
         </div>
 
@@ -646,9 +609,7 @@ app.get('/db-admin', (req, res) => {
       currentConfig = cfg;
       const totalRounds = cfg.rounds.totalRoundsBeforeEndless ?? 4;
       document.getElementById('inp_totalRounds').value = totalRounds;
-      const sec1TotalLbl = document.getElementById('lbl_totalRoundsInSec1');
-      if (sec1TotalLbl) sec1TotalLbl.textContent = totalRounds;
-      renderRoundDurationInputs(totalRounds, cfg.rounds.tierDurations, cfg.rounds.defaultRoundDurationSeconds, cfg.rounds.tierDirections, cfg.rounds.endlessDirections);
+      renderRoundDurationInputs(totalRounds, cfg.rounds.tierDurations, cfg.rounds.defaultRoundDurationSeconds);
 
       document.getElementById('inp_wi1').value = cfg.obstacles.waveIntervals[1];
       document.getElementById('inp_wi2').value = cfg.obstacles.waveIntervals[2];
@@ -863,335 +824,38 @@ app.get('/db-admin', (req, res) => {
       if (sec4TotalLbl) sec4TotalLbl.textContent = totalRounds;
     }
 
-    function getDirectionModeBadge(mode, count) {
-      switch (mode) {
-        case 'random-axis-round':
-          return '<span class="text-amber-400 font-bold">🎲 50% V/H (Round)</span>';
-        case 'random-axis-wave':
-          return '<span class="text-purple-300 font-bold">🌊 Alt V/H (Wave)</span>';
-        case 'random-vertical':
-          return '<span class="text-rose-400 font-bold">↕ Vertical (N+S)</span>';
-        case 'random-horizontal':
-          return '<span class="text-cyan-300 font-bold">↔ Horizontal (W+E)</span>';
-        case 'random-single':
-          return '<span class="text-violet-400 font-bold">🎯 1 of 4 Random</span>';
-        case 'all':
-          return '<span class="text-emerald-400 font-bold">❖ All 4 Sides</span>';
-        case 'custom':
-        default:
-          return '<span class="text-cyan-400 font-bold">' + count + ' Active</span>';
-      }
-    }
-
-    function updateRoundDirUI(key) {
-      const modeEl = document.getElementById('sel_dir_mode_' + key);
-      if (!modeEl) return;
-      const mode = modeEl.value;
-
-      const chkN = document.getElementById('chk_dir_' + key + '_north');
-      const chkS = document.getElementById('chk_dir_' + key + '_south');
-      const chkW = document.getElementById('chk_dir_' + key + '_west');
-      const chkE = document.getElementById('chk_dir_' + key + '_east');
-
-      const btnN = document.getElementById('btn_dir_' + key + '_north');
-      const btnS = document.getElementById('btn_dir_' + key + '_south');
-      const btnW = document.getElementById('btn_dir_' + key + '_west');
-      const btnE = document.getElementById('btn_dir_' + key + '_east');
-
-      const badgeEl = document.getElementById('badge_dir_' + key);
-
-      let activeCount = 0;
-      if (chkN && chkN.checked) activeCount++;
-      if (chkS && chkS.checked) activeCount++;
-      if (chkW && chkW.checked) activeCount++;
-      if (chkE && chkE.checked) activeCount++;
-
-      if (badgeEl) {
-        badgeEl.innerHTML = getDirectionModeBadge(mode, activeCount);
-      }
-
-      // North button (#ff2a6d)
-      if (btnN && chkN) {
-        if (chkN.checked) {
-          btnN.className = 'py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center bg-[#ff2a6d]/20 text-[#ff2a6d] border-[#ff2a6d] shadow-[0_0_8px_rgba(255,42,109,0.35)]';
-        } else {
-          btnN.className = 'py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center bg-[#07080d] text-gray-500 border-gray-800 hover:border-gray-700';
-        }
-      }
-
-      // South button (#ff7700)
-      if (btnS && chkS) {
-        if (chkS.checked) {
-          btnS.className = 'py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center bg-[#ff7700]/20 text-[#ff7700] border-[#ff7700] shadow-[0_0_8px_rgba(255,119,0,0.35)]';
-        } else {
-          btnS.className = 'py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center bg-[#07080d] text-gray-500 border-gray-800 hover:border-gray-700';
-        }
-      }
-
-      // West button (#05d5fa)
-      if (btnW && chkW) {
-        if (chkW.checked) {
-          btnW.className = 'py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center bg-[#05d5fa]/20 text-[#05d5fa] border-[#05d5fa] shadow-[0_0_8px_rgba(5,213,250,0.35)]';
-        } else {
-          btnW.className = 'py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center bg-[#07080d] text-gray-500 border-gray-800 hover:border-gray-700';
-        }
-      }
-
-      // East button (#d300c5)
-      if (btnE && chkE) {
-        if (chkE.checked) {
-          btnE.className = 'py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center bg-[#d300c5]/20 text-[#d300c5] border-[#d300c5] shadow-[0_0_8px_rgba(211,0,197,0.35)]';
-        } else {
-          btnE.className = 'py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center bg-[#07080d] text-gray-500 border-gray-800 hover:border-gray-700';
-        }
-      }
-    }
-
-    function onRoundDirModeChange(key) {
-      const modeEl = document.getElementById('sel_dir_mode_' + key);
-      if (!modeEl) return;
-      const mode = modeEl.value;
-
-      const chkN = document.getElementById('chk_dir_' + key + '_north');
-      const chkS = document.getElementById('chk_dir_' + key + '_south');
-      const chkW = document.getElementById('chk_dir_' + key + '_west');
-      const chkE = document.getElementById('chk_dir_' + key + '_east');
-
-      if (mode === 'random-vertical') {
-        if (chkN) chkN.checked = true;
-        if (chkS) chkS.checked = true;
-        if (chkW) chkW.checked = false;
-        if (chkE) chkE.checked = false;
-      } else if (mode === 'random-horizontal') {
-        if (chkN) chkN.checked = false;
-        if (chkS) chkS.checked = false;
-        if (chkW) chkW.checked = true;
-        if (chkE) chkE.checked = true;
-      } else if (mode === 'all' || mode === 'random-axis-round' || mode === 'random-axis-wave' || mode === 'random-single') {
-        if (chkN) chkN.checked = true;
-        if (chkS) chkS.checked = true;
-        if (chkW) chkW.checked = true;
-        if (chkE) chkE.checked = true;
-      }
-
-      updateRoundDirUI(key);
-    }
-
-    function toggleRoundDir(key, dir) {
-      const chk = document.getElementById('chk_dir_' + key + '_' + dir);
-      if (!chk) return;
-      chk.checked = !chk.checked;
-
-      // Automatically switch to 'custom' mode when directly toggling individual direction buttons
-      const modeEl = document.getElementById('sel_dir_mode_' + key);
-      if (modeEl) {
-        modeEl.value = 'custom';
-      }
-
-      // Safety check: ensure at least one direction is active
-      const chkN = document.getElementById('chk_dir_' + key + '_north');
-      const chkS = document.getElementById('chk_dir_' + key + '_south');
-      const chkW = document.getElementById('chk_dir_' + key + '_west');
-      const chkE = document.getElementById('chk_dir_' + key + '_east');
-      if (!chkN?.checked && !chkS?.checked && !chkW?.checked && !chkE?.checked) {
-        chk.checked = true; // prevent 0 active directions
-      }
-
-      updateRoundDirUI(key);
-    }
-
-    function renderRoundDurationInputs(count, durations, defaultSec, tierDirections, endlessDirections) {
+    function renderRoundDurationInputs(count, durations, defaultSec) {
       durations = durations || (currentConfig && currentConfig.rounds && currentConfig.rounds.tierDurations) || {};
       defaultSec = defaultSec || (currentConfig && currentConfig.rounds && currentConfig.rounds.defaultRoundDurationSeconds) || 7;
-      tierDirections = tierDirections || (currentConfig && currentConfig.rounds && currentConfig.rounds.tierDirections) || {};
-      endlessDirections = endlessDirections || (currentConfig && currentConfig.rounds && currentConfig.rounds.endlessDirections) || { mode: 'all', directions: ['north', 'south', 'east', 'west'] };
-
       const container = document.getElementById('roundDurationsList');
       if (!container) return;
-
-      const roundCards = Array.from({ length: count }, (_, i) => {
+      container.innerHTML = Array.from({ length: count }, (_, i) => {
         const r = i + 1;
         const val = durations[r] !== undefined ? durations[r] : defaultSec;
-        const dirCfg = tierDirections[r] || (
-          r === 1 ? { mode: 'custom', directions: ['north'] } :
-          r === 2 ? { mode: 'custom', directions: ['north', 'south'] } :
-          r === 3 ? { mode: 'custom', directions: ['north', 'south', 'east'] } :
-          { mode: 'all', directions: ['north', 'south', 'east', 'west'] }
-        );
-        const mode = dirCfg.mode || 'custom';
-        const dirs = dirCfg.directions || [];
-        const hasN = dirs.includes('north') || mode === 'all' || mode === 'random-vertical' || mode === 'random-axis-round' || mode === 'random-axis-wave' || mode === 'random-single';
-        const hasS = dirs.includes('south') || mode === 'all' || mode === 'random-vertical' || mode === 'random-axis-round' || mode === 'random-axis-wave' || mode === 'random-single';
-        const hasW = dirs.includes('west') || mode === 'all' || mode === 'random-horizontal' || mode === 'random-axis-round' || mode === 'random-axis-wave' || mode === 'random-single';
-        const hasE = dirs.includes('east') || mode === 'all' || mode === 'random-horizontal' || mode === 'random-axis-round' || mode === 'random-axis-wave' || mode === 'random-single';
-
+        const sides = Math.min(4, r);
+        const sidesLabel = sides === 1 ? '1 Side' : sides + ' Sides';
         return \`
-          <div class="bg-[#090b12] border border-gray-800 rounded-lg p-2.5 flex flex-col justify-between gap-2">
-            <div>
-              <div class="flex justify-between items-center mb-1">
-                <span class="text-gray-200 font-bold flex items-center gap-1.5">
-                  <span class="w-5 h-5 rounded-full bg-cyan-950/80 border border-cyan-500/40 text-cyan-300 font-mono text-[10px] flex items-center justify-center font-bold">R\${r}</span>
-                  <span>Round \${r}</span>
-                </span>
-                <span id="val_r\${r}" class="text-cyan-300 font-bold font-mono text-xs">\${val}s</span>
-              </div>
-              <input id="inp_r\${r}" type="range" min="2" max="45" step="1" value="\${val}" oninput="updateLabels()" class="w-full accent-cyan-400 mb-2" />
+          <div class="bg-[#090b12] border border-gray-800 rounded p-2.5">
+            <div class="flex justify-between mb-1">
+              <span class="text-gray-300 font-semibold">Round \${r} <span class="text-gray-500 font-normal">(\${sidesLabel})</span></span>
+              <span id="val_r\${r}" class="text-cyan-300 font-bold font-mono">\${val}s</span>
             </div>
-
-            <div class="pt-2 border-t border-gray-800/80">
-              <div class="flex items-center justify-between mb-1">
-                <span class="text-[9px] uppercase font-bold text-gray-400 tracking-wider">Wave Direction</span>
-                <span id="badge_dir_\${r}" class="text-[9px] font-mono">\${getDirectionModeBadge(mode, dirs.length)}</span>
-              </div>
-              <select id="sel_dir_mode_\${r}" onchange="onRoundDirModeChange(\${r})" class="w-full bg-[#121520] border border-gray-700/80 rounded px-1.5 py-1 text-[11px] text-gray-200 focus:outline-none focus:border-cyan-400 mb-1.5">
-                <option value="custom" \${mode === 'custom' ? 'selected' : ''}>Custom Sides (Pick Below)</option>
-                <option value="random-axis-round" \${mode === 'random-axis-round' ? 'selected' : ''}>🎲 Random Vert or Horiz (Round)</option>
-                <option value="random-axis-wave" \${mode === 'random-axis-wave' ? 'selected' : ''}>🌊 Random Vert or Horiz (Wave)</option>
-                <option value="random-vertical" \${mode === 'random-vertical' ? 'selected' : ''}>↕ Vertical Only (N + S)</option>
-                <option value="random-horizontal" \${mode === 'random-horizontal' ? 'selected' : ''}>↔ Horizontal Only (W + E)</option>
-                <option value="random-single" \${mode === 'random-single' ? 'selected' : ''}>🎯 Random Single Side (1 of 4)</option>
-                <option value="all" \${mode === 'all' ? 'selected' : ''}>❖ All 4 Sides (N, S, W, E)</option>
-              </select>
-
-              <!-- Hidden Checkboxes for direction state -->
-              <input type="checkbox" id="chk_dir_\${r}_north" \${hasN ? 'checked' : ''} class="hidden" />
-              <input type="checkbox" id="chk_dir_\${r}_south" \${hasS ? 'checked' : ''} class="hidden" />
-              <input type="checkbox" id="chk_dir_\${r}_west" \${hasW ? 'checked' : ''} class="hidden" />
-              <input type="checkbox" id="chk_dir_\${r}_east" \${hasE ? 'checked' : ''} class="hidden" />
-
-              <!-- 4 Direction Buttons -->
-              <div class="grid grid-cols-4 gap-1 text-center">
-                <button type="button" id="btn_dir_\${r}_north" onclick="toggleRoundDir(\${r}, 'north')" class="py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center">
-                  <span>N</span>
-                  <span class="text-[7px] opacity-75">Top</span>
-                </button>
-                <button type="button" id="btn_dir_\${r}_south" onclick="toggleRoundDir(\${r}, 'south')" class="py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center">
-                  <span>S</span>
-                  <span class="text-[7px] opacity-75">Btm</span>
-                </button>
-                <button type="button" id="btn_dir_\${r}_west" onclick="toggleRoundDir(\${r}, 'west')" class="py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center">
-                  <span>W</span>
-                  <span class="text-[7px] opacity-75">Left</span>
-                </button>
-                <button type="button" id="btn_dir_\${r}_east" onclick="toggleRoundDir(\${r}, 'east')" class="py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center">
-                  <span>E</span>
-                  <span class="text-[7px] opacity-75">Right</span>
-                </button>
-              </div>
-            </div>
+            <input id="inp_r\${r}" type="range" min="2" max="45" step="1" value="\${val}" oninput="updateLabels()" class="w-full accent-cyan-400" />
           </div>
         \`;
       }).join('');
-
-      // Endless card
-      const endlessMode = endlessDirections.mode || 'all';
-      const endlessDirs = endlessDirections.directions || ['north', 'south', 'east', 'west'];
-      const eHasN = endlessDirs.includes('north') || endlessMode === 'all';
-      const eHasS = endlessDirs.includes('south') || endlessMode === 'all';
-      const eHasW = endlessDirs.includes('west') || endlessMode === 'all';
-      const eHasE = endlessDirs.includes('east') || endlessMode === 'all';
-
-      const endlessCard = \`
-        <div class="bg-[#120a1a] border border-pink-900/50 rounded-lg p-2.5 flex flex-col justify-between gap-2">
-          <div>
-            <div class="flex justify-between items-center mb-1">
-              <span class="text-pink-300 font-bold flex items-center gap-1.5">
-                <span class="w-5 h-5 rounded-full bg-pink-950/80 border border-pink-500/40 text-pink-300 font-mono text-[11px] flex items-center justify-center font-bold">∞</span>
-                <span>Endless Mode</span>
-              </span>
-              <span class="text-pink-400 font-bold font-mono text-[11px]">Survive</span>
-            </div>
-            <div class="text-[10px] text-pink-300/60 leading-tight mb-2">Runs after clearing all \${count} rounds until elimination</div>
-          </div>
-
-          <div class="pt-2 border-t border-pink-900/40">
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-[9px] uppercase font-bold text-pink-400/80 tracking-wider">Wave Direction</span>
-              <span id="badge_dir_endless" class="text-[9px] font-mono">\${getDirectionModeBadge(endlessMode, endlessDirs.length)}</span>
-            </div>
-            <select id="sel_dir_mode_endless" onchange="onRoundDirModeChange('endless')" class="w-full bg-[#1b1026] border border-pink-700/50 rounded px-1.5 py-1 text-[11px] text-pink-200 focus:outline-none focus:border-pink-400 mb-1.5">
-              <option value="all" \${endlessMode === 'all' ? 'selected' : ''}>❖ All 4 Sides (N, S, W, E)</option>
-              <option value="custom" \${endlessMode === 'custom' ? 'selected' : ''}>Custom Sides (Pick Below)</option>
-              <option value="random-axis-round" \${endlessMode === 'random-axis-round' ? 'selected' : ''}>🎲 Random Vert or Horiz (Round)</option>
-              <option value="random-axis-wave" \${endlessMode === 'random-axis-wave' ? 'selected' : ''}>🌊 Random Vert or Horiz (Wave)</option>
-              <option value="random-vertical" \${endlessMode === 'random-vertical' ? 'selected' : ''}>↕ Vertical Only (N + S)</option>
-              <option value="random-horizontal" \${endlessMode === 'random-horizontal' ? 'selected' : ''}>↔ Horizontal Only (W + E)</option>
-              <option value="random-single" \${endlessMode === 'random-single' ? 'selected' : ''}>🎯 Random Single Side (1 of 4)</option>
-            </select>
-
-            <input type="checkbox" id="chk_dir_endless_north" \${eHasN ? 'checked' : ''} class="hidden" />
-            <input type="checkbox" id="chk_dir_endless_south" \${eHasS ? 'checked' : ''} class="hidden" />
-            <input type="checkbox" id="chk_dir_endless_west" \${eHasW ? 'checked' : ''} class="hidden" />
-            <input type="checkbox" id="chk_dir_endless_east" \${eHasE ? 'checked' : ''} class="hidden" />
-
-            <div class="grid grid-cols-4 gap-1 text-center">
-              <button type="button" id="btn_dir_endless_north" onclick="toggleRoundDir('endless', 'north')" class="py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center">
-                <span>N</span>
-                <span class="text-[7px] opacity-75">Top</span>
-              </button>
-              <button type="button" id="btn_dir_endless_south" onclick="toggleRoundDir('endless', 'south')" class="py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center">
-                <span>S</span>
-                <span class="text-[7px] opacity-75">Btm</span>
-              </button>
-              <button type="button" id="btn_dir_endless_west" onclick="toggleRoundDir('endless', 'west')" class="py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center">
-                <span>W</span>
-                <span class="text-[7px] opacity-75">Left</span>
-              </button>
-              <button type="button" id="btn_dir_endless_east" onclick="toggleRoundDir('endless', 'east')" class="py-1 px-1 rounded text-[10px] font-bold border transition flex flex-col items-center justify-center">
-                <span>E</span>
-                <span class="text-[7px] opacity-75">Right</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      \`;
-
-      container.innerHTML = roundCards + endlessCard;
-
-      // Update button styles for all rendered rounds + endless
-      for (let r = 1; r <= count; r++) {
-        updateRoundDirUI(r);
-      }
-      updateRoundDirUI('endless');
     }
 
     function onTotalRoundsChange() {
       const inp = document.getElementById('inp_totalRounds');
       const val = Math.max(1, Math.min(10, Math.round(Number(inp.value) || 4)));
       inp.value = val;
-
-      const sec1TotalLbl = document.getElementById('lbl_totalRoundsInSec1');
-      if (sec1TotalLbl) sec1TotalLbl.textContent = val;
-
       const currentDurations = {};
-      const currentDirections = {};
       for (let r = 1; r <= 10; r++) {
         const el = document.getElementById('inp_r' + r);
         if (el) currentDurations[r] = Number(el.value);
-
-        const modeEl = document.getElementById('sel_dir_mode_' + r);
-        if (modeEl) {
-          const dirs = [];
-          if (document.getElementById('chk_dir_r' + r + '_north')?.checked) dirs.push('north');
-          if (document.getElementById('chk_dir_r' + r + '_south')?.checked) dirs.push('south');
-          if (document.getElementById('chk_dir_r' + r + '_west')?.checked) dirs.push('west');
-          if (document.getElementById('chk_dir_r' + r + '_east')?.checked) dirs.push('east');
-          currentDirections[r] = { mode: modeEl.value, directions: dirs };
-        }
       }
-
-      let curEndless = undefined;
-      const endlessModeEl = document.getElementById('sel_dir_mode_endless');
-      if (endlessModeEl) {
-        const dirs = [];
-        if (document.getElementById('chk_dir_endless_north')?.checked) dirs.push('north');
-        if (document.getElementById('chk_dir_endless_south')?.checked) dirs.push('south');
-        if (document.getElementById('chk_dir_endless_west')?.checked) dirs.push('west');
-        if (document.getElementById('chk_dir_endless_east')?.checked) dirs.push('east');
-        curEndless = { mode: endlessModeEl.value, directions: dirs };
-      }
-
-      renderRoundDurationInputs(val, currentDurations, undefined, currentDirections, curEndless);
+      renderRoundDurationInputs(val, currentDurations);
 
       // Preserve existing weights before re-rendering Section 4
       if (currentConfig && currentConfig.obstacleTypes) {
@@ -1295,36 +959,11 @@ app.get('/db-admin', (req, res) => {
         tierDurations[r] = el ? Number(el.value) : r1Val;
       }
 
-      const tierDirections = {};
-      for (let r = 1; r <= totalRounds; r++) {
-        const modeEl = document.getElementById('sel_dir_mode_' + r);
-        const mode = modeEl ? modeEl.value : 'custom';
-        const dirs = [];
-        if (document.getElementById('chk_dir_' + r + '_north')?.checked) dirs.push('north');
-        if (document.getElementById('chk_dir_' + r + '_south')?.checked) dirs.push('south');
-        if (document.getElementById('chk_dir_' + r + '_west')?.checked) dirs.push('west');
-        if (document.getElementById('chk_dir_' + r + '_east')?.checked) dirs.push('east');
-        if (dirs.length === 0) dirs.push('north');
-        tierDirections[r] = { mode, directions: dirs };
-      }
-
-      const endlessModeEl = document.getElementById('sel_dir_mode_endless');
-      const endlessMode = endlessModeEl ? endlessModeEl.value : 'all';
-      const endlessDirs = [];
-      if (document.getElementById('chk_dir_endless_north')?.checked) endlessDirs.push('north');
-      if (document.getElementById('chk_dir_endless_south')?.checked) endlessDirs.push('south');
-      if (document.getElementById('chk_dir_endless_west')?.checked) endlessDirs.push('west');
-      if (document.getElementById('chk_dir_endless_east')?.checked) endlessDirs.push('east');
-      if (endlessDirs.length === 0) endlessDirs.push('north', 'south', 'east', 'west');
-      const endlessDirections = { mode: endlessMode, directions: endlessDirs };
-
       return {
         rounds: {
           totalRoundsBeforeEndless: totalRounds,
           defaultRoundDurationSeconds: r1Val,
           tierDurations,
-          tierDirections,
-          endlessDirections,
         },
         randomness: {
           gapPositionVariance: Number(document.getElementById('inp_gapPos').value),

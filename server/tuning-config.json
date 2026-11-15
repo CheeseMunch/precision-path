@@ -8,28 +8,6 @@
       "3": 7,
       "4": 7
     },
-    "tierDirections": {
-      "1": {
-        "mode": "custom",
-        "directions": ["north"]
-      },
-      "2": {
-        "mode": "custom",
-        "directions": ["north", "south"]
-      },
-      "3": {
-        "mode": "custom",
-        "directions": ["north", "south", "east"]
-      },
-      "4": {
-        "mode": "all",
-        "directions": ["north", "south", "east", "west"]
-      }
-    },
-    "endlessDirections": {
-      "mode": "all",
-      "directions": ["north", "south", "east", "west"]
-    },
     "startCountdownDuration": 1
   },
   "randomness": {
@@ -50,8 +28,7 @@
         "2": 0,
         "3": 20,
         "4": 15,
-        "5": 10,
-        "endless": 10
+        "5": 10
       },
       "minTier": 3,
       "label": "Single-Gap Gate"
@@ -64,8 +41,7 @@
         "2": 0,
         "3": 25,
         "4": 25,
-        "5": 30,
-        "endless": 30
+        "5": 30
       },
       "minTier": 1,
       "label": "Twin-Split Gate"
@@ -78,8 +54,7 @@
         "2": 0,
         "3": 20,
         "4": 20,
-        "5": 20,
-        "endless": 20
+        "5": 20
       },
       "minTier": 2,
       "label": "Flank Sweeper Bar"
@@ -92,8 +67,7 @@
         "2": 0,
         "3": 20,
         "4": 30,
-        "5": 30,
-        "endless": 30
+        "5": 30
       },
       "minTier": 1,
       "label": "Staggered Chicane Blocks"
@@ -106,8 +80,7 @@
         "2": 15,
         "3": 0,
         "4": 20,
-        "5": 30,
-        "endless": 30
+        "5": 30
       },
       "minTier": 2,
       "label": "Pulse Orb Barrage"
@@ -120,8 +93,7 @@
         "2": 15,
         "3": 20,
         "4": 25,
-        "5": 25,
-        "endless": 25
+        "5": 25
       },
       "minTier": 2,
       "label": "Diagonal Spinning Blade"
@@ -155,7 +127,7 @@
     "height": 800,
     "radius": 325,
     "playerRadius": 13,
-    "hitboxForgiveness": 12
+    "hitboxForgiveness": 10
   },
   "engine": {
     "serverTickRate": 60,
