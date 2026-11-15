@@ -629,7 +629,7 @@
     {
       "id": "level-1794765830417",
       "levelNumber": 6,
-      "name": "Crosswind Step",
+      "name": "Crossfire Relay",
       "storyName": "Enter the Gauntlet",
       "description": "",
       "spawn": {
@@ -764,7 +764,7 @@
     {
       "id": "level-gauntlet-2",
       "levelNumber": 7,
-      "name": "Orb Drift",
+      "name": "Orb Matrix",
       "storyName": "Enter the Gauntlet",
       "description": "",
       "spawn": {
@@ -885,7 +885,7 @@
     {
       "id": "level-gauntlet-3",
       "levelNumber": 8,
-      "name": "Edge Pocket",
+      "name": "Apex Gauntlet",
       "storyName": "Enter the Gauntlet",
       "description": "",
       "spawn": {
@@ -1027,9 +1027,9 @@
     {
       "id": "level-gauntlet-4",
       "levelNumber": 9,
-      "name": "Spinner Alley",
+      "name": "Vortex Corridor",
       "storyName": "Enter the Gauntlet",
-      "description": "Tight staggered edge pockets, spinner pressure, and rapid double-gap weaves.",
+      "description": "",
       "spawn": {
         "x": 0,
         "y": 120
@@ -1169,9 +1169,9 @@
     {
       "id": "level-gauntlet-5",
       "levelNumber": 10,
-      "name": "Dual Weave",
+      "name": "Final Overdrive",
       "storyName": "Enter the Gauntlet",
-      "description": "High-speed interleaved orb weaves, spinner ambushes, and razor-thin final gates.",
+      "description": "",
       "spawn": {
         "x": 0,
         "y": 0

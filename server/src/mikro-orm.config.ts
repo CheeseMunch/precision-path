@@ -3,11 +3,12 @@ import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import dotenv from 'dotenv';
 import { User } from './entities/User.js';
 import { MatchHistory } from './entities/MatchHistory.js';
+import { CommunityLevel } from './entities/CommunityLevel.js';
 
 dotenv.config();
 
 export default defineConfig({
-  entities: [User, MatchHistory],
+  entities: [User, MatchHistory, CommunityLevel],
   dbName: process.env.DB_NAME || 'precision_path',
   clientUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/precision_path',
   debug: process.env.NODE_ENV !== 'production',

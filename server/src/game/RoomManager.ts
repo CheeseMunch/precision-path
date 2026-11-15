@@ -3,7 +3,7 @@ import { MikroORM } from '@mikro-orm/core';
 import { GameEngine } from './GameEngine.js';
 import { User } from '../entities/User.js';
 import { MatchHistory } from '../entities/MatchHistory.js';
-import { GameState, GameMode, LeaderboardEntry } from '../../../shared/types.js';
+import { GameState, GameMode, LeaderboardEntry, CampaignLevelConfig } from '../../../shared/types.js';
 
 export class RoomManager {
   private rooms: Map<string, GameEngine> = new Map();
@@ -25,7 +25,7 @@ export class RoomManager {
   public createRoom(
     hostSocketId: string,
     playerName: string,
-    options?: { gameMode?: GameMode; campaignLevel?: number }
+    options?: { gameMode?: GameMode; campaignLevel?: number; customLevel?: CampaignLevelConfig; communityLevelId?: string }
   ): { roomId: string; engine: GameEngine } {
     const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
     const engine = new GameEngine(roomId, options);

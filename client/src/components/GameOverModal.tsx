@@ -30,6 +30,7 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
   const isCampaignCleared = isCampaign && gameState.campaignResult === 'cleared';
   const hasNextCampaignLevel =
     isCampaignCleared &&
+    !gameState.communityLevelId &&
     (gameState.campaignLevel || 1) < (gameState.totalCampaignLevels || 1);
 
   return (

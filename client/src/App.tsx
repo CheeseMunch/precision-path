@@ -122,7 +122,8 @@ export const App: React.FC = () => {
         state.gameMode === 'campaign' &&
         state.status === 'gameover' &&
         lastStatusRef.current !== 'gameover' &&
-        state.campaignResult === 'cleared'
+        state.campaignResult === 'cleared' &&
+        !state.communityLevelId
       ) {
         markCampaignLevelCleared(
           me?.name || 'Player',
@@ -252,6 +253,17 @@ export const App: React.FC = () => {
     });
   };
 
+  const handlePlayCommunityLevel = (communityLevelId: string) => {
+    const cleanName = playerName.trim();
+    if (!socket || !cleanName) return;
+    socket.emit('createRoom', {
+      playerName: cleanName,
+      autoStart: true,
+      gameMode: 'campaign',
+      communityLevelId,
+    });
+  };
+
   const handleNextCampaignLevel = () => {
     if (!socket) return;
     socket.emit('nextCampaignLevel');
@@ -316,6 +328,7 @@ export const App: React.FC = () => {
           setPlayerName={setPlayerName}
           onCreateRoom={handleCreateRoom}
           onPlayCampaign={handlePlayCampaign}
+          onPlayCommunityLevel={handlePlayCommunityLevel}
           onJoinRoom={handleJoinRoom}
           onOpenLeaderboard={() => setShowLeaderboard(true)}
         />

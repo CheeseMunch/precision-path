@@ -45,6 +45,9 @@ export function renderCampaignAdminPage(adminToken: string): string {
           <button id="viewTabPatterns" onclick="setViewMode('patterns')" class="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition text-slate-300 hover:text-white">
             Pattern Library
           </button>
+          <button id="viewTabCommunity" onclick="setViewMode('community')" class="px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition text-slate-300 hover:text-white">
+            Community Levels
+          </button>
         </div>
         <a href="/db-admin" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold rounded-lg text-xs uppercase tracking-wider border border-gray-700 transition">
           &larr; DB &amp; Endless Admin
@@ -101,6 +104,14 @@ export function renderCampaignAdminPage(adminToken: string): string {
         </button>
         <button onclick="deleteCurrentPattern()" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/35 text-rose-300 border border-rose-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition">
           Delete Pattern
+        </button>
+      </div>
+      <div id="communityTabActions" class="hidden flex items-center gap-2">
+        <button onclick="addCommunityLevel()" class="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+          + Add Community Level
+        </button>
+        <button onclick="deleteCurrentCommunityLevel()" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/35 text-rose-300 border border-rose-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+          Delete Community Level
         </button>
       </div>
     </div>
@@ -186,6 +197,30 @@ export function renderCampaignAdminPage(adminToken: string): string {
             <div>
               <label class="block text-[11px] text-slate-400 mb-1">Description</label>
               <input id="patMetaDesc" type="text" class="input-dark" oninput="updatePatternMeta('description', this.value)" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Community Level Metadata (Community View) -->
+        <div id="communityMetaPanel" class="hidden cyber-panel rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-xs font-bold uppercase tracking-wider text-emerald-300">Community Level Settings</div>
+            <button onclick="saveCurrentCommunityLevel()" class="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-200 border border-emerald-500/40 rounded-lg text-[11px] font-bold uppercase tracking-wider transition">
+              Save Community Level
+            </button>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Level Name</label>
+              <input id="commMetaName" type="text" class="input-dark" oninput="updateCommunityMeta('name', this.value)" />
+            </div>
+            <div>
+              <label class="block text-[11px] text-slate-400 mb-1">Creator Pilot Name</label>
+              <input id="commMetaCreator" type="text" class="input-dark" placeholder="Admin" oninput="updateCommunityMeta('creatorName', this.value)" />
+            </div>
+            <div class="col-span-2">
+              <label class="block text-[11px] text-slate-400 mb-1">Description</label>
+              <input id="commMetaDesc" type="text" class="input-dark" oninput="updateCommunityMeta('description', this.value)" />
             </div>
           </div>
         </div>
@@ -282,12 +317,14 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
     let levels = [];
     let patterns = [];
+    let communityLevels = [];
     let emptyStories = [];
     let draggedStoryIdx = null;
     let draggedStoryLevelId = null;
     let currentLevelIdx = 0;
     let currentPatternIdx = 0;
-    let viewMode = 'levels'; // 'levels' | 'patterns'
+    let currentCommunityIdx = 0;
+    let viewMode = 'levels'; // 'levels' | 'patterns' | 'community'
     let selectedWaveIdx = 0;
     let selectedWaveIds = new Set();
     let builderSide = 'north';
@@ -323,12 +360,18 @@ export function renderCampaignAdminPage(adminToken: string): string {
       return patterns[currentPatternIdx] || null;
     }
 
+    function curCommunity() {
+      return communityLevels[currentCommunityIdx] || null;
+    }
+
     function activeContainer() {
-      return viewMode === 'levels' ? curLevel() : curPattern();
+      if (viewMode === 'levels') return curLevel();
+      if (viewMode === 'patterns') return curPattern();
+      return curCommunity();
     }
 
     function setViewMode(mode) {
-      viewMode = mode === 'patterns' ? 'patterns' : 'levels';
+      viewMode = mode === 'patterns' ? 'patterns' : mode === 'community' ? 'community' : 'levels';
       selectedWaveIdx = 0;
       selectedWaveIds.clear();
       resetPlayback();
@@ -486,19 +529,123 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
     async function loadConfig() {
       try {
-        const res = await fetch('/api/campaign-config');
+        const [res, commRes] = await Promise.all([
+          fetch('/api/campaign-config'),
+          fetch('/api/community-levels').catch(() => null),
+        ]);
         const data = await res.json();
         if (!Array.isArray(data.levels) || data.levels.length === 0) throw new Error('Invalid payload');
         levels = data.levels;
         patterns = Array.isArray(data.patterns) ? data.patterns : [];
+        if (commRes && commRes.ok) {
+          const commData = await commRes.json();
+          communityLevels = Array.isArray(commData.levels) ? commData.levels : [];
+        }
         currentLevelIdx = 0;
         currentPatternIdx = 0;
+        currentCommunityIdx = 0;
         selectedWaveIdx = 0;
         selectedWaveIds.clear();
         resetPlayback();
         renderAll();
       } catch (err) {
         showBanner('Failed to load campaign config: ' + err.message, true);
+      }
+    }
+
+    function updateCommunityMeta(field, val) {
+      const lvl = curCommunity();
+      if (!lvl) return;
+      lvl[field] = val;
+      if (field === 'name' || field === 'creatorName') renderTabs();
+    }
+
+    async function addCommunityLevel() {
+      const newLevel = {
+        name: 'Community Level ' + (communityLevels.length + 1),
+        creatorName: 'Admin',
+        description: '',
+        spawn: { x: 0, y: 120 },
+        clearBonusPoints: 500,
+        parTimeSeconds: 20,
+        waves: [
+          {
+            id: 'cw-' + Date.now(),
+            order: 1,
+            delayAfterPrev: 0.5,
+            side: 'north',
+            patternType: 'single-gap-wall',
+            speed: 175,
+            gapCenter: 0,
+            gapSize: 125,
+            barThickness: 18,
+            attachedGates: [{ id: 'cg-' + Date.now(), order: 1, start: -62, end: 62, points: 100, label: 'GATE 1' }],
+          },
+        ],
+        obstacles: [],
+        checkpoints: [],
+      };
+      try {
+        const res = await fetch('/api/admin/community-levels', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': ADMIN_TOKEN },
+          body: JSON.stringify({ level: newLevel }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to add community level');
+        communityLevels = Array.isArray(data.levels) ? data.levels : [data.level, ...communityLevels];
+        currentCommunityIdx = Math.max(0, communityLevels.findIndex((l) => l.id === data.level?.id));
+        selectedWaveIdx = 0;
+        resetPlayback();
+        renderAll();
+        showBanner('Added community level "' + newLevel.name + '"!', false);
+      } catch (err) {
+        showBanner('Error adding community level: ' + err.message, true);
+      }
+    }
+
+    async function saveCurrentCommunityLevel() {
+      const lvl = curCommunity();
+      if (!lvl) return;
+      try {
+        const res = await fetch('/api/admin/community-levels/' + encodeURIComponent(lvl.id), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': ADMIN_TOKEN },
+          body: JSON.stringify({ level: lvl }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+        if (Array.isArray(data.levels)) {
+          communityLevels = data.levels;
+          const idx = communityLevels.findIndex((l) => l.id === data.level?.id);
+          if (idx >= 0) currentCommunityIdx = idx;
+        }
+        renderAll();
+        showBanner('Saved community level "' + lvl.name + '"!', false);
+      } catch (err) {
+        showBanner('Error saving community level: ' + err.message, true);
+      }
+    }
+
+    async function deleteCurrentCommunityLevel() {
+      const lvl = curCommunity();
+      if (!lvl) return;
+      if (!confirm('Delete community level "' + lvl.name + '" by ' + (lvl.creatorName || 'Pilot') + '?')) return;
+      try {
+        const res = await fetch('/api/admin/community-levels/' + encodeURIComponent(lvl.id), {
+          method: 'DELETE',
+          headers: { 'x-admin-token': ADMIN_TOKEN },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Delete failed');
+        communityLevels = Array.isArray(data.levels) ? data.levels : communityLevels.filter((l) => l.id !== lvl.id);
+        currentCommunityIdx = Math.max(0, Math.min(currentCommunityIdx, communityLevels.length - 1));
+        selectedWaveIdx = 0;
+        resetPlayback();
+        renderAll();
+        showBanner('Deleted community level "' + lvl.name + '".', false);
+      } catch (err) {
+        showBanner('Error deleting community level: ' + err.message, true);
       }
     }
 
@@ -1419,20 +1566,27 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
     function renderAll() {
       const isLvl = viewMode === 'levels';
+      const isPat = viewMode === 'patterns';
+      const isComm = viewMode === 'community';
       const btnLvl = document.getElementById('viewTabLevels');
       const btnPat = document.getElementById('viewTabPatterns');
-      if (btnLvl && btnPat) {
+      const btnComm = document.getElementById('viewTabCommunity');
+      if (btnLvl && btnPat && btnComm) {
         btnLvl.className = 'px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition ' +
           (isLvl ? 'bg-cyan-500 text-black' : 'text-slate-300 hover:text-white');
         btnPat.className = 'px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition ' +
-          (!isLvl ? 'bg-violet-500 text-black' : 'text-slate-300 hover:text-white');
+          (isPat ? 'bg-violet-500 text-black' : 'text-slate-300 hover:text-white');
+        btnComm.className = 'px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition ' +
+          (isComm ? 'bg-emerald-500 text-black' : 'text-slate-300 hover:text-white');
       }
       document.getElementById('storyGroupingPanel').classList.toggle('hidden', !isLvl);
       document.getElementById('levelTabActions').classList.toggle('hidden', !isLvl);
-      document.getElementById('patternTabActions').classList.toggle('hidden', isLvl);
+      document.getElementById('patternTabActions').classList.toggle('hidden', !isPat);
+      document.getElementById('communityTabActions').classList.toggle('hidden', !isComm);
       document.getElementById('levelMetaPanel').classList.toggle('hidden', !isLvl);
-      document.getElementById('patternMetaPanel').classList.toggle('hidden', isLvl);
-      document.getElementById('bundledPatternRow').classList.toggle('hidden', !isLvl);
+      document.getElementById('patternMetaPanel').classList.toggle('hidden', !isPat);
+      document.getElementById('communityMetaPanel').classList.toggle('hidden', !isComm);
+      document.getElementById('bundledPatternRow').classList.toggle('hidden', isPat);
 
       if (isLvl) renderStoryGroups();
       renderTabs();
@@ -1494,7 +1648,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
           };
           c.appendChild(b);
         });
-      } else {
+      } else if (viewMode === 'patterns') {
         if (!patterns.length) {
           c.innerHTML = '<span class="text-xs text-slate-400">No patterns yet. Click "+ New Pattern" or save from a Level schedule.</span>';
           return;
@@ -1505,6 +1659,19 @@ export function renderCampaignAdminPage(adminToken: string): string {
             (idx === currentPatternIdx ? 'bg-violet-500 text-black border-violet-400' : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-violet-500/50');
           b.textContent = pat.name + ' (' + (pat.waves ? pat.waves.length : 0) + ')';
           b.onclick = () => { currentPatternIdx = idx; selectedWaveIdx = 0; selectedWaveIds.clear(); resetPlayback(); renderAll(); };
+          c.appendChild(b);
+        });
+      } else {
+        if (!communityLevels.length) {
+          c.innerHTML = '<span class="text-xs text-slate-400">No community levels yet. Click "+ Add Community Level" or create one in-game.</span>';
+          return;
+        }
+        communityLevels.forEach((cl, idx) => {
+          const b = document.createElement('button');
+          b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition border ' +
+            (idx === currentCommunityIdx ? 'bg-emerald-500 text-black border-emerald-400' : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-emerald-500/50');
+          b.textContent = cl.name + ' (by ' + (cl.creatorName || 'Pilot') + ')';
+          b.onclick = () => { currentCommunityIdx = idx; selectedWaveIdx = 0; selectedWaveIds.clear(); resetPlayback(); renderAll(); };
           c.appendChild(b);
         });
       }
@@ -1519,10 +1686,15 @@ export function renderCampaignAdminPage(adminToken: string): string {
         document.getElementById('metaDesc').value = lvl.description || '';
         document.getElementById('metaClearBonus').value = lvl.clearBonusPoints ?? 500;
         document.getElementById('metaParTime').value = lvl.parTimeSeconds ?? 20;
-      } else {
+      } else if (viewMode === 'patterns') {
         const pat = curPattern();
         document.getElementById('patMetaName').value = pat ? (pat.name || '') : '';
         document.getElementById('patMetaDesc').value = pat ? (pat.description || '') : '';
+      } else {
+        const cl = curCommunity();
+        document.getElementById('commMetaName').value = cl ? (cl.name || '') : '';
+        document.getElementById('commMetaCreator').value = cl ? (cl.creatorName || '') : '';
+        document.getElementById('commMetaDesc').value = cl ? (cl.description || '') : '';
       }
     }
 

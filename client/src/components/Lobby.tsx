@@ -3,11 +3,16 @@ import { Play, Users, Trophy, Flag, Lock, CheckCircle2, X } from 'lucide-react';
 import type { CampaignLevelConfig } from '../../../shared/types';
 import { getCampaignProgress } from '../utils/campaignProgress';
 
+import { Globe, Plus, Pencil, Trash2 } from 'lucide-react';
+import type { CommunityLevelConfig } from '../../../shared/types';
+import { CommunityLevelEditor } from './CommunityLevelEditor';
+
 interface LobbyProps {
   playerName: string;
   setPlayerName: (name: string) => void;
   onCreateRoom: (solo?: boolean) => void;
   onPlayCampaign: (levelNumber: number) => void;
+  onPlayCommunityLevel: (communityLevelId: string) => void;
   onJoinRoom: (roomCode: string) => void;
   onOpenLeaderboard: () => void;
 }
@@ -17,9 +22,61 @@ export const Lobby: React.FC<LobbyProps> = ({
   setPlayerName,
   onCreateRoom,
   onPlayCampaign,
+  onPlayCommunityLevel,
   onJoinRoom,
   onOpenLeaderboard,
 }) => {
+  const [showCommunityModal, setShowCommunityModal] = React.useState(false);
+  const [communityLevels, setCommunityLevels] = React.useState<CommunityLevelConfig[]>([]);
+  const [communityLoading, setCommunityLoading] = React.useState(false);
+  const [communityError, setCommunityError] = React.useState<string | null>(null);
+  const [editingCommunityLevel, setEditingCommunityLevel] = React.useState<CommunityLevelConfig | null>(null);
+  const [creatingCommunityLevel, setCreatingCommunityLevel] = React.useState(false);
+  const [deletingCommunityId, setDeletingCommunityId] = React.useState<string | null>(null);
+
+  const fetchCommunityLevels = async () => {
+    setCommunityLoading(true);
+    setCommunityError(null);
+    try {
+      const res = await fetch('/api/community-levels');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load community levels');
+      setCommunityLevels(Array.isArray(data.levels) ? data.levels : []);
+    } catch (err: any) {
+      setCommunityError(err?.message || 'Failed to load community levels');
+    } finally {
+      setCommunityLoading(false);
+    }
+  };
+
+  const openCommunityBrowser = () => {
+    setShowCommunityModal(true);
+    fetchCommunityLevels();
+  };
+
+  const handleDeleteCommunityLevel = async (lvl: CommunityLevelConfig) => {
+    const cleanName = playerName.trim();
+    if (!cleanName) return;
+    if (!window.confirm(`Delete "${lvl.name}"? This cannot be undone.`)) return;
+    setDeletingCommunityId(lvl.id);
+    try {
+      const res = await fetch(
+        `/api/community-levels/${encodeURIComponent(lvl.id)}?creatorName=${encodeURIComponent(cleanName)}`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ creatorName: cleanName }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete level');
+      setCommunityLevels((prev) => prev.filter((item) => item.id !== lvl.id));
+    } catch (err: any) {
+      setCommunityError(err?.message || 'Failed to delete level');
+    } finally {
+      setDeletingCommunityId(null);
+    }
+  };
   const [joinCode, setJoinCode] = useState('');
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [campaignLevels, setCampaignLevels] = useState<CampaignLevelConfig[]>([]);
@@ -126,6 +183,14 @@ export const Lobby: React.FC<LobbyProps> = ({
             className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-40 disabled:pointer-events-none text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition shadow-lg shadow-cyan-500/20 active:scale-[0.98]"
           >
             <Play className="w-4 h-4 fill-black" /> Play Solo Endless
+          </button>
+
+          <button
+            onClick={openCommunityBrowser}
+            disabled={!hasPilotName}
+            className="w-full py-3 px-4 bg-cyber-panel hover:bg-[#1a1f30] disabled:opacity-40 disabled:pointer-events-none border border-emerald-500/40 text-emerald-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition active:scale-[0.98]"
+          >
+            <Globe className="w-4 h-4" /> Browse Community Levels
           </button>
 
           <button
@@ -359,6 +424,147 @@ export const Lobby: React.FC<LobbyProps> = ({
             )}
           </div>
         </div>
+      )}
+
+      {/* Community Levels Browser Modal */}
+      {showCommunityModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="w-full max-w-2xl max-h-[85vh] bg-cyber-panel border border-emerald-500/40 rounded-xl p-6 shadow-2xl flex flex-col gap-4">
+            <div className="flex items-center justify-between gap-3 border-b border-cyber-border pb-3">
+              <div>
+                <h2 className="text-xl font-black font-display tracking-wide text-emerald-300 uppercase flex items-center gap-2">
+                  <Globe className="w-5 h-5" /> Community Levels
+                </h2>
+                <p className="text-xs text-slate-400">
+                  Play custom 1-level challenges created by pilots, or build your own.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setEditingCommunityLevel(null);
+                    setCreatingCommunityLevel(true);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-black font-display font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition"
+                >
+                  <Plus className="w-4 h-4" /> Create Level
+                </button>
+                <button
+                  onClick={() => setShowCommunityModal(false)}
+                  className="px-2.5 py-1.5 rounded-lg bg-cyber-bg border border-cyber-border text-slate-300 hover:text-white text-xs font-mono"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {communityError && (
+              <div className="p-2.5 rounded-lg bg-red-950/50 border border-red-500/40 text-red-300 text-xs font-mono">
+                {communityError}
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto flex flex-col gap-2.5 pr-1">
+              {communityLoading ? (
+                <div className="text-center py-10 text-slate-400 text-sm font-mono">
+                  Loading community levels...
+                </div>
+              ) : communityLevels.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 text-sm">
+                  No community levels yet. Click <span className="text-emerald-300 font-semibold">+ Create Level</span> to publish the first one!
+                </div>
+              ) : (
+                communityLevels.map((lvl) => {
+                  const isOwner =
+                    lvl.creatorName.trim().toLowerCase() === playerName.trim().toLowerCase();
+                  return (
+                    <div
+                      key={lvl.id}
+                      className="p-3.5 rounded-lg bg-cyber-bg/80 border border-cyber-border hover:border-emerald-500/40 flex items-center justify-between gap-3 transition"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-display font-bold text-white text-sm truncate">
+                            {lvl.name}
+                          </span>
+                          <span className="px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-[11px] font-mono">
+                            by {lvl.creatorName}
+                          </span>
+                        </div>
+                        {lvl.description && (
+                          <div className="text-xs text-slate-400 mt-1 line-clamp-2">
+                            {lvl.description}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 mt-1.5 text-[11px] font-mono text-slate-500">
+                          <span>Waves: {lvl.waves?.length ?? 0}</span>
+                          <span>Par: {lvl.parTimeSeconds ?? 0}s</span>
+                          <span>Bonus: {lvl.clearBonusPoints ?? 0}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isOwner && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setCreatingCommunityLevel(false);
+                                setEditingCommunityLevel(lvl);
+                              }}
+                              title="Edit Level"
+                              className="p-2 rounded-lg bg-cyber-panel border border-cyber-border hover:border-cyan-400/50 text-cyan-300 transition"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCommunityLevel(lvl)}
+                              disabled={deletingCommunityId === lvl.id}
+                              title="Delete Level"
+                              className="p-2 rounded-lg bg-cyber-panel border border-cyber-border hover:border-red-400/50 text-red-400 disabled:opacity-40 transition"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => {
+                            setShowCommunityModal(false);
+                            onPlayCommunityLevel(lvl.id);
+                          }}
+                          className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-emerald-500 to-cyan-500 hover:from-emerald-400 hover:to-cyan-400 text-black font-display font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 transition"
+                        >
+                          <Play className="w-3.5 h-3.5 fill-black" /> Play
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(creatingCommunityLevel || editingCommunityLevel) && (
+        <CommunityLevelEditor
+          creatorName={playerName.trim()}
+          initialLevel={editingCommunityLevel}
+          onSaved={(saved) => {
+            setCommunityLevels((prev) => {
+              const exists = prev.some((item) => item.id === saved.id);
+              if (exists) {
+                return prev.map((item) => (item.id === saved.id ? saved : item));
+              }
+              return [saved, ...prev];
+            });
+            setCreatingCommunityLevel(false);
+            setEditingCommunityLevel(null);
+          }}
+          onCancel={() => {
+            setCreatingCommunityLevel(false);
+            setEditingCommunityLevel(null);
+          }}
+        />
       )}
     </div>
   );

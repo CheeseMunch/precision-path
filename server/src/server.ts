@@ -13,7 +13,8 @@ import mikroOrmConfig from './mikro-orm.config.js';
 import { RoomManager } from './game/RoomManager.js';
 import { User } from './entities/User.js';
 import { MatchHistory } from './entities/MatchHistory.js';
-import { ClientInput, GameMode, CampaignLevelConfig, CampaignWaveSpec, CampaignPatternTemplate } from '../../shared/types.js';
+import { CommunityLevel } from './entities/CommunityLevel.js';
+import { ClientInput, GameMode, CampaignLevelConfig, CampaignWaveSpec, CampaignPatternTemplate, CommunityLevelConfig } from '../../shared/types.js';
 import { GAME_CONFIG, ObstaclePatternType } from '../../shared/gameConfig.js';
 import { CAMPAIGN_CONFIG, DEFAULT_CAMPAIGN_LEVELS } from '../../shared/campaignConfig.js';
 import { renderCampaignAdminPage } from './campaignAdminHtml.js';
@@ -1686,6 +1687,294 @@ app.post('/api/campaign-config/level', (req, res) => {
   res.json({ level: sanitized, levels: CAMPAIGN_CONFIG.levels });
 });
 
+// Community Levels (PostgreSQL via MikroORM with in-memory fallback)
+const COMMUNITY_LEVELS_FALLBACK: CommunityLevelConfig[] = [];
+
+function toCommunityLevelConfig(row: CommunityLevel): CommunityLevelConfig {
+  return {
+    id: row.id,
+    levelNumber: 1,
+    name: row.name,
+    storyName: 'Community',
+    description: row.description || '',
+    creatorName: row.creatorName,
+    createdAt: row.createdAt ? row.createdAt.getTime() : Date.now(),
+    updatedAt: row.updatedAt ? row.updatedAt.getTime() : Date.now(),
+    spawn: row.levelData?.spawn || { x: 0, y: 120 },
+    clearBonusPoints: 500,
+    parTimeSeconds: row.levelData?.parTimeSeconds ?? 20,
+    waves: Array.isArray(row.levelData?.waves) ? row.levelData.waves : [],
+    obstacles: Array.isArray(row.levelData?.obstacles) ? row.levelData.obstacles : [],
+    checkpoints: Array.isArray(row.levelData?.checkpoints) ? row.levelData.checkpoints : [],
+  };
+}
+
+function sanitizeCommunityPayload(rawLevel: any, creatorName: string, existingId?: string): CommunityLevelConfig {
+  const cleanCreator = String(creatorName || '').trim().slice(0, 24);
+  const id = existingId || (rawLevel?.id ? String(rawLevel.id).slice(0, 64) : `comm-${crypto.randomUUID()}`);
+  const base = sanitizeCampaignLevel({ ...rawLevel, id, storyName: 'Community' }, 0);
+  const now = Date.now();
+  return {
+    ...base,
+    id,
+    levelNumber: 1,
+    storyName: 'Community',
+    clearBonusPoints: 500,
+    creatorName: cleanCreator || 'Pilot',
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+async function listCommunityLevels(): Promise<CommunityLevelConfig[]> {
+  if (orm) {
+    const em = orm.em.fork();
+    const rows = await em.find(CommunityLevel, {}, { orderBy: { updatedAt: 'DESC' } });
+    return rows.map(toCommunityLevelConfig);
+  }
+  return [...COMMUNITY_LEVELS_FALLBACK].sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+async function findCommunityLevelById(id: string): Promise<CommunityLevelConfig | null> {
+  if (orm) {
+    const em = orm.em.fork();
+    const row = await em.findOne(CommunityLevel, { id });
+    return row ? toCommunityLevelConfig(row) : null;
+  }
+  return COMMUNITY_LEVELS_FALLBACK.find((l) => l.id === id) || null;
+}
+
+app.get('/api/community-levels', async (_req, res) => {
+  try {
+    const levels = await listCommunityLevels();
+    res.json({ levels });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to load community levels.' });
+  }
+});
+
+app.post('/api/community-levels', async (req, res) => {
+  const creatorName = String(req.body?.creatorName || '').trim();
+  const rawLevel = req.body?.level;
+  if (!creatorName) {
+    return res.status(400).json({ error: 'Pilot name is required to create a community level.' });
+  }
+  if (!rawLevel || typeof rawLevel !== 'object') {
+    return res.status(400).json({ error: 'Missing level payload.' });
+  }
+  try {
+    const sanitized = sanitizeCommunityPayload(rawLevel, creatorName);
+    if (orm) {
+      const em = orm.em.fork();
+      const entity = new CommunityLevel();
+      entity.id = sanitized.id;
+      entity.name = sanitized.name;
+      entity.creatorName = sanitized.creatorName;
+      entity.description = sanitized.description;
+      entity.levelData = {
+        spawn: sanitized.spawn,
+        clearBonusPoints: sanitized.clearBonusPoints,
+        parTimeSeconds: sanitized.parTimeSeconds,
+        waves: sanitized.waves,
+        obstacles: sanitized.obstacles,
+        checkpoints: sanitized.checkpoints,
+      };
+      await em.persistAndFlush(entity);
+      return res.status(201).json({ level: toCommunityLevelConfig(entity) });
+    }
+    COMMUNITY_LEVELS_FALLBACK.unshift(sanitized);
+    return res.status(201).json({ level: sanitized });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to create community level.' });
+  }
+});
+
+app.put('/api/community-levels/:id', async (req, res) => {
+  const { id } = req.params;
+  const creatorName = String(req.body?.creatorName || '').trim();
+  const rawLevel = req.body?.level;
+  if (!creatorName) {
+    return res.status(400).json({ error: 'Pilot name is required.' });
+  }
+  if (!rawLevel || typeof rawLevel !== 'object') {
+    return res.status(400).json({ error: 'Missing level payload.' });
+  }
+  try {
+    if (orm) {
+      const em = orm.em.fork();
+      const entity = await em.findOne(CommunityLevel, { id });
+      if (!entity) return res.status(404).json({ error: 'Community level not found.' });
+      if (entity.creatorName.trim().toLowerCase() !== creatorName.toLowerCase()) {
+        return res.status(403).json({ error: 'Only the creator can edit this level.' });
+      }
+      const sanitized = sanitizeCommunityPayload(rawLevel, entity.creatorName, entity.id);
+      entity.name = sanitized.name;
+      entity.description = sanitized.description;
+      entity.levelData = {
+        spawn: sanitized.spawn,
+        clearBonusPoints: sanitized.clearBonusPoints,
+        parTimeSeconds: sanitized.parTimeSeconds,
+        waves: sanitized.waves,
+        obstacles: sanitized.obstacles,
+        checkpoints: sanitized.checkpoints,
+      };
+      entity.updatedAt = new Date();
+      await em.flush();
+      return res.json({ level: toCommunityLevelConfig(entity) });
+    }
+    const idx = COMMUNITY_LEVELS_FALLBACK.findIndex((l) => l.id === id);
+    if (idx < 0) return res.status(404).json({ error: 'Community level not found.' });
+    const existing = COMMUNITY_LEVELS_FALLBACK[idx];
+    if (existing.creatorName.trim().toLowerCase() !== creatorName.toLowerCase()) {
+      return res.status(403).json({ error: 'Only the creator can edit this level.' });
+    }
+    const sanitized = sanitizeCommunityPayload(rawLevel, existing.creatorName, existing.id);
+    sanitized.createdAt = existing.createdAt;
+    COMMUNITY_LEVELS_FALLBACK[idx] = sanitized;
+    return res.json({ level: sanitized });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to update community level.' });
+  }
+});
+
+app.delete('/api/community-levels/:id', async (req, res) => {
+  const { id } = req.params;
+  const creatorName = String(req.body?.creatorName || req.query?.creatorName || '').trim();
+  if (!creatorName) {
+    return res.status(400).json({ error: 'Pilot name is required.' });
+  }
+  try {
+    if (orm) {
+      const em = orm.em.fork();
+      const entity = await em.findOne(CommunityLevel, { id });
+      if (!entity) return res.status(404).json({ error: 'Community level not found.' });
+      if (entity.creatorName.trim().toLowerCase() !== creatorName.toLowerCase()) {
+        return res.status(403).json({ error: 'Only the creator can delete this level.' });
+      }
+      await em.removeAndFlush(entity);
+      return res.json({ ok: true });
+    }
+    const idx = COMMUNITY_LEVELS_FALLBACK.findIndex((l) => l.id === id);
+    if (idx < 0) return res.status(404).json({ error: 'Community level not found.' });
+    if (COMMUNITY_LEVELS_FALLBACK[idx].creatorName.trim().toLowerCase() !== creatorName.toLowerCase()) {
+      return res.status(403).json({ error: 'Only the creator can delete this level.' });
+    }
+    COMMUNITY_LEVELS_FALLBACK.splice(idx, 1);
+    return res.json({ ok: true });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to delete community level.' });
+  }
+});
+
+// Admin Community Level Endpoints (bypass creator ownership for moderation)
+app.post('/api/admin/community-levels', async (req, res) => {
+  if (!isDirectLocalhost(req) || !hasValidAdminToken(req)) {
+    return res.status(403).json({ error: 'Admin access required.' });
+  }
+  const rawLevel = req.body?.level;
+  if (!rawLevel || typeof rawLevel !== 'object') {
+    return res.status(400).json({ error: 'Missing level payload.' });
+  }
+  const creatorName = String(rawLevel.creatorName || req.body?.creatorName || 'Admin').trim() || 'Admin';
+  try {
+    const sanitized = sanitizeCommunityPayload(rawLevel, creatorName);
+    if (orm) {
+      const em = orm.em.fork();
+      const entity = new CommunityLevel();
+      entity.id = sanitized.id;
+      entity.name = sanitized.name;
+      entity.creatorName = sanitized.creatorName;
+      entity.description = sanitized.description;
+      entity.levelData = {
+        spawn: sanitized.spawn,
+        clearBonusPoints: sanitized.clearBonusPoints,
+        parTimeSeconds: sanitized.parTimeSeconds,
+        waves: sanitized.waves,
+        obstacles: sanitized.obstacles,
+        checkpoints: sanitized.checkpoints,
+      };
+      await em.persistAndFlush(entity);
+      const levels = await listCommunityLevels();
+      return res.status(201).json({ level: toCommunityLevelConfig(entity), levels });
+    }
+    COMMUNITY_LEVELS_FALLBACK.unshift(sanitized);
+    const levels = await listCommunityLevels();
+    return res.status(201).json({ level: sanitized, levels });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to add community level.' });
+  }
+});
+
+app.put('/api/admin/community-levels/:id', async (req, res) => {
+  if (!isDirectLocalhost(req) || !hasValidAdminToken(req)) {
+    return res.status(403).json({ error: 'Admin access required.' });
+  }
+  const { id } = req.params;
+  const rawLevel = req.body?.level;
+  if (!rawLevel || typeof rawLevel !== 'object') {
+    return res.status(400).json({ error: 'Missing level payload.' });
+  }
+  try {
+    if (orm) {
+      const em = orm.em.fork();
+      const entity = await em.findOne(CommunityLevel, { id });
+      if (!entity) return res.status(404).json({ error: 'Community level not found.' });
+      const creatorName = String(rawLevel.creatorName || entity.creatorName || 'Admin').trim() || 'Admin';
+      const sanitized = sanitizeCommunityPayload(rawLevel, creatorName, entity.id);
+      entity.name = sanitized.name;
+      entity.creatorName = sanitized.creatorName;
+      entity.description = sanitized.description;
+      entity.levelData = {
+        spawn: sanitized.spawn,
+        clearBonusPoints: sanitized.clearBonusPoints,
+        parTimeSeconds: sanitized.parTimeSeconds,
+        waves: sanitized.waves,
+        obstacles: sanitized.obstacles,
+        checkpoints: sanitized.checkpoints,
+      };
+      entity.updatedAt = new Date();
+      await em.flush();
+      const levels = await listCommunityLevels();
+      return res.json({ level: toCommunityLevelConfig(entity), levels });
+    }
+    const idx = COMMUNITY_LEVELS_FALLBACK.findIndex((l) => l.id === id);
+    if (idx < 0) return res.status(404).json({ error: 'Community level not found.' });
+    const existing = COMMUNITY_LEVELS_FALLBACK[idx];
+    const creatorName = String(rawLevel.creatorName || existing.creatorName || 'Admin').trim() || 'Admin';
+    const sanitized = sanitizeCommunityPayload(rawLevel, creatorName, existing.id);
+    sanitized.createdAt = existing.createdAt;
+    COMMUNITY_LEVELS_FALLBACK[idx] = sanitized;
+    const levels = await listCommunityLevels();
+    return res.json({ level: sanitized, levels });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to update community level.' });
+  }
+});
+
+app.delete('/api/admin/community-levels/:id', async (req, res) => {
+  if (!isDirectLocalhost(req) || !hasValidAdminToken(req)) {
+    return res.status(403).json({ error: 'Admin access required.' });
+  }
+  const { id } = req.params;
+  try {
+    if (orm) {
+      const em = orm.em.fork();
+      const entity = await em.findOne(CommunityLevel, { id });
+      if (!entity) return res.status(404).json({ error: 'Community level not found.' });
+      await em.removeAndFlush(entity);
+      const levels = await listCommunityLevels();
+      return res.json({ ok: true, levels });
+    }
+    const idx = COMMUNITY_LEVELS_FALLBACK.findIndex((l) => l.id === id);
+    if (idx < 0) return res.status(404).json({ error: 'Community level not found.' });
+    COMMUNITY_LEVELS_FALLBACK.splice(idx, 1);
+    const levels = await listCommunityLevels();
+    return res.json({ ok: true, levels });
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message || 'Failed to delete community level.' });
+  }
+});
+
 // Serve built React frontend in production / Docker / Coolify single-container mode
 const clientDistPath = path.resolve(__dirname, '../../client/dist');
 if (fs.existsSync(path.join(clientDistPath, 'index.html'))) {
@@ -1703,16 +1992,30 @@ io.on('connection', (socket) => {
   console.log(`[Socket] Client connected: ${socket.id}`);
 
   // Create Room
-  socket.on('createRoom', ({ playerName, autoStart, gameMode, campaignLevel }: { playerName: string; autoStart?: boolean; gameMode?: GameMode; campaignLevel?: number }) => {
+  socket.on('createRoom', async ({ playerName, autoStart, gameMode, campaignLevel, communityLevelId }: { playerName: string; autoStart?: boolean; gameMode?: GameMode; campaignLevel?: number; communityLevelId?: string }) => {
     const prevRoom = roomManager.getRoomBySocketId(socket.id);
     if (prevRoom) {
       socket.leave(prevRoom.roomId);
       roomManager.leaveRoom(socket.id);
     }
 
+    let customLevel: CampaignLevelConfig | undefined;
+    let resolvedMode: GameMode = gameMode === 'campaign' ? 'campaign' : 'endless';
+    if (communityLevelId) {
+      const found = await findCommunityLevelById(communityLevelId);
+      if (!found) {
+        socket.emit('error', 'Community level not found.');
+        return;
+      }
+      customLevel = found;
+      resolvedMode = 'campaign';
+    }
+
     const { roomId, engine } = roomManager.createRoom(socket.id, playerName || 'Player', {
-      gameMode: gameMode === 'campaign' ? 'campaign' : 'endless',
+      gameMode: resolvedMode,
       campaignLevel: typeof campaignLevel === 'number' ? campaignLevel : 1,
+      customLevel,
+      communityLevelId: customLevel ? customLevel.id : undefined,
     });
     socket.join(roomId);
     socket.emit('roomCreated', { roomId, playerId: socket.id, state: engine.state });

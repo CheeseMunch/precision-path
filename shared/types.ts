@@ -128,9 +128,16 @@ export interface CampaignLevelConfig {
   checkpoints: CampaignCheckpoint[];
 }
 
+export interface CommunityLevelConfig extends CampaignLevelConfig {
+  creatorName: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export interface GameState {
   roomId: string;
   gameMode?: GameMode;
+  communityLevelId?: string;
   campaignLevel?: number;
   campaignLevelName?: string;
   campaignStoryName?: string;

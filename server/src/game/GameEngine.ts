@@ -8,6 +8,7 @@ import {
   ClientInput,
   CampaignObstacleSpec,
   CampaignWaveSpec,
+  CampaignLevelConfig,
 } from '../../../shared/types.js';
 import {
   GAME_CONFIG,
@@ -50,6 +51,8 @@ export class GameEngine {
   private currentRoundAxis: 'vertical' | 'horizontal' = 'vertical';
   private gameMode: GameMode = 'endless';
   private campaignLevelNumber = 1;
+  private customLevel: CampaignLevelConfig | null = null;
+  private communityLevelId: string | undefined = undefined;
   private campaignObstacleSpecs: Map<string, CampaignObstacleSpec> = new Map();
   private campaignWaveQueue: Array<{ triggerAt: number; wave: CampaignWaveSpec }> = [];
   private campaignTransitionTimer: number | null = null;
@@ -68,15 +71,18 @@ export class GameEngine {
   public readonly ARENA_RADIUS = GAME_CONFIG.arena.radius;
   public readonly PLAYER_RADIUS = GAME_CONFIG.arena.playerRadius;
 
-  constructor(roomId: string, options?: { gameMode?: GameMode; campaignLevel?: number }) {
+  constructor(roomId: string, options?: { gameMode?: GameMode; campaignLevel?: number; customLevel?: CampaignLevelConfig; communityLevelId?: string }) {
     this.initRng();
     this.gameMode = options?.gameMode ?? 'endless';
     this.campaignLevelNumber = options?.campaignLevel ?? 1;
+    this.customLevel = options?.customLevel ?? null;
+    this.communityLevelId = options?.communityLevelId;
     this.state = {
       roomId,
       gameMode: this.gameMode,
+      communityLevelId: this.communityLevelId,
       campaignLevel: this.campaignLevelNumber,
-      totalCampaignLevels: CAMPAIGN_CONFIG.levels.length,
+      totalCampaignLevels: this.customLevel ? 1 : CAMPAIGN_CONFIG.levels.length,
       campaignResult: null,
       status: 'lobby',
       countdownTimer: GAME_CONFIG.rounds.startCountdownDuration,
@@ -442,7 +448,7 @@ export class GameEngine {
 
     const spawnPos =
       this.gameMode === 'campaign'
-        ? getCampaignLevel(this.campaignLevelNumber).spawn
+        ? (this.customLevel ?? getCampaignLevel(this.campaignLevelNumber)).spawn
         : { x: 0, y: 0 };
 
     for (const id in this.state.players) {
@@ -473,13 +479,14 @@ export class GameEngine {
   }
 
   private loadCampaignLevelState() {
-    const level = getCampaignLevel(this.campaignLevelNumber);
+    const level = this.customLevel ?? getCampaignLevel(this.campaignLevelNumber);
     this.state.gameMode = 'campaign';
-    this.state.campaignLevel = level.levelNumber;
+    this.state.communityLevelId = this.communityLevelId;
+    this.state.campaignLevel = this.customLevel ? 1 : level.levelNumber;
     this.state.campaignLevelName = level.name;
-    this.state.campaignStoryName = level.storyName || 'Story 1';
+    this.state.campaignStoryName = this.customLevel ? 'Community' : (level.storyName || 'Story 1');
     this.state.campaignStoryCompleted = false;
-    this.state.totalCampaignLevels = CAMPAIGN_CONFIG.levels.length;
+    this.state.totalCampaignLevels = this.customLevel ? 1 : CAMPAIGN_CONFIG.levels.length;
     this.state.campaignSpawn = { ...level.spawn };
     this.state.campaignResult = null;
     this.state.campaignClearBonus = 0;
@@ -720,7 +727,7 @@ export class GameEngine {
   }
 
   private triggerCampaignLevelClear(winner?: Player): boolean {
-    const level = getCampaignLevel(this.campaignLevelNumber);
+    const level = this.customLevel ?? getCampaignLevel(this.campaignLevelNumber);
     const bonusPoints = this.CAMPAIGN_CLEAR_BONUS;
     if (!this.campaignLevelClearedAwarded) {
       this.campaignLevelClearedAwarded = true;
@@ -731,6 +738,17 @@ export class GameEngine {
     this.campaignWaveQueue = [];
     this.state.campaignClearBonus = bonusPoints;
     this.state.campaignTimeBonus = 0;
+
+    if (this.customLevel) {
+      this.state.campaignStoryName = 'Community';
+      if (this.state.obstacles.length === 0) {
+        this.state.campaignResult = 'cleared';
+        this.state.campaignStoryCompleted = false;
+        this.endGame(winner ?? null);
+        return true;
+      }
+      return false;
+    }
 
     const totalLevels = CAMPAIGN_CONFIG.levels.length;
     const curStory = (level.storyName || 'Story 1').trim();
