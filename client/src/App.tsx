@@ -7,11 +7,10 @@ import { GameCanvas } from './components/GameCanvas';
 import { HUD } from './components/HUD';
 import { GameOverModal } from './components/GameOverModal';
 import { LeaderboardModal } from './components/LeaderboardModal';
-import { ConfigModal } from './components/ConfigModal';
 import { ReadyGoOverlay } from './components/ReadyGoOverlay';
 import { sound } from './utils/sound';
 import { SERVER_URL } from './utils/api';
-import { Play, RotateCcw, Sliders, Home, Pause, Volume2, VolumeX } from 'lucide-react';
+import { Play, RotateCcw, Home, Pause, Volume2, VolumeX } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
@@ -22,7 +21,6 @@ export const App: React.FC = () => {
   });
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [showConfig, setShowConfig] = useState(false);
   const [showReadyGo, setShowReadyGo] = useState(false);
   const [readyGoTrigger, setReadyGoTrigger] = useState(0);
   const [volume, setVolume] = useState<number>(sound.volume);
@@ -178,10 +176,6 @@ export const App: React.FC = () => {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        if (showConfig) {
-          setShowConfig(false);
-          return;
-        }
         if (showLeaderboard) {
           setShowLeaderboard(false);
           return;
@@ -194,7 +188,7 @@ export const App: React.FC = () => {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [gameState, showConfig, showLeaderboard, handleTogglePause]);
+  }, [gameState, showLeaderboard, handleTogglePause]);
 
   const handleCreateRoom = (solo: boolean = false) => {
     if (!socket) return;
@@ -255,7 +249,6 @@ export const App: React.FC = () => {
           onCreateRoom={handleCreateRoom}
           onJoinRoom={handleJoinRoom}
           onOpenLeaderboard={() => setShowLeaderboard(true)}
-          onOpenConfig={() => setShowConfig(true)}
         />
       )}
 
@@ -363,13 +356,6 @@ export const App: React.FC = () => {
                     <Play className="w-4 h-4 fill-black" /> Resume (ESC)
                   </button>
 
-                  <button
-                    onClick={() => setShowConfig(true)}
-                    className="w-full py-2.5 px-4 bg-cyber-dark hover:bg-[#1a1f30] border border-cyan-500/30 text-cyan-300 font-mono text-xs rounded-lg flex items-center justify-center gap-2 transition"
-                  >
-                    <Sliders className="w-4 h-4" /> Tune Config & Randomness
-                  </button>
-
                   {gameState.players[myPlayerId]?.isHost && (
                     <button
                       onClick={handleStartGame}
@@ -406,11 +392,6 @@ export const App: React.FC = () => {
       {/* Global Leaderboard Modal */}
       {showLeaderboard && (
         <LeaderboardModal onClose={() => setShowLeaderboard(false)} />
-      )}
-
-      {/* Live Config & Randomness Tuner Modal */}
-      {showConfig && (
-        <ConfigModal onClose={() => setShowConfig(false)} />
       )}
     </main>
   );

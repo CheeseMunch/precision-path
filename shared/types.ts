@@ -65,6 +65,7 @@ export interface ClientInput {
 export interface LeaderboardEntry {
   id: string;
   username: string;
+  bestScore?: number;
   bestSurvivalTime: number;
   highestTier: number;
   totalGames: number;

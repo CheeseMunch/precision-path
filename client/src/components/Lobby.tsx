@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Users, Trophy, Zap, Sliders } from 'lucide-react';
+import { Play, Users, Trophy, Zap } from 'lucide-react';
 
 interface LobbyProps {
   playerName: string;
@@ -7,7 +7,6 @@ interface LobbyProps {
   onCreateRoom: (solo?: boolean) => void;
   onJoinRoom: (roomCode: string) => void;
   onOpenLeaderboard: () => void;
-  onOpenConfig: () => void;
 }
 
 export const Lobby: React.FC<LobbyProps> = ({
@@ -16,7 +15,6 @@ export const Lobby: React.FC<LobbyProps> = ({
   onCreateRoom,
   onJoinRoom,
   onOpenLeaderboard,
-  onOpenConfig,
 }) => {
   const [joinCode, setJoinCode] = useState('');
 
@@ -28,13 +26,13 @@ export const Lobby: React.FC<LobbyProps> = ({
       {/* Title */}
       <div className="text-center mb-8">
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded-full text-xs font-mono text-cyan-400 mb-3 tracking-widest uppercase">
-          <Zap className="w-3.5 h-3.5 animate-pulse" /> Precision Radial Survival
+          <Zap className="w-3.5 h-3.5 animate-pulse" /> Precision Arcade Survival
         </div>
         <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white font-display mb-2 drop-shadow-md">
           PRECISION<span className="text-cyan-400">PATH</span>
         </h1>
         <p className="text-gray-400 text-sm md:text-base max-w-md mx-auto">
-          Keep your circle inside the ring. Slip through procedurally generated obstacles across 4 converging rounds into Endless mode.
+          Pass through the gates to rack up points and survive converging obstacle waves across 4 stages into Endless mode.
         </p>
       </div>
 
@@ -98,19 +96,13 @@ export const Lobby: React.FC<LobbyProps> = ({
           </button>
         </div>
 
-        {/* Leaderboard & Config Buttons */}
-        <div className="grid grid-cols-2 gap-2">
+        {/* Leaderboard Button */}
+        <div>
           <button
             onClick={onOpenLeaderboard}
             className="w-full py-2.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 font-mono text-xs rounded-lg flex items-center justify-center gap-1.5 transition"
           >
             <Trophy className="w-3.5 h-3.5" /> Leaderboard
-          </button>
-          <button
-            onClick={onOpenConfig}
-            className="w-full py-2.5 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 font-mono text-xs rounded-lg flex items-center justify-center gap-1.5 transition"
-          >
-            <Sliders className="w-3.5 h-3.5" /> Tune Config
           </button>
         </div>
       </div>

@@ -30,6 +30,7 @@ export class GameEngine {
   private onGameOverCallback?: (state: GameState) => void;
   private onTierUpCallback?: (tier: GameTier) => void;
   private onStateUpdateCallback?: (state: GameState) => void;
+  private onPlayerEliminatedCallback?: (player: Player, tier: GameTier) => void;
 
   // Arena configuration from central config (phone-screen 9:16 portrait rectangle)
   public readonly ARENA_WIDTH = GAME_CONFIG.arena.width;
@@ -115,10 +116,12 @@ export class GameEngine {
     onGameOver?: (state: GameState) => void;
     onTierUp?: (tier: GameTier) => void;
     onStateUpdate?: (state: GameState) => void;
+    onPlayerEliminated?: (player: Player, tier: GameTier) => void;
   }) {
     this.onGameOverCallback = callbacks.onGameOver;
     this.onTierUpCallback = callbacks.onTierUp;
     this.onStateUpdateCallback = callbacks.onStateUpdate;
+    this.onPlayerEliminatedCallback = callbacks.onPlayerEliminated;
   }
 
   public addPlayer(id: string, name: string, isHost = false): Player {
@@ -141,7 +144,7 @@ export class GameEngine {
       color: playerColors[colorIndex],
       x: 0,
       y: 0,
-      radius: this.PLAYER_RADIUS,
+      radius: GAME_CONFIG.arena.playerRadius,
       alive: !isMatchActive,
       score: 0,
       survivedTime: 0,
@@ -154,6 +157,11 @@ export class GameEngine {
 
   public removePlayer(id: string) {
     const removed = this.state.players[id];
+    if (removed && (this.state.status === 'playing' || this.state.status === 'paused') && removed.survivedTime > 0) {
+      if (this.onPlayerEliminatedCallback) {
+        this.onPlayerEliminatedCallback(removed, this.state.currentTier);
+      }
+    }
     delete this.state.players[id];
 
     const remaining = Object.values(this.state.players);
@@ -191,6 +199,9 @@ export class GameEngine {
       for (const obs of this.state.obstacles) {
         if (this.isColliding(player, obs)) {
           player.alive = false;
+          if (this.onPlayerEliminatedCallback) {
+            this.onPlayerEliminatedCallback(player, this.state.currentTier);
+          }
           this.checkPlayerStatus();
           return;
         }
@@ -272,6 +283,7 @@ export class GameEngine {
       p.alive = true;
       p.x = 0;
       p.y = 0;
+      p.radius = GAME_CONFIG.arena.playerRadius;
       p.score = 0;
       p.gatesCleared = 0;
       p.survivedTime = 0;
@@ -1083,6 +1095,9 @@ export class GameEngine {
       for (const obs of this.state.obstacles) {
         if (this.isColliding(p, obs)) {
           p.alive = false;
+          if (this.onPlayerEliminatedCallback) {
+            this.onPlayerEliminatedCallback(p, this.state.currentTier);
+          }
           this.checkPlayerStatus();
           break;
         }

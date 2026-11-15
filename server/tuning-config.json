@@ -1,0 +1,85 @@
+{
+  "rounds": {
+    "defaultRoundDurationSeconds": 7,
+    "tierDurations": {
+      "1": 7,
+      "2": 7,
+      "3": 7,
+      "4": 7
+    },
+    "startCountdownDuration": 1
+  },
+  "randomness": {
+    "seed": null,
+    "gapPositionVariance": 0.68,
+    "gapSizeVariance": 0.22,
+    "speedVariance": 0.15,
+    "waveIntervalJitter": 0.18,
+    "staggerVariance": 0.25,
+    "randomizeRound1Direction": true
+  },
+  "obstacleTypes": {
+    "single-gap-wall": {
+      "enabled": true,
+      "weight": 40,
+      "minTier": 1,
+      "label": "Single-Gap Gate"
+    },
+    "double-gap-wall": {
+      "enabled": true,
+      "weight": 25,
+      "minTier": 1,
+      "label": "Twin-Split Gate"
+    },
+    "sweeping-half-wall": {
+      "enabled": true,
+      "weight": 20,
+      "minTier": 1,
+      "label": "Flank Sweeper Bar"
+    },
+    "staggered-blocks": {
+      "enabled": true,
+      "weight": 20,
+      "minTier": 2,
+      "label": "Staggered Chicane Blocks"
+    },
+    "orb-cluster": {
+      "enabled": true,
+      "weight": 15,
+      "minTier": 3,
+      "label": "Pulse Orb Barrage"
+    }
+  },
+  "obstacles": {
+    "baseSpeed": 145,
+    "speedPerTier": 14,
+    "endlessMaxBonusSpeed": 120,
+    "endlessSpeedScaleRate": 2.5,
+    "gapBaseWidth": 96,
+    "gapTierDecrement": 4,
+    "gapMinWidth": 64,
+    "doubleGapIslandWidth": 56,
+    "barThickness": 14,
+    "barLengthMultiplier": 2.5,
+    "spawnDistanceOffset": 35,
+    "staggerMs": 260,
+    "waveIntervals": {
+      "1": 1.6,
+      "2": 1.9,
+      "3": 2.2,
+      "4": 2.5,
+      "5": 1.8
+    }
+  },
+  "arena": {
+    "width": 450,
+    "height": 800,
+    "radius": 325,
+    "playerRadius": 13,
+    "hitboxForgiveness": 1.5
+  },
+  "engine": {
+    "serverTickRate": 60,
+    "clientInputThrottleMs": 8
+  }
+}

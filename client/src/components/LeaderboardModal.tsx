@@ -66,12 +66,15 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ onClose }) =
                     <span className="font-semibold text-gray-200">{entry.username}</span>
                   </div>
 
-                  <div className="flex items-center gap-4 text-gray-400">
+                  <div className="flex items-center gap-3 text-gray-400">
                     <span className="flex items-center gap-1 text-pink-400">
-                      <Shield className="w-3 h-3" /> Tier {entry.highestTier}
+                      <Shield className="w-3 h-3" /> Lv.{entry.highestTier}
                     </span>
-                    <span className="flex items-center gap-1 text-cyan-300 font-bold">
-                      <Clock className="w-3 h-3 text-cyan-400" /> {entry.bestSurvivalTime}s
+                    <span className="flex items-center gap-1 text-gray-300">
+                      <Clock className="w-3 h-3 text-gray-400" /> {entry.bestSurvivalTime}s
+                    </span>
+                    <span className="text-cyan-300 font-bold">
+                      {entry.bestScore ?? 0} PTS
                     </span>
                   </div>
                 </div>

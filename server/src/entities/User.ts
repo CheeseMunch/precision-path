@@ -11,6 +11,9 @@ export class User {
   @Property({ default: 0, type: 'float' })
   bestSurvivalTime: number = 0;
 
+  @Property({ default: 0 })
+  bestScore: number = 0;
+
   @Property({ default: 1 })
   highestTier: number = 1;
 
