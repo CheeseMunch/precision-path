@@ -834,6 +834,14 @@ io.on('connection', (socket) => {
     room.engine.handleInput(socket.id, input);
   });
 
+  // Frame-exact client-side collision notification (zero visual desync)
+  socket.on('playerHit', () => {
+    const room = roomManager.getRoomBySocketId(socket.id);
+    if (!room) return;
+
+    room.engine.eliminatePlayer(socket.id);
+  });
+
   // Disconnect
   socket.on('disconnect', () => {
     console.log(`[Socket] Client disconnected: ${socket.id}`);

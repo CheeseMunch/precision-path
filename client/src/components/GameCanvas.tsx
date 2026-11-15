@@ -6,6 +6,7 @@ interface GameCanvasProps {
   liveGameStateRef?: React.MutableRefObject<GameState | null>;
   myPlayerId: string;
   onSendInput: (input: ClientInput) => void;
+  onPlayerHit?: () => void;
 }
 
 const LOGICAL_WIDTH = 450;
@@ -16,19 +17,23 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   liveGameStateRef,
   myPlayerId,
   onSendInput,
+  onPlayerHit,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animFrameRef = useRef<number | null>(null);
   const inputThrottleRef = useRef<number>(0);
   const gameStateRef = useRef<GameState>(gameState);
   const myPlayerIdRef = useRef<string>(myPlayerId);
+  const onPlayerHitRef = useRef(onPlayerHit);
+  onPlayerHitRef.current = onPlayerHit;
+  const hasTriggeredHitRef = useRef<boolean>(false);
   const localPointerRef = useRef<{ x: number; y: number } | null>(null);
   // Zero-latency client-predicted position for the local player ball
   const localPlayerPosRef = useRef<{ x: number; y: number } | null>(null);
   // Smoothed display positions for remote multiplayer players
   const remotePlayerPosRef = useRef<Record<string, { x: number; y: number }>>({});
-  // Monotonic per-obstacle display coordinates driven by the native display frame clock
-  const obstacleDisplayRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  // VSync-locked birth timestamp (performance.now() ms) per obstacle ID — immune to network jitter
+  const obstacleSpawnPerfRef = useRef<Map<string, number>>(new Map());
   const isDraggingRef = useRef<boolean>(false);
   const lastScoreRef = useRef<number>(0);
   const popupsRef = useRef<
@@ -47,7 +52,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     if (gameState.status === 'countdown' || gameState.elapsedTime < 0.15) {
       localPlayerPosRef.current = { x: me.x, y: me.y };
-      obstacleDisplayRef.current.clear();
+      obstacleSpawnPerfRef.current.clear();
+      hasTriggeredHitRef.current = false;
       lastScoreRef.current = me.score;
       return;
     }
@@ -197,13 +203,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     canvas.width = LOGICAL_WIDTH * dpr;
     canvas.height = LOGICAL_HEIGHT * dpr;
 
-    let pulse = 0;
     let lastFrameTime = performance.now();
 
     const render = (now: number) => {
       const frameDt = Math.min(0.05, Math.max(0.001, (now - lastFrameTime) / 1000));
       lastFrameTime = now;
-      pulse += frameDt * 2.4;
 
       const currentState = liveGameStateRef?.current || gameStateRef.current;
       const currentMyId = myPlayerIdRef.current;
@@ -271,39 +275,76 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineTo(0, 16);
       ctx.stroke();
 
-      // 3. Draw Obstacles using Monotonic Frame-Clock Integration (Zero End-of-Screen Stutter)
+      // 3. Draw Obstacles using Hardware VSync Linear Equation (100% Immune to Network Jitter)
       ctx.save();
       ctx.beginPath();
       ctx.rect(-halfW, -halfH, arenaWidth, arenaHeight);
       ctx.clip();
 
-      const dispMap = obstacleDisplayRef.current;
+      const spawnPerfMap = obstacleSpawnPerfRef.current;
       const activeIds = new Set<string>();
+      const frameDeltaMs = frameDt * 1000;
+
+      // If game is paused, shift birth timestamps forward by frameDeltaMs so walls freeze in place cleanly
+      if (currentState.status === 'paused') {
+        for (const [id, t0] of spawnPerfMap.entries()) {
+          spawnPerfMap.set(id, t0 + frameDeltaMs);
+        }
+      }
+
+      const mePlayer = currentState.players[currentMyId];
+      const mePos = localPlayerPosRef.current || (mePlayer ? { x: mePlayer.x, y: mePlayer.y } : null);
+      // Hitbox is slightly smaller than the visual 13px ball sprite (3.5px forgiveness)
+      const meHitboxRadius = mePlayer ? Math.max(4, mePlayer.radius - 3.5) : 9.5;
 
       for (const obs of currentState.obstacles) {
         activeIds.add(obs.id);
-        let disp = dispMap.get(obs.id);
+        let spawnPerfMs = spawnPerfMap.get(obs.id);
 
-        if (!disp) {
-          disp = { x: obs.x, y: obs.y };
-          dispMap.set(obs.id, disp);
-        } else if (isPlaying) {
-          // Advance smoothly by constant velocity on the local display refresh clock
-          disp.x += obs.vx * frameDt;
-          disp.y += obs.vy * frameDt;
+        if (spawnPerfMs === undefined) {
+          const initialAgeSec =
+            obs.spawnTime !== undefined
+              ? Math.max(0, currentState.elapsedTime - obs.spawnTime)
+              : 0;
+          spawnPerfMs = now - initialAgeSec * 1000;
+          spawnPerfMap.set(obs.id, spawnPerfMs);
+        }
 
-          // Gentle forward-only drift convergence so network jitter never pulls a wall backward
-          const errX = obs.x - disp.x;
-          const errY = obs.y - disp.y;
-          if (obs.vx !== 0 && Math.sign(errX) === Math.sign(obs.vx)) {
-            disp.x += errX * 0.08;
-          } else if (Math.abs(errX) > 18) {
-            disp.x += errX * 0.15;
+        const ageSec = Math.max(0, (now - spawnPerfMs) / 1000);
+        const baseX = obs.spawnX !== undefined ? obs.spawnX : obs.x;
+        const baseY = obs.spawnY !== undefined ? obs.spawnY : obs.y;
+        const drawX = baseX + obs.vx * ageSec;
+        const drawY = baseY + obs.vy * ageSec;
+
+        // Frame-exact local collision check against the exact drawn wall coordinates (zero desync)
+        if (
+          isPlaying &&
+          mePlayer &&
+          mePlayer.alive &&
+          !hasTriggeredHitRef.current &&
+          mePos
+        ) {
+          let hit = false;
+          if (obs.type === 'circle') {
+            const r = obs.radius || 12;
+            const dist = Math.hypot(mePos.x - drawX, mePos.y - drawY);
+            hit = dist < meHitboxRadius + r;
+          } else {
+            const hw = obs.width / 2;
+            const hh = obs.height / 2;
+            const closestX = Math.max(drawX - hw, Math.min(mePos.x, drawX + hw));
+            const closestY = Math.max(drawY - hh, Math.min(mePos.y, drawY + hh));
+            const dx = mePos.x - closestX;
+            const dy = mePos.y - closestY;
+            hit = dx * dx + dy * dy < meHitboxRadius * meHitboxRadius;
           }
-          if (obs.vy !== 0 && Math.sign(errY) === Math.sign(obs.vy)) {
-            disp.y += errY * 0.08;
-          } else if (Math.abs(errY) > 18) {
-            disp.y += errY * 0.15;
+
+          if (hit) {
+            hasTriggeredHitRef.current = true;
+            mePlayer.alive = false;
+            if (onPlayerHitRef.current) {
+              onPlayerHitRef.current();
+            }
           }
         }
 
@@ -315,24 +356,24 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         if (obs.type === 'circle') {
           const r = obs.radius || 11;
           ctx.beginPath();
-          ctx.arc(disp.x, disp.y, r, 0, Math.PI * 2);
+          ctx.arc(drawX, drawY, r, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
         } else {
           const w = obs.width;
           const h = obs.height;
           ctx.beginPath();
-          ctx.roundRect(disp.x - w / 2, disp.y - h / 2, w, h, 4);
+          ctx.roundRect(drawX - w / 2, drawY - h / 2, w, h, 4);
           ctx.fill();
           ctx.stroke();
         }
       }
 
       // Prune despawned obstacle IDs
-      if (dispMap.size > activeIds.size + 10) {
-        for (const id of dispMap.keys()) {
+      if (spawnPerfMap.size > activeIds.size + 10) {
+        for (const id of spawnPerfMap.keys()) {
           if (!activeIds.has(id)) {
-            dispMap.delete(id);
+            spawnPerfMap.delete(id);
           }
         }
       }
@@ -449,15 +490,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.arc(0, 0, player.radius * 0.45, 0, Math.PI * 2);
         ctx.fillStyle = '#ffffff';
         ctx.fill();
-
-        // Pulsing halo on local player
-        if (isMe) {
-          ctx.beginPath();
-          ctx.arc(0, 0, player.radius + 5 + Math.sin(pulse * 1.8) * 2, 0, Math.PI * 2);
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-        }
 
         // Player Name Label ("YOU" for local player, name for others)
         ctx.fillStyle = isMe ? '#00f0ff' : '#ffffff';

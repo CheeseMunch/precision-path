@@ -76,7 +76,7 @@
     "height": 800,
     "radius": 325,
     "playerRadius": 13,
-    "hitboxForgiveness": 1.5
+    "hitboxForgiveness": 3.5
   },
   "engine": {
     "serverTickRate": 60,

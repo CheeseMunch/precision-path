@@ -217,6 +217,11 @@ export const App: React.FC = () => {
     socket.emit('playerInput', input);
   }, [socket]);
 
+  const handlePlayerHit = useCallback(() => {
+    if (!socket) return;
+    socket.emit('playerHit');
+  }, [socket]);
+
   const handleLeaveRoom = () => {
     sound.stopMusic();
     if (socket) {
@@ -276,6 +281,7 @@ export const App: React.FC = () => {
             liveGameStateRef={liveGameStateRef}
             myPlayerId={myPlayerId}
             onSendInput={handleSendInput}
+            onPlayerHit={handlePlayerHit}
           />
 
           {/* Green-Screen Chroma-Keyed "Ready... Go!" Video Overlay */}

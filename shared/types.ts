@@ -21,6 +21,9 @@ export interface Obstacle {
   id: string;
   x: number; // relative to arena center
   y: number;
+  spawnX?: number;
+  spawnY?: number;
+  spawnTime?: number;
   vx: number;
   vy: number;
   width: number;

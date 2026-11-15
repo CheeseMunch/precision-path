@@ -192,8 +192,8 @@ export const GAME_CONFIG = {
     /** Player circle radius in pixels */
     playerRadius: 13,
 
-    /** Hitbox forgiveness buffer (pixels) */
-    hitboxForgiveness: 1.5,
+    /** Hitbox forgiveness buffer (pixels) so hitbox is slightly smaller than visual ball sprite */
+    hitboxForgiveness: 3.5,
   },
 
   // ==========================================

@@ -22,6 +22,7 @@ export class GameEngine {
     lastPlayerRel: Map<string, number>;
   }> = [];
   private tickRate = GAME_CONFIG.engine.serverTickRate;
+  private lastTickTime = 0;
   private obstacleSpawnTimer = 0;
   private nextWaveInterval = GAME_CONFIG.obstacles.waveIntervals[1];
   private rngState: number | null = null;
@@ -253,7 +254,22 @@ export class GameEngine {
     } else if (this.state.status === 'paused') {
       this.state.status = 'playing';
       this.state.pausedBy = null;
+      this.lastTickTime = performance.now();
       if (this.onStateUpdateCallback) this.onStateUpdateCallback(this.state);
+    }
+  }
+
+  public eliminatePlayer(playerId: string) {
+    if (this.state.status !== 'playing') return;
+    const player = this.state.players[playerId];
+    if (!player || !player.alive) return;
+    player.alive = false;
+    if (this.onPlayerEliminatedCallback) {
+      this.onPlayerEliminatedCallback(player, this.state.currentTier);
+    }
+    this.checkPlayerStatus();
+    if (this.onStateUpdateCallback) {
+      this.onStateUpdateCallback(this.state);
     }
   }
 
@@ -329,6 +345,7 @@ export class GameEngine {
     }
 
     if (this.intervalId) clearInterval(this.intervalId);
+    this.lastTickTime = performance.now();
     this.intervalId = setInterval(() => this.tick(), 1000 / this.tickRate);
   }
 
@@ -359,7 +376,12 @@ export class GameEngine {
   private tick() {
     if (this.state.status !== 'playing') return;
 
-    const dt = 1 / this.tickRate;
+    const now = performance.now();
+    const dt =
+      this.lastTickTime > 0
+        ? Math.min(0.05, Math.max(0.001, (now - this.lastTickTime) / 1000))
+        : 1 / this.tickRate;
+    this.lastTickTime = now;
     this.state.elapsedTime += dt;
 
     // Process any staggered directional spawns scheduled on the game clock
@@ -908,6 +930,9 @@ export class GameEngine {
       type: 'rectangle',
       x,
       y,
+      spawnX: x,
+      spawnY: y,
+      spawnTime: this.state.elapsedTime,
       vx,
       vy,
       width,
@@ -974,6 +999,9 @@ export class GameEngine {
       type: 'circle',
       x,
       y,
+      spawnX: x,
+      spawnY: y,
+      spawnTime: this.state.elapsedTime,
       vx,
       vy,
       width: radius * 2,
@@ -992,8 +1020,14 @@ export class GameEngine {
     const remaining: Obstacle[] = [];
 
     for (const obs of this.state.obstacles) {
-      obs.x += obs.vx * dt;
-      obs.y += obs.vy * dt;
+      if (obs.spawnX !== undefined && obs.spawnY !== undefined && obs.spawnTime !== undefined) {
+        const age = Math.max(0, this.state.elapsedTime - obs.spawnTime);
+        obs.x = obs.spawnX + obs.vx * age;
+        obs.y = obs.spawnY + obs.vy * age;
+      } else {
+        obs.x += obs.vx * dt;
+        obs.y += obs.vy * dt;
+      }
 
       if (obs.rotationSpeed) {
         obs.rotation += obs.rotationSpeed * dt;
@@ -1107,7 +1141,8 @@ export class GameEngine {
 
   private isColliding(player: Player, obs: Obstacle): boolean {
     const forgiveness = GAME_CONFIG.arena.hitboxForgiveness;
-    const effectiveRadius = Math.max(4, player.radius - forgiveness);
+    // Server fallback includes a small 2.0px network-latency tolerance so in-flight client inputs never cause phantom hits
+    const effectiveRadius = Math.max(3.5, player.radius - forgiveness - 2.0);
 
     if (obs.type === 'circle') {
       const dist = Math.hypot(player.x - obs.x, player.y - obs.y);
