@@ -4,6 +4,9 @@ import {
   getTierDuration,
   getPreEndlessDuration,
   getObstacleWeight,
+  getRoundDirectionConfig,
+  RoundDirectionConfig,
+  RoundDirectionMode,
   ObstaclePatternType,
 } from '../../../shared/gameConfig.js';
 
@@ -33,6 +36,7 @@ export class GameEngine {
   private nextWaveInterval = GAME_CONFIG.obstacles.waveIntervals[1];
   private rngState: number | null = null;
   private matchDirections: ObstacleDirection[] = ['north', 'east', 'south', 'west'];
+  private currentRoundAxis: 'vertical' | 'horizontal' = 'vertical';
 
   private onGameOverCallback?: (state: GameState) => void;
   private onTierUpCallback?: (tier: GameTier) => void;
@@ -75,18 +79,55 @@ export class GameEngine {
   }
 
   /**
-   * Returns the exact active sides for the current level:
-   * - Level 1: 1 side
-   * - Level 2: 2 sides
-   * - Level 3: 3 sides
-   * - Level 4 & Endless: all 4 sides
+   * Randomly selects either 'vertical' or 'horizontal' axis for rounds set to random axis mode.
    */
-  private getActiveSidesForTier(tier: GameTier): ObstacleDirection[] {
-    if (this.isEndlessMode()) {
-      return this.matchDirections.slice(0, 4);
+  private rollRoundAxis() {
+    this.currentRoundAxis = this.random() > 0.5 ? 'vertical' : 'horizontal';
+  }
+
+  /**
+   * Returns the exact active sides for the current level based on custom per-round configuration:
+   * - Custom selected directions
+   * - Random vertical or horizontal for the round (North & South vs West & East)
+   * - Random vertical or horizontal per wave
+   * - Vertical only or Horizontal only
+   * - Random single side or All 4 sides
+   */
+  public getActiveSidesForTier(tier: GameTier): ObstacleDirection[] {
+    const isEndless = this.isEndlessMode();
+    const config = getRoundDirectionConfig(tier, isEndless);
+
+    switch (config.mode) {
+      case 'custom': {
+        const valid: ObstacleDirection[] = ['north', 'south', 'east', 'west'];
+        const dirs = (config.directions || []).filter((d): d is ObstacleDirection => valid.includes(d));
+        return dirs.length > 0 ? dirs : ['north'];
+      }
+      case 'random-axis-round': {
+        return this.currentRoundAxis === 'vertical'
+          ? ['north', 'south']
+          : ['west', 'east'];
+      }
+      case 'random-axis-wave': {
+        return this.random() > 0.5
+          ? ['north', 'south']
+          : ['west', 'east'];
+      }
+      case 'random-vertical': {
+        return ['north', 'south'];
+      }
+      case 'random-horizontal': {
+        return ['west', 'east'];
+      }
+      case 'random-single': {
+        const all: ObstacleDirection[] = ['north', 'south', 'east', 'west'];
+        return [this.shuffle(all)[0]];
+      }
+      case 'all':
+      default: {
+        return ['north', 'south', 'east', 'west'];
+      }
     }
-    const count = Math.min(4, Math.max(1, tier));
-    return this.matchDirections.slice(0, count);
   }
 
   /**
@@ -347,6 +388,7 @@ export class GameEngine {
     this.matchDirections = GAME_CONFIG.randomness.randomizeRound1Direction
       ? this.shuffle(allDirs)
       : allDirs;
+    this.rollRoundAxis();
 
     this.state.status = 'playing';
     this.state.elapsedTime = 0;
@@ -391,6 +433,7 @@ export class GameEngine {
     this.state.currentTier = 1;
     this.state.isEndless = false;
     this.state.totalRoundsBeforeEndless = GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4;
+    this.rollRoundAxis();
     this.state.activeDirections = this.getActiveSidesForTier(1);
     this.state.tierTimeRemaining = getTierDuration(1);
     this.state.elapsedTime = 0;
@@ -446,12 +489,14 @@ export class GameEngine {
         if (this.state.currentTier < maxTimed) {
           this.state.currentTier = (this.state.currentTier + 1) as GameTier;
           this.state.isEndless = false;
+          this.rollRoundAxis();
           this.state.activeDirections = this.getActiveSidesForTier(this.state.currentTier);
           this.state.tierTimeRemaining = getTierDuration(this.state.currentTier);
         } else {
           // Transition directly to Endless Mode!
           this.state.currentTier = (maxTimed + 1) as GameTier;
           this.state.isEndless = true;
+          this.rollRoundAxis();
           this.state.activeDirections = this.getActiveSidesForTier(this.state.currentTier);
           this.state.tierTimeRemaining = 0;
         }
@@ -548,6 +593,7 @@ export class GameEngine {
   private generateProceduralWave(tier: GameTier) {
     const isEndless = this.isEndlessMode();
     const activeSides = this.getActiveSidesForTier(tier);
+    this.state.activeDirections = activeSides;
     const directions: ObstacleDirection[] = this.shuffle(activeSides);
 
     const preEndlessDuration = getPreEndlessDuration();
