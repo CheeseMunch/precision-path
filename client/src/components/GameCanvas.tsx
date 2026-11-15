@@ -383,8 +383,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.strokeStyle = isCleared ? 'rgba(16, 185, 129, 0.5)' : isCurrent ? '#34d399' : 'rgba(148, 163, 184, 0.45)';
           ctx.stroke();
 
-          ctx.fillStyle = isCleared ? 'rgba(110, 231, 183, 0.8)' : isCurrent ? '#ffffff' : 'rgba(203, 213, 225, 0.75)';
-          ctx.font = 'bold 11px Orbitron, monospace';
+          ctx.fillStyle = isCleared ? 'rgba(110, 231, 183, 0.85)' : '#ffe600';
+          ctx.shadowColor = isCleared ? 'transparent' : '#ffe600';
+          ctx.shadowBlur = isCleared ? 0 : isCurrent ? 10 : 5;
+          ctx.font = 'bold 12px Orbitron, monospace';
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText(isCleared ? '✓' : String(cp.order), mid.x, mid.y);
