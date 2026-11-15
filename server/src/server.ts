@@ -171,6 +171,16 @@ function applyTuningConfig(body: any) {
         if (typeof incoming.minTier === 'number') {
           GAME_CONFIG.obstacleTypes[key].minTier = Math.max(1, Math.min(5, Math.round(incoming.minTier))) as any;
         }
+        if (incoming.tierWeights && typeof incoming.tierWeights === 'object') {
+          if (!GAME_CONFIG.obstacleTypes[key].tierWeights) {
+            GAME_CONFIG.obstacleTypes[key].tierWeights = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+          }
+          for (const t of [1, 2, 3, 4, 5] as const) {
+            if (typeof incoming.tierWeights[t] === 'number') {
+              GAME_CONFIG.obstacleTypes[key].tierWeights![t] = Math.max(0, incoming.tierWeights[t]);
+            }
+          }
+        }
       }
     }
   }
@@ -504,10 +514,10 @@ app.get('/db-admin', (req, res) => {
           </div>
         </div>
 
-        <!-- 4. Allowed Procedural Obstacle Types & Weights -->
+        <!-- 4. Allowed Procedural Obstacle Types & Weights by Round -->
         <div class="bg-[#121520] border border-gray-800 rounded-xl p-5 flex flex-col gap-3 text-xs">
           <div class="border-b border-gray-800 pb-2 text-cyan-400 font-bold uppercase text-sm">
-            4. Procedural Obstacle Types & Spawn Weights
+            4. Procedural Obstacle Archetypes & Spawn Weights by Round
           </div>
           <div id="obstacleTypesList" class="flex flex-col gap-3"></div>
         </div>
@@ -615,30 +625,96 @@ app.get('/db-admin', (req, res) => {
       const container = document.getElementById('obstacleTypesList');
       container.innerHTML = Object.keys(typesObj).map((key) => {
         const item = typesObj[key];
+        const tw = item.tierWeights || { 1: item.weight, 2: item.weight, 3: item.weight, 4: item.weight, 5: item.weight };
         return \`
-          <div class="p-3 bg-[#090b12] border border-gray-800 rounded-lg flex flex-wrap items-center justify-between gap-3">
-            <label class="flex items-center gap-2 cursor-pointer text-gray-200 font-semibold">
-              <input type="checkbox" id="ot_en_\${key}" \${item.enabled ? 'checked' : ''} class="accent-cyan-400 w-4 h-4" />
-              <span>\${item.label}</span>
-              <span class="text-[10px] text-gray-500">(\${key})</span>
-            </label>
-            <div class="flex items-center gap-4">
+          <div class="p-3.5 bg-[#090b12] border border-gray-800 rounded-lg flex flex-col gap-2.5">
+            <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-800/60 pb-2">
+              <label class="flex items-center gap-2 cursor-pointer text-gray-200 font-semibold">
+                <input type="checkbox" id="ot_en_\${key}" \${item.enabled ? 'checked' : ''} onchange="updateWeightBadges()" class="accent-cyan-400 w-4 h-4" />
+                <span>\${item.label}</span>
+                <span class="text-[10px] text-gray-500 font-mono">(\${key})</span>
+              </label>
               <div class="flex items-center gap-1.5">
-                <span class="text-[11px] text-gray-400">Min Round:</span>
-                <select id="ot_tier_\${key}" class="bg-[#121520] border border-gray-700 rounded px-2 py-1 text-xs text-cyan-300">
-                  \${[1,2,3,4,5].map(t => \`<option value="\${t}" \${item.minTier === t ? 'selected' : ''}>\${t === 5 ? 'Endless' : 'Round ' + t}</option>\`).join('')}
+                <span class="text-[11px] text-gray-400">Unlock:</span>
+                <select id="ot_tier_\${key}" onchange="updateWeightBadges()" class="bg-[#121520] border border-gray-700 rounded px-2 py-1 text-xs text-cyan-300 font-bold">
+                  \${[1,2,3,4,5].map(t => \`<option value="\${t}" \${item.minTier === t ? 'selected' : ''}>\${t === 5 ? 'Endless Only' : 'Round ' + t + '+'}</option>\`).join('')}
                 </select>
               </div>
-              <div class="flex items-center gap-2">
-                <span class="text-[11px] text-gray-400 w-20">Weight: <b id="ot_wval_\${key}" class="text-cyan-300">\${item.weight}</b></span>
-                <input type="range" id="ot_w_\${key}" min="0" max="100" step="5" value="\${item.weight}"
-                  oninput="document.getElementById('ot_wval_\${key}').textContent = this.value"
-                  class="w-24 accent-cyan-400" />
+            </div>
+
+            <!-- Per-Round Weights Grid -->
+            <div>
+              <div class="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-1.5">
+                Spawn Weights By Round (0 = disabled in that round)
+              </div>
+              <div class="grid grid-cols-5 gap-2">
+                \${[1, 2, 3, 4, 5].map((t) => {
+                  const val = tw[t] !== undefined ? tw[t] : item.weight;
+                  const label = t === 5 ? 'Endless' : 'Round ' + t;
+                  return \`
+                    <div class="bg-[#121520] border border-gray-800 rounded p-1.5 flex flex-col items-center">
+                      <span class="text-[10px] font-bold \${t === 5 ? 'text-pink-400' : 'text-gray-300'} mb-1">\${label}</span>
+                      <input
+                        type="number"
+                        id="ot_tw_\${key}_\${t}"
+                        min="0"
+                        max="200"
+                        step="5"
+                        value="\${val}"
+                        oninput="updateWeightBadges()"
+                        class="w-full bg-[#07080d] border border-gray-700 rounded p-1 text-center font-bold text-cyan-300 text-xs focus:outline-none focus:border-cyan-400"
+                      />
+                      <span id="badge_\${key}_\${t}" class="text-[9px] text-gray-500 mt-1 font-mono">--%</span>
+                    </div>
+                  \`;
+                }).join('')}
               </div>
             </div>
           </div>
         \`;
       }).join('');
+      updateWeightBadges();
+    }
+
+    function updateWeightBadges() {
+      if (!currentConfig || !currentConfig.obstacleTypes) return;
+      const keys = Object.keys(currentConfig.obstacleTypes);
+
+      // Compute total eligible weight per round across all enabled obstacles
+      const roundTotals = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      for (const t of [1, 2, 3, 4, 5]) {
+        for (const key of keys) {
+          const enEl = document.getElementById('ot_en_' + key);
+          const tierEl = document.getElementById('ot_tier_' + key);
+          const wEl = document.getElementById('ot_tw_' + key + '_' + t);
+          if (enEl && enEl.checked && tierEl && Number(tierEl.value) <= t && wEl) {
+            roundTotals[t] += Math.max(0, Number(wEl.value) || 0);
+          }
+        }
+      }
+
+      // Update percentage badges for each obstacle in each round
+      for (const t of [1, 2, 3, 4, 5]) {
+        const total = roundTotals[t];
+        for (const key of keys) {
+          const badgeEl = document.getElementById('badge_' + key + '_' + t);
+          if (!badgeEl) continue;
+          const enEl = document.getElementById('ot_en_' + key);
+          const tierEl = document.getElementById('ot_tier_' + key);
+          const wEl = document.getElementById('ot_tw_' + key + '_' + t);
+          const isEligible = enEl && enEl.checked && tierEl && Number(tierEl.value) <= t;
+          const w = wEl ? Math.max(0, Number(wEl.value) || 0) : 0;
+
+          if (!isEligible || w === 0 || total === 0) {
+            badgeEl.textContent = '0%';
+            badgeEl.className = 'text-[9px] text-gray-600 mt-1 font-mono';
+          } else {
+            const pct = Math.round((w / total) * 100);
+            badgeEl.textContent = pct + '%';
+            badgeEl.className = 'text-[9px] text-cyan-400 font-bold mt-1 font-mono';
+          }
+        }
+      }
     }
 
     function updateLabels() {
@@ -683,11 +759,18 @@ app.get('/db-admin', (req, res) => {
       const obstacleTypes = {};
       if (currentConfig && currentConfig.obstacleTypes) {
         for (const key of Object.keys(currentConfig.obstacleTypes)) {
+          const item = currentConfig.obstacleTypes[key];
+          const tierWeights = {};
+          for (let t = 1; t <= 5; t++) {
+            const el = document.getElementById('ot_tw_' + key + '_' + t);
+            tierWeights[t] = el ? Math.max(0, Number(el.value) || 0) : (item.tierWeights?.[t] ?? item.weight);
+          }
           obstacleTypes[key] = {
-            ...currentConfig.obstacleTypes[key],
+            ...item,
             enabled: document.getElementById('ot_en_' + key).checked,
             minTier: Number(document.getElementById('ot_tier_' + key).value),
-            weight: Number(document.getElementById('ot_w_' + key).value),
+            weight: tierWeights[1] || item.weight,
+            tierWeights,
           };
         }
       }

@@ -11,10 +11,10 @@
   },
   "randomness": {
     "seed": null,
-    "gapPositionVariance": 0.68,
-    "gapSizeVariance": 0.22,
-    "speedVariance": 0.16,
-    "waveIntervalJitter": 0.18,
+    "gapPositionVariance": 0.74,
+    "gapSizeVariance": 0.3,
+    "speedVariance": 0.24,
+    "waveIntervalJitter": 0.1,
     "staggerVariance": 0.26,
     "randomizeRound1Direction": true
   },
@@ -22,31 +22,66 @@
     "single-gap-wall": {
       "enabled": true,
       "weight": 15,
-      "minTier": 3,
+      "tierWeights": {
+        "1": 35,
+        "2": 30,
+        "3": 20,
+        "4": 15,
+        "5": 10
+      },
+      "minTier": 1,
       "label": "Single-Gap Gate"
     },
     "double-gap-wall": {
       "enabled": true,
       "weight": 25,
+      "tierWeights": {
+        "1": 30,
+        "2": 25,
+        "3": 25,
+        "4": 25,
+        "5": 25
+      },
       "minTier": 1,
       "label": "Twin-Split Gate"
     },
     "sweeping-half-wall": {
       "enabled": true,
       "weight": 20,
+      "tierWeights": {
+        "1": 20,
+        "2": 20,
+        "3": 20,
+        "4": 20,
+        "5": 20
+      },
       "minTier": 1,
       "label": "Flank Sweeper Bar"
     },
     "staggered-blocks": {
       "enabled": true,
       "weight": 20,
-      "minTier": 2,
+      "tierWeights": {
+        "1": 15,
+        "2": 20,
+        "3": 20,
+        "4": 25,
+        "5": 25
+      },
+      "minTier": 1,
       "label": "Staggered Chicane Blocks"
     },
     "orb-cluster": {
       "enabled": true,
       "weight": 15,
-      "minTier": 3,
+      "tierWeights": {
+        "1": 0,
+        "2": 5,
+        "3": 15,
+        "4": 20,
+        "5": 25
+      },
+      "minTier": 2,
       "label": "Pulse Orb Barrage"
     }
   },

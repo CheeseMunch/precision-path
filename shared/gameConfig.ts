@@ -10,12 +10,24 @@ export type ObstaclePatternType =
 export interface ObstacleTypeConfig {
   /** Whether this obstacle archetype is active in procedural generation */
   enabled: boolean;
-  /** Relative probability weight (higher = spawns more frequently) */
+  /** Default relative probability weight */
   weight: number;
+  /** Optional per-round weight overrides (1: Round 1, 2: Round 2, 3: Round 3, 4: Round 4, 5: Endless) */
+  tierWeights?: Record<GameTier, number>;
   /** Minimum round/tier (1-5) before this obstacle type can be generated */
   minTier: GameTier;
   /** Display label for UI/debug */
   label: string;
+}
+
+/**
+ * Returns the effective spawn weight for an obstacle pattern in a specific round.
+ */
+export function getObstacleWeight(config: ObstacleTypeConfig, tier: GameTier): number {
+  if (config.tierWeights && typeof config.tierWeights[tier] === 'number') {
+    return Math.max(0, config.tierWeights[tier]);
+  }
+  return Math.max(0, config.weight);
 }
 
 /**
@@ -97,30 +109,35 @@ export const GAME_CONFIG = {
     'single-gap-wall': {
       enabled: true,
       weight: 40,
+      tierWeights: { 1: 40, 2: 35, 3: 30, 4: 25, 5: 20 },
       minTier: 1,
       label: 'Single-Gap Gate',
     },
     'double-gap-wall': {
       enabled: true,
       weight: 25,
+      tierWeights: { 1: 30, 2: 25, 3: 25, 4: 25, 5: 25 },
       minTier: 1,
       label: 'Twin-Split Gate',
     },
     'sweeping-half-wall': {
       enabled: true,
       weight: 20,
+      tierWeights: { 1: 15, 2: 20, 3: 20, 4: 20, 5: 20 },
       minTier: 1,
       label: 'Flank Sweeper Bar',
     },
     'staggered-blocks': {
       enabled: true,
       weight: 20,
+      tierWeights: { 1: 15, 2: 20, 3: 25, 4: 25, 5: 25 },
       minTier: 2,
       label: 'Staggered Chicane Blocks',
     },
     'orb-cluster': {
       enabled: true,
       weight: 15,
+      tierWeights: { 1: 0, 2: 10, 3: 15, 4: 20, 5: 25 },
       minTier: 3,
       label: 'Pulse Orb Barrage',
     },

@@ -1,5 +1,10 @@
 import { GameState, GameTier, Player, Obstacle, ObstacleDirection, ClientInput } from '../../../shared/types.js';
-import { GAME_CONFIG, getTierDuration, ObstaclePatternType } from '../../../shared/gameConfig.js';
+import {
+  GAME_CONFIG,
+  getTierDuration,
+  getObstacleWeight,
+  ObstaclePatternType,
+} from '../../../shared/gameConfig.js';
 
 export class GameEngine {
   public state: GameState;
@@ -464,7 +469,7 @@ export class GameEngine {
   }
 
   /**
-   * Selects an obstacle pattern archetype using the configured weights and minimum tier rules.
+   * Selects an obstacle pattern archetype using per-round configured weights and minimum tier rules.
    */
   private pickProceduralObstacleType(tier: GameTier): ObstaclePatternType {
     const entries = Object.entries(GAME_CONFIG.obstacleTypes) as [
@@ -472,25 +477,29 @@ export class GameEngine {
       (typeof GAME_CONFIG.obstacleTypes)[ObstaclePatternType]
     ][];
 
-    const eligible = entries.filter(
-      ([, cfg]) => cfg.enabled && cfg.weight > 0 && tier >= cfg.minTier
-    );
+    const eligible = entries
+      .map(([type, cfg]) => ({
+        type,
+        cfg,
+        weight: getObstacleWeight(cfg, tier),
+      }))
+      .filter(({ cfg, weight }) => cfg.enabled && weight > 0 && tier >= cfg.minTier);
 
     if (eligible.length === 0) {
       return 'single-gap-wall';
     }
 
-    const totalWeight = eligible.reduce((sum, [, cfg]) => sum + cfg.weight, 0);
+    const totalWeight = eligible.reduce((sum, item) => sum + item.weight, 0);
     let roll = this.random() * totalWeight;
 
-    for (const [type, cfg] of eligible) {
-      roll -= cfg.weight;
+    for (const item of eligible) {
+      roll -= item.weight;
       if (roll <= 0) {
-        return type;
+        return item.type;
       }
     }
 
-    return eligible[eligible.length - 1][0];
+    return eligible[eligible.length - 1].type;
   }
 
   /**
