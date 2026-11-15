@@ -1,8 +1,8 @@
 /**
- * HTML/JS renderer for the Campaign Level Admin visual editor (/campaign-admin).
- * Uses center-relative arena coordinates (-225..225 x -400..400) matching GameEngine & GameCanvas.
- * Checkpoints are axis-aligned gates with automatic opening detection (treating arena walls as endgates)
- * and explicit Gate Numbering (order: 1, 2, 3...).
+ * HTML/JS renderer for the Campaign Level Admin visual wave & gate designer (/campaign-admin).
+ * Supports per-side offscreen obstacle waves, configurable order & delay between waves,
+ * live timeline playback on the 450x800 map, and clicking openings on incoming waves
+ * to attach/remove numbered checkpoint gates (with arena walls acting as endgates).
  */
 
 export function renderCampaignAdminPage(adminToken: string): string {
@@ -13,16 +13,16 @@ export function renderCampaignAdminPage(adminToken: string): string {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Precision Path — Campaign Level Admin</title>
+  <title>Precision Path — Campaign Wave &amp; Gate Designer</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     body { background: #070a12; color: #e2e8f0; font-family: ui-sans-serif, system-ui, sans-serif; }
     .cyber-panel { background: #0d1322; border: 1px solid rgba(34, 211, 238, 0.22); }
     .input-dark { background: #060913; border: 1px solid #1e293b; color: #f8fafc; border-radius: 0.375rem; padding: 0.375rem 0.5rem; font-size: 0.75rem; width: 100%; }
     .input-dark:focus { outline: none; border-color: #22d3ee; }
-    .tool-btn { background: #111827; border: 1px solid #334155; color: #cbd5e1; padding: 0.45rem 0.7rem; border-radius: 0.5rem; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
-    .tool-btn:hover { border-color: #22d3ee; color: #fff; }
-    .tool-btn.active { background: #06b6d4; border-color: #22d3ee; color: #04101a; }
+    .side-btn { background: #0f172a; border: 1px solid #334155; color: #cbd5e1; padding: 0.4rem 0.65rem; border-radius: 0.5rem; font-size: 0.72rem; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+    .side-btn:hover { border-color: #22d3ee; color: #fff; }
+    .side-btn.active { background: #06b6d4; border-color: #22d3ee; color: #04101a; }
     canvas { touch-action: none; }
   </style>
 </head>
@@ -33,18 +33,18 @@ export function renderCampaignAdminPage(adminToken: string): string {
       <div>
         <div class="flex items-center gap-2">
           <span class="text-xs font-mono uppercase tracking-widest px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Campaign Admin</span>
-          <h1 class="text-xl font-black tracking-wide text-white">Structured Gate Path Designer</h1>
+          <h1 class="text-xl font-black tracking-wide text-white">Offscreen Wave &amp; Attached Gate Designer</h1>
         </div>
-        <p class="text-xs text-slate-400 mt-1">Place obstacles, scan horizontal/vertical lines to pick any gate opening (walls act as endgates), and number gates (1, 2, 3...) to define the path.</p>
+        <p class="text-xs text-slate-400 mt-1">Choose a side, configure incoming obstacle waves &amp; timing, then press Play on the map and click wave openings to attach numbered checkpoint gates.</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <a href="/db-admin" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold rounded-lg text-xs uppercase tracking-wider border border-gray-700 transition">
           &larr; DB &amp; Endless Admin
         </a>
-        <button id="btnResetDefaults" onclick="resetCampaignConfig()" class="px-3 py-2 bg-rose-950/70 hover:bg-rose-900 text-rose-200 font-bold rounded-lg text-xs uppercase tracking-wider border border-rose-500/40 transition">
+        <button onclick="resetCampaignConfig()" class="px-3 py-2 bg-rose-950/70 hover:bg-rose-900 text-rose-200 font-bold rounded-lg text-xs uppercase tracking-wider border border-rose-500/40 transition">
           Reset Defaults
         </button>
-        <button id="btnSaveAll" onclick="saveCampaignConfig()" class="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black rounded-lg text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 transition">
+        <button onclick="saveCampaignConfig()" class="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black rounded-lg text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 transition">
           Save All Levels
         </button>
       </div>
@@ -68,24 +68,28 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
     <!-- Main Editor Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-      <!-- Left: Canvas & Placement Toolbar -->
+      <!-- Left: Interactive Map Playback + Gate Clicking -->
       <div class="lg:col-span-6 cyber-panel rounded-xl p-4 space-y-3">
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="text-xs font-bold uppercase tracking-wider text-cyan-300">Visual Arena (450 &times; 800, Center 0,0)</div>
-          <label class="flex items-center gap-1.5 text-xs text-slate-300 cursor-pointer">
-            <input type="checkbox" id="chkSnapGrid" checked class="accent-cyan-400" />
-            Snap 10px
-          </label>
+          <div class="text-xs font-bold uppercase tracking-wider text-cyan-300">Live Map Timeline (450 &times; 800)</div>
+          <div class="flex items-center gap-1.5">
+            <button id="btnPlayPause" onclick="togglePlay()" class="px-3 py-1 rounded bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs uppercase tracking-wider transition">
+              &#9654; Play
+            </button>
+            <button onclick="resetPlayback()" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs border border-slate-600 transition">
+              &#9198; 0.0s
+            </button>
+          </div>
         </div>
 
-        <div class="flex flex-wrap gap-1.5" id="toolPalette">
-          <button class="tool-btn active" data-tool="select" onclick="setTool('select')">Select / Drag</button>
-          <button class="tool-btn" data-tool="spawn" onclick="setTool('spawn')">Set Spawn</button>
-          <button class="tool-btn" data-tool="gate-h" onclick="setTool('gate-h')">+ Gate (Horiz)</button>
-          <button class="tool-btn" data-tool="gate-v" onclick="setTool('gate-v')">+ Gate (Vert)</button>
-          <button class="tool-btn" data-tool="wall" onclick="setTool('wall')">+ Gate Wall</button>
-          <button class="tool-btn" data-tool="spinner" onclick="setTool('spinner')">+ Spinner</button>
-          <button class="tool-btn" data-tool="orb" onclick="setTool('orb')">+ Orb</button>
+        <!-- Timeline Scrubber -->
+        <div class="flex items-center gap-3 bg-[#060913] px-3 py-2 rounded-lg border border-slate-800">
+          <input id="timeScrubber" type="range" min="0" max="15" step="0.05" value="0" oninput="scrubTime(Number(this.value))" class="flex-1 accent-cyan-400 cursor-pointer" />
+          <span id="timeLabel" class="text-xs font-mono text-cyan-300 w-24 text-right">0.00s / 0.00s</span>
+        </div>
+
+        <div class="text-[11px] text-emerald-300/90 bg-emerald-950/30 border border-emerald-500/25 rounded-lg px-3 py-1.5">
+          Tip: Press <strong>Play</strong> (or scrub the slider), then <strong>click any opening on an incoming wave</strong> on the map to attach or toggle a numbered Checkpoint Gate!
         </div>
 
         <div class="flex justify-center bg-[#04060c] rounded-xl p-3 border border-slate-800">
@@ -94,11 +98,11 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
         <div class="flex items-center justify-between text-[11px] text-slate-400">
           <span id="cursorCoords">X: 0, Y: 0</span>
-          <span>Hover with + Gate (Horiz/Vert) to pick any opening (walls = endgates)</span>
+          <span>Drag SPAWN circle to reposition player start</span>
         </div>
       </div>
 
-      <!-- Right: Level Metadata + Selected Item Inspector + Lists -->
+      <!-- Right: Level Metadata + Side/Obstacle Builder + Wave Queue & Attached Gates -->
       <div class="lg:col-span-6 space-y-4">
         <!-- Level Metadata -->
         <div class="cyber-panel rounded-xl p-4 space-y-3">
@@ -120,44 +124,50 @@ export function renderCampaignAdminPage(adminToken: string): string {
               <label class="block text-[11px] text-slate-400 mb-1">Par Time (seconds)</label>
               <input id="metaParTime" type="number" class="input-dark" oninput="updateLevelMeta('parTimeSeconds', Number(this.value))" />
             </div>
-            <div>
-              <label class="block text-[11px] text-slate-400 mb-1">Spawn X</label>
-              <input id="metaSpawnX" type="number" class="input-dark" oninput="updateSpawn('x', Number(this.value))" />
-            </div>
-            <div>
-              <label class="block text-[11px] text-slate-400 mb-1">Spawn Y</label>
-              <input id="metaSpawnY" type="number" class="input-dark" oninput="updateSpawn('y', Number(this.value))" />
-            </div>
           </div>
         </div>
 
-        <!-- Selected Element Inspector -->
+        <!-- Add Wave by Side -->
+        <div class="cyber-panel rounded-xl p-4 space-y-3">
+          <div class="text-xs font-bold uppercase tracking-wider text-amber-300">Send Obstacle Wave From Side</div>
+          <div class="grid grid-cols-4 gap-1.5" id="sideSelector">
+            <button class="side-btn active" data-side="north" onclick="setBuilderSide('north')">North &darr;</button>
+            <button class="side-btn" data-side="south" onclick="setBuilderSide('south')">South &uarr;</button>
+            <button class="side-btn" data-side="west" onclick="setBuilderSide('west')">West &rarr;</button>
+            <button class="side-btn" data-side="east" onclick="setBuilderSide('east')">East &larr;</button>
+          </div>
+          <div class="flex gap-2">
+            <select id="builderPattern" class="input-dark flex-1">
+              <option value="single-gap-wall">Single Gap Wall</option>
+              <option value="double-gap-wall">Double Gap Wall (2 Openings)</option>
+              <option value="sweeping-half-wall">Sweeping Half Wall</option>
+              <option value="staggered-blocks">Staggered Blocks (3 Openings)</option>
+              <option value="orb-cluster">Orb Cluster</option>
+              <option value="diagonal-spinner">Diagonal Spinner</option>
+            </select>
+            <button onclick="addWaveFromBuilder()" class="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-400 text-black font-black rounded-lg text-xs uppercase tracking-wider shrink-0 transition">
+              + Add Wave
+            </button>
+          </div>
+        </div>
+
+        <!-- Wave Queue -->
+        <div class="cyber-panel rounded-xl p-4 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">Wave Schedule (Order &amp; Delay)</span>
+            <span id="waveCountLabel" class="text-[11px] font-mono text-slate-400">0 waves</span>
+          </div>
+          <div id="waveList" class="space-y-1.5 max-h-48 overflow-y-auto pr-1"></div>
+        </div>
+
+        <!-- Selected Wave Config & Attached Gates -->
         <div class="cyber-panel rounded-xl p-4 space-y-3">
           <div class="flex items-center justify-between">
-            <div class="text-xs font-bold uppercase tracking-wider text-amber-300" id="inspectorTitle">Inspector (Nothing Selected)</div>
-            <div class="flex gap-2" id="inspectorActions"></div>
+            <div class="text-xs font-bold uppercase tracking-wider text-rose-300" id="waveInspectorTitle">Wave Inspector</div>
+            <div class="flex gap-1.5" id="waveInspectorActions"></div>
           </div>
-          <div id="inspectorBody" class="text-xs text-slate-400">
-            Click a checkpoint gate or obstacle on the canvas (or in the lists below) to edit its properties.
-          </div>
-        </div>
-
-        <!-- Checkpoints & Obstacles Lists -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div class="cyber-panel rounded-xl p-3 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider text-emerald-300">Checkpoint Gates (Path Order)</span>
-              <button onclick="addQuickGate()" class="text-[11px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30">+ Gate</button>
-            </div>
-            <div id="checkpointList" class="space-y-1 max-h-60 overflow-y-auto pr-1"></div>
-          </div>
-
-          <div class="cyber-panel rounded-xl p-3 space-y-2">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-bold uppercase tracking-wider text-rose-300">Obstacles</span>
-              <button onclick="addQuickObstacle('wall')" class="text-[11px] px-2 py-0.5 rounded bg-rose-500/20 text-rose-300 border border-rose-500/30 hover:bg-rose-500/30">+ Wall</button>
-            </div>
-            <div id="obstacleList" class="space-y-1 max-h-60 overflow-y-auto pr-1"></div>
+          <div id="waveInspectorBody" class="text-xs text-slate-400">
+            Select a wave above (or click it on the map) to configure its side, obstacle type, speed, gap, delay, and attached gates.
           </div>
         </div>
       </div>
@@ -170,14 +180,19 @@ export function renderCampaignAdminPage(adminToken: string): string {
     const ARENA_H = 800;
     const HALF_W = ARENA_W / 2;
     const HALF_H = ARENA_H / 2;
+    const SPAWN_OFFSET = 18;
     const PLAYER_RADIUS = 13;
 
     let levels = [];
     let currentLevelIdx = 0;
-    let activeTool = 'select';
-    let selected = null;
-    let dragState = null;
-    let hoverPointer = null; // { x, y }
+    let selectedWaveIdx = 0;
+    let builderSide = 'north';
+
+    let simTime = 0;
+    let isPlaying = false;
+    let lastRafMs = null;
+    let dragSpawn = false;
+    let hoverOpening = null; // { waveIdx, start, end }
 
     const canvas = document.getElementById('editorCanvas');
     const ctx = canvas.getContext('2d');
@@ -195,121 +210,164 @@ export function renderCampaignAdminPage(adminToken: string): string {
       return levels[currentLevelIdx] || null;
     }
 
-    function snap(val) {
-      if (!document.getElementById('chkSnapGrid').checked) return Math.round(val);
-      return Math.round(val / 10) * 10;
-    }
-
-    function setTool(tool) {
-      activeTool = tool;
-      document.querySelectorAll('#toolPalette .tool-btn').forEach((b) => {
-        b.classList.toggle('active', b.dataset.tool === tool);
+    function setBuilderSide(side) {
+      builderSide = side;
+      document.querySelectorAll('#sideSelector .side-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.side === side);
       });
-      drawCanvas();
     }
 
-    function gateMidpoint(cp) {
-      const mid = (cp.start + cp.end) / 2;
-      return cp.axis === 'vertical' ? { x: cp.coord, y: mid } : { x: mid, y: cp.coord };
+    function getOrderedWaves(lvl) {
+      return (lvl.waves || []).slice().sort((a, b) => a.order - b.order);
+    }
+
+    function computeWaveSchedule(lvl) {
+      const waves = getOrderedWaves(lvl);
+      let acc = 0;
+      let maxEnd = 2;
+      const items = waves.map((w) => {
+        acc += Math.max(0, Number(w.delayAfterPrev || 0));
+        const isVert = w.side === 'north' || w.side === 'south';
+        const halfBound = isVert ? HALF_H : HALF_W;
+        const travelDist = (halfBound + SPAWN_OFFSET) * 2 + 40;
+        const dur = travelDist / Math.max(40, Number(w.speed || 175));
+        maxEnd = Math.max(maxEnd, acc + dur);
+        return { wave: w, spawnAt: acc, duration: dur };
+      });
+      return { items, totalDuration: Math.ceil(maxEnd * 10) / 10 };
+    }
+
+    function computeWaveGeometry(w, tSinceSpawn) {
+      const isVert = w.side === 'north' || w.side === 'south';
+      const latHalf = isVert ? HALF_W : HALF_H;
+      const halfBound = isVert ? HALF_H : HALF_W;
+      const spawnDist = halfBound + SPAWN_OFFSET;
+      const travelSign = (w.side === 'north' || w.side === 'west') ? 1 : -1;
+      const startCoord = -travelSign * spawnDist;
+      const speed = Math.max(40, Number(w.speed || 175));
+      const coord = startCoord + travelSign * speed * tSinceSpawn;
+
+      const gapSize = Math.max(60, Number(w.gapSize || 120));
+      const gapCenter = Number(w.gapCenter || 0);
+      const thickness = Number(w.barThickness || 18);
+
+      const dirColors = { north: '#ff2a6d', south: '#ff7700', east: '#d300c5', west: '#05d5fa' };
+      const color = w.color || dirColors[w.side] || '#ff2a6d';
+
+      let gaps = [];
+      let rects = []; // { x, y, w, h, rot }
+      let circles = []; // { x, y, r }
+
+      if (w.patternType === 'single-gap-wall') {
+        gaps = [{ start: Math.max(-latHalf, gapCenter - gapSize / 2), end: Math.min(latHalf, gapCenter + gapSize / 2) }];
+      } else if (w.patternType === 'double-gap-wall') {
+        const island = 56;
+        const sideGap = Math.max(76, gapSize * 0.95);
+        const secondCenter = gapCenter <= 0 ? gapCenter + sideGap + island : gapCenter - (sideGap + island);
+        gaps = [
+          { start: gapCenter - sideGap / 2, end: gapCenter + sideGap / 2 },
+          { start: secondCenter - sideGap / 2, end: secondCenter + sideGap / 2 },
+        ];
+      } else if (w.patternType === 'sweeping-half-wall') {
+        const openPos = gapCenter >= 0;
+        gaps = [{ start: openPos ? gapCenter - gapSize / 2 : -latHalf, end: openPos ? latHalf : gapCenter + gapSize / 2 }];
+      } else if (w.patternType === 'staggered-blocks') {
+        const cg = Math.max(84, gapSize);
+        const outer = 54;
+        gaps = [
+          { start: -latHalf, end: -latHalf + outer },
+          { start: gapCenter - cg / 2, end: gapCenter + cg / 2 },
+          { start: latHalf - outer, end: latHalf },
+        ];
+      } else if (w.patternType === 'orb-cluster') {
+        const orbR = 12;
+        const count = isVert ? 4 : 5;
+        const usable = latHalf - 28;
+        const orbs = [];
+        for (let i = 0; i < count; i++) {
+          const lat = -usable + (i / (count - 1)) * (usable * 2);
+          if (Math.abs(lat - gapCenter) < gapSize * 0.6 + orbR) continue;
+          orbs.push(lat);
+          circles.push({ x: isVert ? lat : coord, y: isVert ? coord : lat, r: orbR });
+        }
+        let cur = -latHalf;
+        for (const lat of orbs.sort((a, b) => a - b)) {
+          if (lat - orbR - cur >= 24) gaps.push({ start: Math.round(cur), end: Math.round(lat - orbR) });
+          cur = lat + orbR;
+        }
+        if (latHalf - cur >= 24) gaps.push({ start: Math.round(cur), end: latHalf });
+      } else if (w.patternType === 'diagonal-spinner') {
+        const len = 152;
+        const driftSign = gapCenter >= 0 ? -1 : 1;
+        const drift = speed * 0.45 * driftSign;
+        const latPos = gapCenter + drift * tSinceSpawn;
+        rects.push({
+          x: isVert ? latPos : coord,
+          y: isVert ? coord : latPos,
+          w: isVert ? len : 16,
+          h: isVert ? 16 : len,
+          rot: 0.4 + 2.0 * tSinceSpawn,
+        });
+        const br = len / 2 + 12;
+        if (latPos - br > -latHalf + 24) gaps.push({ start: -latHalf, end: Math.round(latPos - br) });
+        if (latPos + br < latHalf - 24) gaps.push({ start: Math.round(latPos + br), end: latHalf });
+      }
+
+      if (w.patternType !== 'orb-cluster' && w.patternType !== 'diagonal-spinner') {
+        const sortedGaps = gaps.map((g) => [Math.max(-latHalf, g.start), Math.min(latHalf, g.end)]).sort((a, b) => a[0] - b[0]);
+        let cursor = -latHalf;
+        const cleanGaps = [];
+        for (const [gs, ge] of sortedGaps) {
+          if (gs > cursor + 2) {
+            const segLen = gs - cursor;
+            const segMid = (cursor + gs) / 2;
+            rects.push({
+              x: isVert ? segMid : coord,
+              y: isVert ? coord : segMid,
+              w: isVert ? segLen : thickness,
+              h: isVert ? thickness : segLen,
+              rot: 0,
+            });
+          }
+          if (ge - gs >= 16) cleanGaps.push({ start: Math.round(gs), end: Math.round(ge) });
+          cursor = Math.max(cursor, ge);
+        }
+        if (latHalf > cursor + 2) {
+          const segLen = latHalf - cursor;
+          const segMid = (cursor + latHalf) / 2;
+          rects.push({
+            x: isVert ? segMid : coord,
+            y: isVert ? coord : segMid,
+            w: isVert ? segLen : thickness,
+            h: isVert ? thickness : segLen,
+            rot: 0,
+          });
+        }
+        gaps = cleanGaps;
+      }
+
+      return { isVert, coord, gaps, rects, circles, color };
     }
 
     function nextGateOrder(lvl) {
-      if (!lvl.checkpoints.length) return 1;
-      return Math.max(...lvl.checkpoints.map((c) => Number(c.order || 1))) + 1;
-    }
-
-    /**
-     * Scans a horizontal (Y = coord) or vertical (X = coord) line across the arena,
-     * treating the outer arena walls (-225/+225 or -400/+400) as endgates and returning
-     * all open intervals not blocked by any obstacle.
-     */
-    function computeLineOpenings(lvl, axis, coord) {
-      const spanLimit = axis === 'horizontal' ? HALF_W : HALF_H;
-      const blocked = [];
-
-      for (const obs of lvl.obstacles) {
-        if (obs.type === 'circle') {
-          const r = obs.radius || 20;
-          const centerLine = axis === 'horizontal' ? obs.y : obs.x;
-          const centerPerp = axis === 'horizontal' ? obs.x : obs.y;
-          const d = Math.abs(coord - centerLine);
-          if (d < r) {
-            const hc = Math.sqrt(r * r - d * d);
-            blocked.push([centerPerp - hc, centerPerp + hc]);
-          }
-        } else {
-          const hw = (obs.width || 180) / 2;
-          const hh = (obs.height || 20) / 2;
-          const ang = obs.rotation || 0;
-          const cos = Math.cos(ang);
-          const sin = Math.sin(ang);
-          const corners = [
-            [-hw, -hh],
-            [hw, -hh],
-            [hw, hh],
-            [-hw, hh],
-          ].map(([lx, ly]) => ({
-            x: obs.x + lx * cos - ly * sin,
-            y: obs.y + lx * sin + ly * cos,
-          }));
-
-          const hits = [];
-          for (let i = 0; i < 4; i++) {
-            const a = corners[i];
-            const b = corners[(i + 1) % 4];
-            const aLine = axis === 'horizontal' ? a.y : a.x;
-            const bLine = axis === 'horizontal' ? b.y : b.x;
-            const aPerp = axis === 'horizontal' ? a.x : a.y;
-            const bPerp = axis === 'horizontal' ? b.x : b.y;
-            if ((aLine <= coord && bLine >= coord) || (bLine <= coord && aLine >= coord)) {
-              if (Math.abs(bLine - aLine) < 1e-6) {
-                hits.push(aPerp, bPerp);
-              } else {
-                const t = (coord - aLine) / (bLine - aLine);
-                hits.push(aPerp + t * (bPerp - aPerp));
-              }
-            }
-          }
-          if (hits.length >= 2) {
-            blocked.push([Math.min(...hits), Math.max(...hits)]);
-          }
+      let maxOrd = 0;
+      for (const w of lvl.waves || []) {
+        for (const g of w.attachedGates || []) {
+          if (Number(g.order) > maxOrd) maxOrd = Number(g.order);
         }
       }
-
-      blocked.sort((a, b) => a[0] - b[0]);
-      const merged = [];
-      for (const iv of blocked) {
-        if (!merged.length || iv[0] > merged[merged.length - 1][1]) {
-          merged.push([iv[0], iv[1]]);
-        } else {
-          merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], iv[1]);
-        }
-      }
-
-      const openings = [];
-      let cursor = -spanLimit;
-      for (const [bStart, bEnd] of merged) {
-        const s = Math.max(-spanLimit, cursor);
-        const e = Math.min(spanLimit, bStart);
-        if (e - s >= 18) openings.push({ start: Math.round(s), end: Math.round(e) });
-        cursor = Math.max(cursor, bEnd);
-      }
-      if (spanLimit - cursor >= 18) {
-        openings.push({ start: Math.round(cursor), end: spanLimit });
-      }
-      return openings;
+      return maxOrd + 1;
     }
 
     async function loadConfig() {
       try {
         const res = await fetch('/api/campaign-config');
         const data = await res.json();
-        if (!Array.isArray(data.levels) || data.levels.length === 0) {
-          throw new Error('Invalid campaign config payload');
-        }
+        if (!Array.isArray(data.levels) || data.levels.length === 0) throw new Error('Invalid payload');
         levels = data.levels;
         currentLevelIdx = 0;
-        selected = null;
+        selectedWaveIdx = 0;
+        resetPlayback();
         renderAll();
       } catch (err) {
         showBanner('Failed to load campaign config: ' + err.message, true);
@@ -324,10 +382,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
       try {
         const res = await fetch('/api/campaign-config', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-admin-token': ADMIN_TOKEN,
-          },
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': ADMIN_TOKEN },
           body: JSON.stringify({ levels }),
         });
         const data = await res.json();
@@ -341,7 +396,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
     }
 
     async function resetCampaignConfig() {
-      if (!confirm('Reset all campaign levels back to the built-in 2-level defaults?')) return;
+      if (!confirm('Reset all campaign levels back to defaults?')) return;
       try {
         const res = await fetch('/api/campaign-config/reset', {
           method: 'POST',
@@ -351,7 +406,8 @@ export function renderCampaignAdminPage(adminToken: string): string {
         if (!res.ok) throw new Error(data.error || 'Reset failed');
         levels = data.levels;
         currentLevelIdx = 0;
-        selected = null;
+        selectedWaveIdx = 0;
+        resetPlayback();
         renderAll();
         showBanner('Campaign config reset to built-in defaults.', false);
       } catch (err) {
@@ -365,33 +421,41 @@ export function renderCampaignAdminPage(adminToken: string): string {
         id: 'level-' + nextNum,
         levelNumber: nextNum,
         name: 'Level ' + nextNum + ' Sector',
-        description: 'Custom structured gate path',
-        spawn: { x: 0, y: 340 },
+        description: 'Custom wave sequence',
+        spawn: { x: 0, y: 120 },
         clearBonusPoints: 500,
-        parTimeSeconds: 25,
-        checkpoints: [
-          { id: 'cp-' + nextNum + '-1', order: 1, axis: 'horizontal', coord: -40, start: 50, end: 225, points: 200, label: 'GATE 1' },
-          { id: 'cp-' + nextNum + '-2', order: 2, axis: 'horizontal', coord: -360, start: -140, end: 140, points: 300, label: 'FINISH' },
+        parTimeSeconds: 20,
+        waves: [
+          {
+            id: 'w-' + Date.now(),
+            order: 1,
+            delayAfterPrev: 0.5,
+            side: 'north',
+            patternType: 'single-gap-wall',
+            speed: 175,
+            gapCenter: 0,
+            gapSize: 125,
+            barThickness: 18,
+            attachedGates: [{ id: 'g-' + Date.now(), order: 1, start: -62, end: 62, points: 200, label: 'GATE 1' }],
+          },
         ],
-        obstacles: [
-          { id: 'obs-' + nextNum + '-1', type: 'rectangle', x: -85, y: -40, width: 270, height: 20, rotation: 0, rotationSpeed: 0, patrolAxis: 'none', patrolRange: 0, patrolSpeed: 0, color: '#ff2a6d' },
-        ],
+        obstacles: [],
+        checkpoints: [],
       });
       currentLevelIdx = levels.length - 1;
-      selected = null;
+      selectedWaveIdx = 0;
+      resetPlayback();
       renderAll();
     }
 
     function deleteCurrentLevel() {
-      if (levels.length <= 1) {
-        showBanner('At least 1 campaign level must remain.', true);
-        return;
-      }
+      if (levels.length <= 1) return showBanner('At least 1 level must remain.', true);
       if (!confirm('Delete ' + curLevel().name + '?')) return;
       levels.splice(currentLevelIdx, 1);
-      levels.forEach((lvl, idx) => { lvl.levelNumber = idx + 1; });
+      levels.forEach((l, i) => { l.levelNumber = i + 1; });
       currentLevelIdx = Math.max(0, currentLevelIdx - 1);
-      selected = null;
+      selectedWaveIdx = 0;
+      resetPlayback();
       renderAll();
     }
 
@@ -402,83 +466,97 @@ export function renderCampaignAdminPage(adminToken: string): string {
       if (field === 'name') renderTabs();
     }
 
-    function updateSpawn(axis, val) {
+    function addWaveFromBuilder() {
       const lvl = curLevel();
       if (!lvl) return;
-      lvl.spawn[axis] = val;
+      if (!lvl.waves) lvl.waves = [];
+      const pattern = document.getElementById('builderPattern').value;
+      const maxOrd = lvl.waves.length ? Math.max(...lvl.waves.map((w) => Number(w.order || 1))) : 0;
+      const newWave = {
+        id: 'wave-' + Date.now(),
+        order: maxOrd + 1,
+        delayAfterPrev: lvl.waves.length === 0 ? 0.5 : 1.8,
+        side: builderSide,
+        patternType: pattern,
+        speed: 175,
+        gapCenter: 0,
+        gapSize: 125,
+        barThickness: 18,
+        attachedGates: [],
+      };
+      lvl.waves.push(newWave);
+      selectedWaveIdx = lvl.waves.length - 1;
+      renderAll();
+    }
+
+    function togglePlay() {
+      isPlaying = !isPlaying;
+      lastRafMs = null;
+      document.getElementById('btnPlayPause').innerHTML = isPlaying ? '&#9208; Pause' : '&#9654; Play';
+      if (isPlaying) requestAnimationFrame(animLoop);
+    }
+
+    function resetPlayback() {
+      isPlaying = false;
+      simTime = 0;
+      lastRafMs = null;
+      document.getElementById('btnPlayPause').innerHTML = '&#9654; Play';
+      updateScrubberUI();
       drawCanvas();
     }
 
-    function addQuickGate() {
-      const lvl = curLevel();
-      if (!lvl) return;
-      const ord = nextGateOrder(lvl);
-      lvl.checkpoints.push({
-        id: 'cp-' + Date.now(),
-        order: ord,
-        axis: 'horizontal',
-        coord: Math.max(-360, 260 - ord * 110),
-        start: -100,
-        end: 100,
-        points: 200,
-        label: 'GATE ' + ord,
-      });
-      selected = { kind: 'checkpoint', index: lvl.checkpoints.length - 1 };
-      renderAll();
+    function scrubTime(val) {
+      simTime = val;
+      updateScrubberUI();
+      drawCanvas();
     }
 
-    function makeObstacleSpec(tool, x, y) {
-      const isOrb = tool === 'orb';
-      const isSpinner = tool === 'spinner';
-      return {
-        id: 'obs-' + Date.now(),
-        type: isOrb ? 'circle' : 'rectangle',
-        x,
-        y,
-        width: isOrb ? 36 : isSpinner ? 180 : 220,
-        height: isOrb ? 36 : isSpinner ? 16 : 20,
-        radius: isOrb ? 18 : undefined,
-        rotation: 0,
-        rotationSpeed: isSpinner ? 1.4 : 0,
-        patrolAxis: 'none',
-        patrolRange: 0,
-        patrolSpeed: 0,
-        color: isSpinner ? '#f59e0b' : isOrb ? '#a855f7' : '#ff2a6d',
-      };
-    }
-
-    function addQuickObstacle(tool) {
+    function updateScrubberUI() {
       const lvl = curLevel();
       if (!lvl) return;
-      lvl.obstacles.push(makeObstacleSpec(tool, 0, 0));
-      selected = { kind: 'obstacle', index: lvl.obstacles.length - 1 };
-      renderAll();
+      const { totalDuration } = computeWaveSchedule(lvl);
+      const scrub = document.getElementById('timeScrubber');
+      scrub.max = Math.max(2, totalDuration);
+      scrub.value = Math.min(simTime, Number(scrub.max));
+      document.getElementById('timeLabel').textContent = simTime.toFixed(2) + 's / ' + totalDuration.toFixed(2) + 's';
+    }
+
+    function animLoop(nowMs) {
+      if (!isPlaying) return;
+      if (lastRafMs !== null) {
+        const dt = Math.min(0.05, (nowMs - lastRafMs) / 1000);
+        simTime += dt;
+        const lvl = curLevel();
+        if (lvl) {
+          const { totalDuration } = computeWaveSchedule(lvl);
+          if (simTime > totalDuration) simTime = 0;
+        }
+      }
+      lastRafMs = nowMs;
+      updateScrubberUI();
+      drawCanvas();
+      requestAnimationFrame(animLoop);
     }
 
     function renderAll() {
       renderTabs();
       renderMeta();
-      renderLists();
-      renderInspector();
+      renderWaveList();
+      renderWaveInspector();
+      updateScrubberUI();
       drawCanvas();
     }
 
     function renderTabs() {
-      const container = document.getElementById('levelTabs');
-      container.innerHTML = '';
+      const c = document.getElementById('levelTabs');
+      c.innerHTML = '';
       levels.forEach((lvl, idx) => {
-        const btn = document.createElement('button');
-        btn.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition border ' +
-          (idx === currentLevelIdx
-            ? 'bg-cyan-500 text-black border-cyan-400'
-            : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-cyan-500/50');
-        btn.textContent = 'L' + (idx + 1) + ': ' + lvl.name;
-        btn.onclick = () => {
-          currentLevelIdx = idx;
-          selected = null;
-          renderAll();
-        };
-        container.appendChild(btn);
+        const b = document.createElement('button');
+        b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition border ' +
+          (idx === currentLevelIdx ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-cyan-500/50');
+        b.textContent = 'L' + (idx + 1) + ': ' + lvl.name;
+        b.onclick = () => { currentLevelIdx = idx; selectedWaveIdx = 0; resetPlayback(); renderAll(); };
+        c.appendChild(b);
       });
     }
 
@@ -488,179 +566,160 @@ export function renderCampaignAdminPage(adminToken: string): string {
       document.getElementById('metaName').value = lvl.name || '';
       document.getElementById('metaDesc').value = lvl.description || '';
       document.getElementById('metaClearBonus').value = lvl.clearBonusPoints ?? 500;
-      document.getElementById('metaParTime').value = lvl.parTimeSeconds ?? 25;
-      document.getElementById('metaSpawnX').value = lvl.spawn.x;
-      document.getElementById('metaSpawnY').value = lvl.spawn.y;
+      document.getElementById('metaParTime').value = lvl.parTimeSeconds ?? 20;
     }
 
-    function renderLists() {
+    function renderWaveList() {
       const lvl = curLevel();
       if (!lvl) return;
+      const listEl = document.getElementById('waveList');
+      listEl.innerHTML = '';
+      const ordered = getOrderedWaves(lvl);
+      document.getElementById('waveCountLabel').textContent = ordered.length + ' wave(s)';
 
-      const cpList = document.getElementById('checkpointList');
-      cpList.innerHTML = '';
-      lvl.checkpoints
-        .map((cp, idx) => ({ cp, idx }))
-        .sort((a, b) => a.cp.order - b.cp.order)
-        .forEach(({ cp, idx }) => {
-          const isSel = selected && selected.kind === 'checkpoint' && selected.index === idx;
-          const row = document.createElement('div');
-          row.className = 'flex items-center justify-between px-2 py-1.5 rounded text-xs cursor-pointer border ' +
-            (isSel ? 'bg-emerald-950/60 border-emerald-400 text-emerald-200' : 'bg-slate-900/80 border-slate-800 hover:border-slate-600');
-          const axLabel = cp.axis === 'vertical' ? 'V@X=' + cp.coord : 'H@Y=' + cp.coord;
-          row.innerHTML = '<span><strong class="text-emerald-300">#' + cp.order + '</strong> ' + (cp.label || 'GATE') + ' <span class="text-slate-400 font-mono">(' + axLabel + ')</span></span><span class="text-emerald-400 font-mono">+' + cp.points + '</span>';
-          row.onclick = () => { selected = { kind: 'checkpoint', index: idx }; renderAll(); };
-          cpList.appendChild(row);
-        });
-
-      const obsList = document.getElementById('obstacleList');
-      obsList.innerHTML = '';
-      lvl.obstacles.forEach((obs, idx) => {
-        const isSel = selected && selected.kind === 'obstacle' && selected.index === idx;
+      let acc = 0;
+      ordered.forEach((w) => {
+        acc += Number(w.delayAfterPrev || 0);
+        const origIdx = lvl.waves.indexOf(w);
+        const isSel = origIdx === selectedWaveIdx;
         const row = document.createElement('div');
-        row.className = 'flex items-center justify-between px-2 py-1.5 rounded text-xs cursor-pointer border ' +
-          (isSel ? 'bg-rose-950/60 border-rose-400 text-rose-200' : 'bg-slate-900/80 border-slate-800 hover:border-slate-600');
-        const label = obs.type === 'circle' ? 'ORB' : (obs.rotationSpeed ? 'SPINNER' : 'WALL');
-        row.innerHTML = '<span class="uppercase font-mono">' + label + '</span><span class="text-slate-400">(' + Math.round(obs.x) + ',' + Math.round(obs.y) + ')</span>';
-        row.onclick = () => { selected = { kind: 'obstacle', index: idx }; renderAll(); };
-        obsList.appendChild(row);
+        row.className = 'flex items-center justify-between px-2.5 py-2 rounded-lg text-xs cursor-pointer border ' +
+          (isSel ? 'bg-cyan-950/60 border-cyan-400 text-cyan-100' : 'bg-slate-900/80 border-slate-800 hover:border-slate-600');
+        const gateCount = (w.attachedGates || []).length;
+        row.innerHTML =
+          '<div class="flex items-center gap-2">' +
+            '<span class="px-1.5 py-0.5 rounded bg-slate-800 font-mono text-cyan-300 font-bold">#' + w.order + '</span>' +
+            '<span class="uppercase font-bold text-rose-300">' + w.side + '</span>' +
+            '<span class="text-slate-300">' + w.patternType + '</span>' +
+          '</div>' +
+          '<div class="flex items-center gap-2 font-mono text-[11px]">' +
+            '<span class="text-slate-400">@' + acc.toFixed(1) + 's</span>' +
+            '<span class="px-1.5 py-0.5 rounded ' + (gateCount ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500') + '">' + gateCount + ' gate</span>' +
+          '</div>';
+        row.onclick = () => {
+          selectedWaveIdx = origIdx;
+          simTime = acc + 0.6;
+          updateScrubberUI();
+          renderWaveList();
+          renderWaveInspector();
+          drawCanvas();
+        };
+        listEl.appendChild(row);
       });
     }
 
-    function renderInspector() {
-      const titleEl = document.getElementById('inspectorTitle');
-      const actionsEl = document.getElementById('inspectorActions');
-      const bodyEl = document.getElementById('inspectorBody');
+    function renderWaveInspector() {
+      const titleEl = document.getElementById('waveInspectorTitle');
+      const actionsEl = document.getElementById('waveInspectorActions');
+      const bodyEl = document.getElementById('waveInspectorBody');
       actionsEl.innerHTML = '';
       const lvl = curLevel();
-
-      if (!lvl || !selected) {
-        titleEl.textContent = 'Inspector (Nothing Selected)';
-        bodyEl.innerHTML = 'Click a checkpoint gate or obstacle on the canvas (or in the lists below) to edit its properties.';
+      const w = lvl && lvl.waves ? lvl.waves[selectedWaveIdx] : null;
+      if (!w) {
+        titleEl.textContent = 'Wave Inspector';
+        bodyEl.innerHTML = 'No wave selected.';
         return;
       }
+      titleEl.textContent = 'Wave #' + w.order + ' (' + w.side.toUpperCase() + ')';
 
-      if (selected.kind === 'checkpoint') {
-        const cp = lvl.checkpoints[selected.index];
-        if (!cp) return;
-        titleEl.textContent = 'Checkpoint Gate #' + cp.order;
+      const btnDup = makeActionBtn('Duplicate', () => {
+        const clone = JSON.parse(JSON.stringify(w));
+        clone.id = 'wave-' + Date.now();
+        clone.order = (lvl.waves.length ? Math.max(...lvl.waves.map((x) => x.order)) : 0) + 1;
+        clone.attachedGates = [];
+        lvl.waves.push(clone);
+        selectedWaveIdx = lvl.waves.length - 1;
+        renderAll();
+      });
+      const btnDel = makeActionBtn('Delete', () => {
+        lvl.waves.splice(selectedWaveIdx, 1);
+        selectedWaveIdx = Math.max(0, selectedWaveIdx - 1);
+        renderAll();
+      }, true);
+      actionsEl.append(btnDup, btnDel);
 
-        const btnDel = makeActionBtn('Delete', () => {
-          lvl.checkpoints.splice(selected.index, 1);
-          selected = null;
-          renderAll();
-        }, true);
-        actionsEl.append(btnDel);
+      bodyEl.innerHTML = '';
+      const grid = document.createElement('div');
+      grid.className = 'grid grid-cols-2 gap-2';
 
-        bodyEl.innerHTML = '';
-        const grid = document.createElement('div');
-        grid.className = 'grid grid-cols-2 gap-2';
+      const sideDiv = document.createElement('div');
+      sideDiv.innerHTML = '<label class="block text-[11px] text-slate-400 mb-1">Side</label>';
+      const sSel = document.createElement('select');
+      sSel.className = 'input-dark';
+      ['north', 'south', 'west', 'east'].forEach((s) => {
+        const o = document.createElement('option'); o.value = s; o.textContent = s; o.selected = w.side === s;
+        sSel.appendChild(o);
+      });
+      sSel.onchange = () => { w.side = sSel.value; renderWaveList(); drawCanvas(); };
+      sideDiv.appendChild(sSel);
 
-        const axDiv = document.createElement('div');
-        axDiv.innerHTML = '<label class="block text-[11px] text-slate-400 mb-1">Axis</label>';
-        const axSel = document.createElement('select');
-        axSel.className = 'input-dark';
-        ['horizontal', 'vertical'].forEach((ax) => {
-          const o = document.createElement('option');
-          o.value = ax;
-          o.textContent = ax;
-          o.selected = cp.axis === ax;
-          axSel.appendChild(o);
+      const patDiv = document.createElement('div');
+      patDiv.innerHTML = '<label class="block text-[11px] text-slate-400 mb-1">Obstacle Pattern</label>';
+      const pSel = document.createElement('select');
+      pSel.className = 'input-dark';
+      ['single-gap-wall', 'double-gap-wall', 'sweeping-half-wall', 'staggered-blocks', 'orb-cluster', 'diagonal-spinner'].forEach((p) => {
+        const o = document.createElement('option'); o.value = p; o.textContent = p; o.selected = w.patternType === p;
+        pSel.appendChild(o);
+      });
+      pSel.onchange = () => { w.patternType = pSel.value; renderWaveList(); drawCanvas(); };
+      patDiv.appendChild(pSel);
+
+      grid.append(
+        makeField('Wave Order (#)', 'number', w.order, (v) => { w.order = Math.max(1, Math.round(Number(v))); renderWaveList(); drawCanvas(); }),
+        makeField('Delay After Prev (s)', 'number', w.delayAfterPrev, (v) => { w.delayAfterPrev = Math.max(0, Number(v)); renderWaveList(); updateScrubberUI(); drawCanvas(); }, '0.1'),
+        sideDiv,
+        patDiv,
+        makeField('Speed (px/s)', 'number', w.speed, (v) => { w.speed = Math.max(40, Number(v)); updateScrubberUI(); drawCanvas(); }),
+        makeField('Gap Center', 'number', w.gapCenter, (v) => { w.gapCenter = Number(v); drawCanvas(); }),
+        makeField('Gap Size (px)', 'number', w.gapSize, (v) => { w.gapSize = Math.max(60, Number(v)); drawCanvas(); }),
+        makeField('Color', 'color', w.color || '#ff2a6d', (v) => { w.color = v; drawCanvas(); })
+      );
+      bodyEl.appendChild(grid);
+
+      // Attached gates list for this wave
+      const gWrap = document.createElement('div');
+      gWrap.className = 'mt-3 pt-3 border-t border-slate-800 space-y-2';
+      gWrap.innerHTML = '<div class="flex items-center justify-between"><span class="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Attached Checkpoint Gates</span><span class="text-[10px] text-slate-400">Click wave openings on the map to toggle</span></div>';
+
+      if (!w.attachedGates || w.attachedGates.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'text-[11px] text-slate-500 italic';
+        empty.textContent = 'No gates attached to this wave yet. Scrub/Play and click an opening on the map!';
+        gWrap.appendChild(empty);
+      } else {
+        w.attachedGates.forEach((g, gi) => {
+          const row = document.createElement('div');
+          row.className = 'grid grid-cols-12 gap-1.5 items-center bg-[#060913] p-1.5 rounded border border-emerald-500/30';
+
+          const ordInp = document.createElement('input');
+          ordInp.type = 'number'; ordInp.className = 'input-dark col-span-2 text-center'; ordInp.value = g.order;
+          ordInp.title = 'Gate Number';
+          ordInp.oninput = () => { g.order = Math.max(1, Math.round(Number(ordInp.value))); drawCanvas(); };
+
+          const lblInp = document.createElement('input');
+          lblInp.type = 'text'; lblInp.className = 'input-dark col-span-4'; lblInp.value = g.label || '';
+          lblInp.placeholder = 'Label';
+          lblInp.oninput = () => { g.label = lblInp.value; };
+
+          const ptsInp = document.createElement('input');
+          ptsInp.type = 'number'; ptsInp.className = 'input-dark col-span-3'; ptsInp.value = g.points;
+          ptsInp.title = 'Points';
+          ptsInp.oninput = () => { g.points = Number(ptsInp.value); };
+
+          const spanTxt = document.createElement('span');
+          spanTxt.className = 'col-span-2 text-[10px] font-mono text-slate-400 text-center';
+          spanTxt.textContent = g.start + '..' + g.end;
+
+          const delBtn = document.createElement('button');
+          delBtn.className = 'col-span-1 text-rose-400 hover:text-rose-200 font-bold text-xs';
+          delBtn.textContent = '×';
+          delBtn.onclick = () => { w.attachedGates.splice(gi, 1); renderWaveList(); renderWaveInspector(); drawCanvas(); };
+
+          row.append(ordInp, lblInp, ptsInp, spanTxt, delBtn);
+          gWrap.appendChild(row);
         });
-        axSel.onchange = () => { cp.axis = axSel.value; renderLists(); drawCanvas(); };
-        axDiv.appendChild(axSel);
-
-        grid.append(
-          makeField('Gate Number (Order)', 'number', cp.order, (v) => { cp.order = Math.max(1, Math.round(Number(v))); renderLists(); drawCanvas(); }),
-          makeField('Label', 'text', cp.label || '', (v) => { cp.label = v; renderLists(); drawCanvas(); }),
-          axDiv,
-          makeField('Points', 'number', cp.points, (v) => { cp.points = Number(v); renderLists(); }),
-          makeField(cp.axis === 'horizontal' ? 'Y Coord (-400..400)' : 'X Coord (-225..225)', 'number', cp.coord, (v) => { cp.coord = Number(v); renderLists(); drawCanvas(); }),
-          makeField('Span Start', 'number', cp.start, (v) => { cp.start = Number(v); drawCanvas(); }),
-          makeField('Span End', 'number', cp.end, (v) => { cp.end = Number(v); drawCanvas(); })
-        );
-        bodyEl.appendChild(grid);
-        return;
       }
-
-      if (selected.kind === 'obstacle') {
-        const obs = lvl.obstacles[selected.index];
-        if (!obs) return;
-        titleEl.textContent = 'Obstacle: ' + obs.type.toUpperCase();
-
-        const btnDup = makeActionBtn('Duplicate', () => {
-          const clone = JSON.parse(JSON.stringify(obs));
-          clone.id = 'obs-' + Date.now();
-          clone.x = Math.min(HALF_W - 20, clone.x + 20);
-          clone.y = Math.min(HALF_H - 20, clone.y + 20);
-          lvl.obstacles.push(clone);
-          selected = { kind: 'obstacle', index: lvl.obstacles.length - 1 };
-          renderAll();
-        });
-        const btnDel = makeActionBtn('Delete', () => {
-          lvl.obstacles.splice(selected.index, 1);
-          selected = null;
-          renderAll();
-        }, true);
-        actionsEl.append(btnDup, btnDel);
-
-        bodyEl.innerHTML = '';
-        const grid = document.createElement('div');
-        grid.className = 'grid grid-cols-2 gap-2';
-
-        const typeSelect = document.createElement('div');
-        typeSelect.innerHTML = '<label class="block text-[11px] text-slate-400 mb-1">Shape Type</label>';
-        const sel = document.createElement('select');
-        sel.className = 'input-dark';
-        ['rectangle', 'circle'].forEach((t) => {
-          const o = document.createElement('option');
-          o.value = t;
-          o.textContent = t;
-          o.selected = obs.type === t;
-          sel.appendChild(o);
-        });
-        sel.onchange = () => {
-          obs.type = sel.value;
-          if (obs.type === 'circle' && !obs.radius) obs.radius = 20;
-          if (obs.type === 'rectangle' && !obs.width) { obs.width = 180; obs.height = 20; }
-          renderAll();
-        };
-        typeSelect.appendChild(sel);
-        grid.appendChild(typeSelect);
-
-        grid.appendChild(makeField('Color', 'color', obs.color || '#ff2a6d', (v) => { obs.color = v; drawCanvas(); }));
-        grid.appendChild(makeField('X (-225..225)', 'number', obs.x, (v) => { obs.x = Number(v); drawCanvas(); }));
-        grid.appendChild(makeField('Y (-400..400)', 'number', obs.y, (v) => { obs.y = Number(v); drawCanvas(); }));
-
-        if (obs.type === 'circle') {
-          grid.appendChild(makeField('Radius', 'number', obs.radius ?? 20, (v) => { obs.radius = Math.max(6, Number(v)); drawCanvas(); }));
-        } else {
-          grid.appendChild(makeField('Width', 'number', obs.width ?? 180, (v) => { obs.width = Math.max(10, Number(v)); drawCanvas(); }));
-          grid.appendChild(makeField('Height', 'number', obs.height ?? 20, (v) => { obs.height = Math.max(8, Number(v)); drawCanvas(); }));
-          grid.appendChild(makeField('Rotation (rad)', 'number', obs.rotation ?? 0, (v) => { obs.rotation = Number(v); drawCanvas(); }, '0.1'));
-          grid.appendChild(makeField('Rot Speed (rad/s)', 'number', obs.rotationSpeed ?? 0, (v) => { obs.rotationSpeed = Number(v); drawCanvas(); }, '0.1'));
-        }
-
-        const patrolDiv = document.createElement('div');
-        patrolDiv.innerHTML = '<label class="block text-[11px] text-slate-400 mb-1">Patrol Axis</label>';
-        const pSel = document.createElement('select');
-        pSel.className = 'input-dark';
-        ['none', 'x', 'y'].forEach((ax) => {
-          const o = document.createElement('option');
-          o.value = ax;
-          o.textContent = ax;
-          o.selected = (obs.patrolAxis || 'none') === ax;
-          pSel.appendChild(o);
-        });
-        pSel.onchange = () => { obs.patrolAxis = pSel.value; drawCanvas(); };
-        patrolDiv.appendChild(pSel);
-        grid.appendChild(patrolDiv);
-
-        grid.appendChild(makeField('Patrol Range (px)', 'number', obs.patrolRange ?? 0, (v) => { obs.patrolRange = Number(v); drawCanvas(); }));
-        grid.appendChild(makeField('Patrol Speed (rad/s)', 'number', obs.patrolSpeed ?? 0, (v) => { obs.patrolSpeed = Number(v); drawCanvas(); }, '0.2'));
-
-        bodyEl.appendChild(grid);
-      }
+      bodyEl.appendChild(gWrap);
     }
 
     function makeActionBtn(label, onClick, isDanger) {
@@ -678,8 +737,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
       lbl.className = 'block text-[11px] text-slate-400 mb-1';
       lbl.textContent = label;
       const inp = document.createElement('input');
-      inp.type = type;
-      inp.className = 'input-dark';
+      inp.type = type; inp.className = 'input-dark';
       if (step) inp.step = step;
       inp.value = value;
       inp.oninput = () => onChange(inp.value);
@@ -700,172 +758,86 @@ export function renderCampaignAdminPage(adminToken: string): string {
       ctx.lineWidth = 2;
       ctx.strokeRect(-HALF_W + 1, -HALF_H + 1, ARENA_W - 2, ARENA_H - 2);
 
-      // Center-aligned 50px grid
+      // Center grid
       ctx.strokeStyle = 'rgba(148, 163, 184, 0.08)';
       ctx.lineWidth = 1;
-      for (let x = -200; x <= 200; x += 50) {
-        ctx.beginPath(); ctx.moveTo(x, -HALF_H); ctx.lineTo(x, HALF_H); ctx.stroke();
-      }
-      for (let y = -350; y <= 350; y += 50) {
-        ctx.beginPath(); ctx.moveTo(-HALF_W, y); ctx.lineTo(HALF_W, y); ctx.stroke();
-      }
+      for (let x = -200; x <= 200; x += 50) { ctx.beginPath(); ctx.moveTo(x, -HALF_H); ctx.lineTo(x, HALF_H); ctx.stroke(); }
+      for (let y = -350; y <= 350; y += 50) { ctx.beginPath(); ctx.moveTo(-HALF_W, y); ctx.lineTo(HALF_W, y); ctx.stroke(); }
 
       const lvl = curLevel();
-      if (!lvl) {
-        ctx.restore();
-        return;
-      }
+      if (!lvl) { ctx.restore(); return; }
 
-      // Structured numbered path lines: Spawn -> Gate #1 -> Gate #2 ...
-      const ordered = [...lvl.checkpoints].sort((a, b) => a.order - b.order);
-      ctx.save();
-      ctx.strokeStyle = 'rgba(34, 211, 238, 0.35)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 6]);
-      ctx.beginPath();
-      ctx.moveTo(lvl.spawn.x, lvl.spawn.y);
-      ordered.forEach((cp) => {
-        const m = gateMidpoint(cp);
-        ctx.lineTo(m.x, m.y);
-      });
-      ctx.stroke();
-      ctx.restore();
+      const { items } = computeWaveSchedule(lvl);
+      for (const item of items) {
+        const tSince = simTime - item.spawnAt;
+        if (tSince < 0 || tSince > item.duration) continue;
+        const w = item.wave;
+        const geom = computeWaveGeometry(w, tSince);
 
-      // Patrol range preview lines
-      lvl.obstacles.forEach((obs) => {
-        if (obs.patrolAxis && obs.patrolAxis !== 'none' && obs.patrolRange > 0) {
+        // Draw wave obstacles
+        ctx.save();
+        ctx.fillStyle = geom.color;
+        ctx.shadowColor = geom.color;
+        ctx.shadowBlur = 10;
+        for (const r of geom.rects) {
           ctx.save();
-          ctx.strokeStyle = 'rgba(250, 204, 21, 0.35)';
-          ctx.lineWidth = 1.5;
-          ctx.setLineDash([4, 4]);
-          ctx.beginPath();
-          if (obs.patrolAxis === 'x') {
-            ctx.moveTo(obs.x - obs.patrolRange, obs.y);
-            ctx.lineTo(obs.x + obs.patrolRange, obs.y);
-          } else {
-            ctx.moveTo(obs.x, obs.y - obs.patrolRange);
-            ctx.lineTo(obs.x, obs.y + obs.patrolRange);
-          }
-          ctx.stroke();
+          ctx.translate(r.x, r.y);
+          if (r.rot) ctx.rotate(r.rot);
+          ctx.fillRect(-r.w / 2, -r.h / 2, r.w, r.h);
           ctx.restore();
         }
-      });
-
-      // Obstacles
-      lvl.obstacles.forEach((obs, idx) => {
-        const isSel = selected && selected.kind === 'obstacle' && selected.index === idx;
-        ctx.save();
-        ctx.translate(obs.x, obs.y);
-        if (obs.rotation) ctx.rotate(obs.rotation);
-        ctx.fillStyle = obs.color || '#ff2a6d';
-        ctx.shadowColor = obs.color || '#ff2a6d';
-        ctx.shadowBlur = isSel ? 16 : 8;
-
-        if (obs.type === 'circle') {
-          const r = obs.radius || 20;
+        for (const c of geom.circles) {
           ctx.beginPath();
-          ctx.arc(0, 0, r, 0, Math.PI * 2);
+          ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
           ctx.fill();
-          if (isSel) {
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-          }
-        } else {
-          const w = obs.width || 180;
-          const h = obs.height || 20;
-          ctx.fillRect(-w / 2, -h / 2, w, h);
-          if (isSel) {
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(-w / 2 - 2, -h / 2 - 2, w + 4, h + 4);
-          }
         }
         ctx.restore();
-      });
 
-      // Checkpoint Gates
-      lvl.checkpoints.forEach((cp, idx) => {
-        const isSel = selected && selected.kind === 'checkpoint' && selected.index === idx;
-        const x1 = cp.axis === 'horizontal' ? cp.start : cp.coord;
-        const y1 = cp.axis === 'horizontal' ? cp.coord : cp.start;
-        const x2 = cp.axis === 'horizontal' ? cp.end : cp.coord;
-        const y2 = cp.axis === 'horizontal' ? cp.coord : cp.end;
-        const mid = gateMidpoint(cp);
+        // Draw clickable opening hints + attached numbered gates
+        for (const op of geom.gaps) {
+          const attached = (w.attachedGates || []).find((g) => Math.abs(g.start - op.start) <= 14 && Math.abs(g.end - op.end) <= 14);
+          const isHov = hoverOpening && hoverOpening.waveId === w.id && hoverOpening.start === op.start && hoverOpening.end === op.end;
 
-        ctx.save();
-        ctx.strokeStyle = isSel ? '#ffffff' : '#34d399';
-        ctx.shadowColor = '#10b981';
-        ctx.shadowBlur = isSel ? 16 : 10;
-        ctx.lineWidth = isSel ? 5 : 4;
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
+          const x1 = geom.isVert ? op.start : geom.coord;
+          const y1 = geom.isVert ? geom.coord : op.start;
+          const x2 = geom.isVert ? op.end : geom.coord;
+          const y2 = geom.isVert ? geom.coord : op.end;
+          const midX = (x1 + x2) / 2;
+          const midY = (y1 + y2) / 2;
 
-        // End-posts
-        ctx.fillStyle = isSel ? '#ffffff' : '#6ee7b7';
-        ctx.beginPath(); ctx.arc(x1, y1, 4, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(x2, y2, 4, 0, Math.PI * 2); ctx.fill();
+          ctx.save();
+          if (attached) {
+            ctx.strokeStyle = isHov ? '#ffffff' : '#34d399';
+            ctx.shadowColor = '#10b981';
+            ctx.shadowBlur = 14;
+            ctx.lineWidth = 4.5;
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
 
-        // Gate Number badge
-        ctx.shadowBlur = 0;
-        ctx.beginPath();
-        ctx.arc(mid.x, mid.y, 12, 0, Math.PI * 2);
-        ctx.fillStyle = '#064e3b';
-        ctx.fill();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = isSel ? '#ffffff' : '#34d399';
-        ctx.stroke();
-
-        ctx.fillStyle = '#ecfdf5';
-        ctx.font = 'bold 11px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(String(cp.order), mid.x, mid.y);
-        ctx.restore();
-      });
-
-      // Live Gate Scan-Line Preview
-      if ((activeTool === 'gate-h' || activeTool === 'gate-v') && hoverPointer) {
-        const axis = activeTool === 'gate-h' ? 'horizontal' : 'vertical';
-        const scanCoord = snap(axis === 'horizontal' ? hoverPointer.y : hoverPointer.x);
-        const perpVal = axis === 'horizontal' ? hoverPointer.x : hoverPointer.y;
-        const openings = computeLineOpenings(lvl, axis, scanCoord);
-
-        ctx.save();
-        ctx.strokeStyle = 'rgba(34, 211, 238, 0.25)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath();
-        if (axis === 'horizontal') {
-          ctx.moveTo(-HALF_W, scanCoord);
-          ctx.lineTo(HALF_W, scanCoord);
-        } else {
-          ctx.moveTo(scanCoord, -HALF_H);
-          ctx.lineTo(scanCoord, HALF_H);
-        }
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        openings.forEach((op) => {
-          const hovered = perpVal >= op.start && perpVal <= op.end;
-          ctx.strokeStyle = hovered ? '#a7f3d0' : 'rgba(52, 211, 153, 0.5)';
-          ctx.lineWidth = hovered ? 6 : 3;
-          ctx.beginPath();
-          if (axis === 'horizontal') {
-            ctx.moveTo(op.start, scanCoord);
-            ctx.lineTo(op.end, scanCoord);
+            ctx.shadowBlur = 0;
+            ctx.beginPath(); ctx.arc(midX, midY, 12, 0, Math.PI * 2);
+            ctx.fillStyle = '#065f46'; ctx.fill();
+            ctx.lineWidth = 2; ctx.strokeStyle = '#34d399'; ctx.stroke();
+            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px monospace';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(String(attached.order), midX, midY);
           } else {
-            ctx.moveTo(scanCoord, op.start);
-            ctx.lineTo(scanCoord, op.end);
+            ctx.strokeStyle = isHov ? '#6ee7b7' : 'rgba(52, 211, 153, 0.32)';
+            ctx.lineWidth = isHov ? 4 : 2;
+            ctx.setLineDash([5, 5]);
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            if (isHov) {
+              ctx.setLineDash([]);
+              ctx.fillStyle = '#a7f3d0';
+              ctx.font = 'bold 10px monospace';
+              ctx.textAlign = 'center';
+              ctx.fillText('+ GATE', midX, midY - 10);
+            }
           }
-          ctx.stroke();
-        });
-        ctx.restore();
+          ctx.restore();
+        }
       }
 
-      // Spawn + 13px ball clearance ring
+      // Player Spawn
       ctx.save();
       ctx.beginPath();
       ctx.arc(lvl.spawn.x, lvl.spawn.y, PLAYER_RADIUS, 0, Math.PI * 2);
@@ -885,56 +857,27 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
     function getCanvasCoords(evt) {
       const rect = canvas.getBoundingClientRect();
-      const scaleX = ARENA_W / rect.width;
-      const scaleY = ARENA_H / rect.height;
       return {
-        x: (evt.clientX - rect.left) * scaleX - HALF_W,
-        y: (evt.clientY - rect.top) * scaleY - HALF_H,
+        x: (evt.clientX - rect.left) * (ARENA_W / rect.width) - HALF_W,
+        y: (evt.clientY - rect.top) * (ARENA_H / rect.height) - HALF_H,
       };
     }
 
-    function distToSegment(px, py, x1, y1, x2, y2) {
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const lenSq = dx * dx + dy * dy;
-      if (lenSq === 0) return Math.hypot(px - x1, py - y1);
-      const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / lenSq));
-      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
-    }
-
-    function hitTest(x, y) {
+    function findHoveredWaveOpening(x, y) {
       const lvl = curLevel();
       if (!lvl) return null;
-
-      if (Math.hypot(x - lvl.spawn.x, y - lvl.spawn.y) <= 18) {
-        return { kind: 'spawn' };
-      }
-      for (let i = lvl.checkpoints.length - 1; i >= 0; i--) {
-        const cp = lvl.checkpoints[i];
-        const x1 = cp.axis === 'horizontal' ? cp.start : cp.coord;
-        const y1 = cp.axis === 'horizontal' ? cp.coord : cp.start;
-        const x2 = cp.axis === 'horizontal' ? cp.end : cp.coord;
-        const y2 = cp.axis === 'horizontal' ? cp.coord : cp.end;
-        if (distToSegment(x, y, x1, y1, x2, y2) <= 14) {
-          return { kind: 'checkpoint', index: i };
-        }
-      }
-      for (let i = lvl.obstacles.length - 1; i >= 0; i--) {
-        const obs = lvl.obstacles[i];
-        if (obs.type === 'circle') {
-          if (Math.hypot(x - obs.x, y - obs.y) <= (obs.radius || 20) + 6) {
-            return { kind: 'obstacle', index: i };
-          }
-        } else {
-          const w = obs.width || 180;
-          const h = obs.height || 20;
-          const dx = x - obs.x;
-          const dy = y - obs.y;
-          const ang = -(obs.rotation || 0);
-          const lx = dx * Math.cos(ang) - dy * Math.sin(ang);
-          const ly = dx * Math.sin(ang) + dy * Math.cos(ang);
-          if (Math.abs(lx) <= w / 2 + 6 && Math.abs(ly) <= h / 2 + 6) {
-            return { kind: 'obstacle', index: i };
+      const { items } = computeWaveSchedule(lvl);
+      for (const item of items) {
+        const tSince = simTime - item.spawnAt;
+        if (tSince < 0 || tSince > item.duration) continue;
+        const w = item.wave;
+        const geom = computeWaveGeometry(w, tSince);
+        const coordDiff = Math.abs((geom.isVert ? y : x) - geom.coord);
+        if (coordDiff <= 18) {
+          const perp = geom.isVert ? x : y;
+          const op = geom.gaps.find((g) => perp >= g.start && perp <= g.end);
+          if (op) {
+            return { waveId: w.id, start: op.start, end: op.end };
           }
         }
       }
@@ -945,106 +888,60 @@ export function renderCampaignAdminPage(adminToken: string): string {
       const lvl = curLevel();
       if (!lvl) return;
       const { x, y } = getCanvasCoords(e);
-      const sx = snap(x);
-      const sy = snap(y);
 
-      if (activeTool === 'spawn') {
-        lvl.spawn.x = sx;
-        lvl.spawn.y = sy;
-        selected = { kind: 'spawn' };
-        renderMeta();
-        drawCanvas();
-        return;
-      }
-      if (activeTool === 'gate-h' || activeTool === 'gate-v') {
-        const axis = activeTool === 'gate-h' ? 'horizontal' : 'vertical';
-        const scanCoord = axis === 'horizontal' ? sy : sx;
-        const perpVal = axis === 'horizontal' ? x : y;
-        const openings = computeLineOpenings(lvl, axis, scanCoord);
-        const picked = openings.find((op) => perpVal >= op.start && perpVal <= op.end) || openings[0];
-        if (!picked) {
-          showBanner('No open gate segment detected on that line.', true);
-          return;
-        }
-        const ord = nextGateOrder(lvl);
-        lvl.checkpoints.push({
-          id: 'cp-' + Date.now(),
-          order: ord,
-          axis,
-          coord: scanCoord,
-          start: picked.start,
-          end: picked.end,
-          points: 200,
-          label: 'GATE ' + ord,
-        });
-        selected = { kind: 'checkpoint', index: lvl.checkpoints.length - 1 };
-        setTool('select');
-        renderAll();
-        return;
-      }
-      if (activeTool === 'wall' || activeTool === 'spinner' || activeTool === 'orb') {
-        lvl.obstacles.push(makeObstacleSpec(activeTool, sx, sy));
-        selected = { kind: 'obstacle', index: lvl.obstacles.length - 1 };
-        setTool('select');
-        renderAll();
+      if (Math.hypot(x - lvl.spawn.x, y - lvl.spawn.y) <= 18) {
+        dragSpawn = true;
         return;
       }
 
-      const hit = hitTest(x, y);
-      selected = hit;
+      const hit = findHoveredWaveOpening(x, y);
       if (hit) {
-        if (hit.kind === 'spawn') {
-          dragState = { kind: 'spawn', offsetX: lvl.spawn.x - x, offsetY: lvl.spawn.y - y };
-        } else if (hit.kind === 'obstacle') {
-          dragState = { kind: 'obstacle', index: hit.index, offsetX: lvl.obstacles[hit.index].x - x, offsetY: lvl.obstacles[hit.index].y - y };
-        } else if (hit.kind === 'checkpoint') {
-          const cp = lvl.checkpoints[hit.index];
-          dragState = { kind: 'checkpoint', index: hit.index, offsetCoord: cp.coord - (cp.axis === 'horizontal' ? y : x) };
+        const wIdx = lvl.waves.findIndex((w) => w.id === hit.waveId);
+        if (wIdx >= 0) {
+          const w = lvl.waves[wIdx];
+          if (!w.attachedGates) w.attachedGates = [];
+          const existingIdx = w.attachedGates.findIndex(
+            (g) => Math.abs(g.start - hit.start) <= 14 && Math.abs(g.end - hit.end) <= 14
+          );
+          if (existingIdx >= 0) {
+            w.attachedGates.splice(existingIdx, 1);
+          } else {
+            const ord = nextGateOrder(lvl);
+            w.attachedGates.push({
+              id: 'gate-' + Date.now(),
+              order: ord,
+              start: hit.start,
+              end: hit.end,
+              points: 200,
+              label: 'GATE ' + ord,
+            });
+          }
+          selectedWaveIdx = wIdx;
+          renderWaveList();
+          renderWaveInspector();
+          drawCanvas();
         }
       }
-      renderLists();
-      renderInspector();
-      drawCanvas();
     });
 
     canvas.addEventListener('pointermove', (e) => {
       const { x, y } = getCanvasCoords(e);
-      hoverPointer = { x, y };
       document.getElementById('cursorCoords').textContent = 'X: ' + Math.round(x) + ', Y: ' + Math.round(y);
-      if (!dragState) {
-        if (activeTool === 'gate-h' || activeTool === 'gate-v') drawCanvas();
-        return;
-      }
       const lvl = curLevel();
       if (!lvl) return;
-      if (dragState.kind === 'spawn') {
-        lvl.spawn.x = Math.max(-HALF_W, Math.min(HALF_W, snap(x + dragState.offsetX)));
-        lvl.spawn.y = Math.max(-HALF_H, Math.min(HALF_H, snap(y + dragState.offsetY)));
-        renderMeta();
-      } else if (dragState.kind === 'checkpoint') {
-        const cp = lvl.checkpoints[dragState.index];
-        const limit = cp.axis === 'horizontal' ? HALF_H : HALF_W;
-        const raw = (cp.axis === 'horizontal' ? y : x) + dragState.offsetCoord;
-        cp.coord = Math.max(-limit, Math.min(limit, snap(raw)));
-        renderInspector();
-        renderLists();
-      } else if (dragState.kind === 'obstacle') {
-        lvl.obstacles[dragState.index].x = Math.max(-HALF_W, Math.min(HALF_W, snap(x + dragState.offsetX)));
-        lvl.obstacles[dragState.index].y = Math.max(-HALF_H, Math.min(HALF_H, snap(y + dragState.offsetY)));
-        renderInspector();
-        renderLists();
+
+      if (dragSpawn) {
+        lvl.spawn.x = Math.max(-HALF_W + 15, Math.min(HALF_W - 15, Math.round(x / 10) * 10));
+        lvl.spawn.y = Math.max(-HALF_H + 15, Math.min(HALF_H - 15, Math.round(y / 10) * 10));
+        drawCanvas();
+        return;
       }
-      drawCanvas();
+
+      hoverOpening = findHoveredWaveOpening(x, y);
+      if (!isPlaying) drawCanvas();
     });
 
-    canvas.addEventListener('pointerleave', () => {
-      hoverPointer = null;
-      if (activeTool === 'gate-h' || activeTool === 'gate-v') drawCanvas();
-    });
-
-    window.addEventListener('pointerup', () => {
-      dragState = null;
-    });
+    window.addEventListener('pointerup', () => { dragSpawn = false; });
 
     loadConfig();
   </script>

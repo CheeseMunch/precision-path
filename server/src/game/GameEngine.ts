@@ -7,6 +7,7 @@ import {
   ObstacleDirection,
   ClientInput,
   CampaignObstacleSpec,
+  CampaignWaveSpec,
 } from '../../../shared/types.js';
 import {
   GAME_CONFIG,
@@ -50,6 +51,7 @@ export class GameEngine {
   private gameMode: GameMode = 'endless';
   private campaignLevelNumber = 1;
   private campaignObstacleSpecs: Map<string, CampaignObstacleSpec> = new Map();
+  private campaignWaveQueue: Array<{ triggerAt: number; wave: CampaignWaveSpec }> = [];
 
   private onGameOverCallback?: (state: GameState) => void;
   private onTierUpCallback?: (tier: GameTier) => void;
@@ -465,14 +467,53 @@ export class GameEngine {
     this.state.isEndless = false;
     this.state.tierTimeRemaining = 0;
 
-    const orderedCheckpoints = [...level.checkpoints]
+    this.campaignWaveQueue = [];
+    this.campaignObstacleSpecs.clear();
+
+    const waves = Array.isArray(level.waves) ? [...level.waves].sort((a, b) => a.order - b.order) : [];
+    if (waves.length > 0) {
+      let accTime = 0;
+      const preCheckpoints: NonNullable<GameState['checkpoints']> = [];
+      for (const w of waves) {
+        accTime += Math.max(0, w.delayAfterPrev ?? 1.5);
+        this.campaignWaveQueue.push({ triggerAt: accTime, wave: w });
+
+        const isVerticalTravel = w.side === 'north' || w.side === 'south';
+        const halfBound = isVerticalTravel ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
+        const travelSign = w.side === 'north' || w.side === 'west' ? 1 : -1;
+        const offscreenParked = -travelSign * (halfBound + 200);
+
+        for (const g of w.attachedGates || []) {
+          preCheckpoints.push({
+            id: g.id,
+            order: g.order,
+            axis: isVerticalTravel ? 'horizontal' : 'vertical',
+            coord: offscreenParked,
+            travelSign,
+            speed: w.speed,
+            waveId: w.id,
+            start: g.start,
+            end: g.end,
+            points: g.points,
+            label: g.label,
+            reached: false,
+          });
+        }
+      }
+      preCheckpoints.sort((a, b) => a.order - b.order);
+      this.state.checkpoints = preCheckpoints;
+      this.state.nextCheckpointIndex = 0;
+      this.state.obstacles = [];
+      return;
+    }
+
+    const orderedCheckpoints = [...(level.checkpoints || [])]
       .sort((a, b) => a.order - b.order)
       .map((cp) => ({ ...cp, reached: false }));
     this.state.checkpoints = orderedCheckpoints;
     this.state.nextCheckpointIndex = 0;
 
-    this.campaignObstacleSpecs.clear();
-    this.state.obstacles = level.obstacles.map((spec) => {
+    this.state.obstacles = (level.obstacles || []).map((spec) => {
       this.campaignObstacleSpecs.set(spec.id, spec);
       return {
         id: spec.id,
@@ -491,6 +532,143 @@ export class GameEngine {
         speed: spec.patrolSpeed || 0,
       };
     });
+  }
+
+  private spawnCampaignWave(wave: CampaignWaveSpec) {
+    const direction = wave.side;
+    const isVerticalTravel = direction === 'north' || direction === 'south';
+    const lateralHalfSpan = isVerticalTravel ? this.ARENA_WIDTH / 2 : this.ARENA_HEIGHT / 2;
+    const halfBound = isVerticalTravel ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
+    const spawnDist = halfBound + GAME_CONFIG.obstacles.spawnDistanceOffset;
+    const travelSign = direction === 'north' || direction === 'west' ? 1 : -1;
+    const startCoord = -travelSign * spawnDist;
+
+    const dirColors: Record<string, string> = {
+      north: '#ff2a6d',
+      south: '#ff7700',
+      east: '#d300c5',
+      west: '#05d5fa',
+    };
+    const color = wave.color || dirColors[direction] || '#ff2a6d';
+    const barThickness = wave.barThickness || GAME_CONFIG.obstacles.barThickness;
+    const gapSize = Math.max(60, wave.gapSize || 120);
+    const gapCenter = wave.gapCenter || 0;
+    const speed = Math.max(40, wave.speed || 175);
+    const tier = this.campaignLevelNumber;
+
+    switch (wave.patternType) {
+      case 'single-gap-wall': {
+        this.addSegmentedWallWithGaps(
+          direction,
+          lateralHalfSpan,
+          [{ start: gapCenter - gapSize / 2, end: gapCenter + gapSize / 2 }],
+          barThickness,
+          speed,
+          tier,
+          color
+        );
+        break;
+      }
+      case 'double-gap-wall': {
+        const islandWidth = Math.max(48, GAME_CONFIG.obstacles.doubleGapIslandWidth);
+        const sideGap = Math.max(76, gapSize * 0.95);
+        const placeSecondOnRight = gapCenter <= 0;
+        const secondCenter = placeSecondOnRight
+          ? gapCenter + sideGap + islandWidth
+          : gapCenter - (sideGap + islandWidth);
+        this.addSegmentedWallWithGaps(
+          direction,
+          lateralHalfSpan,
+          [
+            { start: gapCenter - sideGap / 2, end: gapCenter + sideGap / 2 },
+            { start: secondCenter - sideGap / 2, end: secondCenter + sideGap / 2 },
+          ],
+          barThickness,
+          speed,
+          tier,
+          color
+        );
+        break;
+      }
+      case 'sweeping-half-wall': {
+        const openPositiveSide = gapCenter >= 0;
+        const openStart = openPositiveSide ? gapCenter - gapSize / 2 : -lateralHalfSpan;
+        const openEnd = openPositiveSide ? lateralHalfSpan : gapCenter + gapSize / 2;
+        this.addSegmentedWallWithGaps(
+          direction,
+          lateralHalfSpan,
+          [{ start: openStart, end: openEnd }],
+          barThickness + 2,
+          speed,
+          tier,
+          color
+        );
+        break;
+      }
+      case 'staggered-blocks': {
+        const centerGap = Math.max(84, gapSize);
+        const outerMarginGap = 54;
+        this.addSegmentedWallWithGaps(
+          direction,
+          lateralHalfSpan,
+          [
+            { start: -lateralHalfSpan, end: -lateralHalfSpan + outerMarginGap },
+            { start: gapCenter - centerGap / 2, end: gapCenter + centerGap / 2 },
+            { start: lateralHalfSpan - outerMarginGap, end: lateralHalfSpan },
+          ],
+          barThickness + 2,
+          speed,
+          tier,
+          color
+        );
+        break;
+      }
+      case 'orb-cluster': {
+        const orbRadius = 12;
+        const orbCount = isVerticalTravel ? 4 : 5;
+        const usableHalf = lateralHalfSpan - 28;
+        for (let i = 0; i < orbCount; i++) {
+          const orbLat = -usableHalf + (i / (orbCount - 1)) * (usableHalf * 2);
+          if (Math.abs(orbLat - gapCenter) < gapSize * 0.6 + orbRadius) {
+            continue;
+          }
+          this.addLocalCircleObstacle(direction, orbLat, 0, orbRadius, speed, 0, wave.color || '#ffea00');
+        }
+        break;
+      }
+      case 'diagonal-spinner': {
+        const spinnerLength = 152;
+        const spinnerThickness = 16;
+        const rotSpeed = 2.0;
+        const lateralDrift = speed * 0.45 * (gapCenter >= 0 ? -1 : 1);
+        this.addLocalSpinningObstacle(
+          direction,
+          gapCenter,
+          0,
+          spinnerLength,
+          spinnerThickness,
+          speed,
+          lateralDrift,
+          0.4,
+          rotSpeed,
+          wave.color || '#b800ff'
+        );
+        break;
+      }
+    }
+
+    // Activate all gates attached to this wave
+    if (this.state.checkpoints) {
+      for (const cp of this.state.checkpoints) {
+        if (cp.waveId === wave.id) {
+          cp.coord = startCoord;
+          cp.spawnCoord = startCoord;
+          cp.spawnTime = this.state.elapsedTime;
+          cp.travelSign = travelSign;
+          cp.speed = speed;
+        }
+      }
+    }
   }
 
   private updateCampaignObstacles() {
@@ -519,7 +697,8 @@ export class GameEngine {
   private checkCampaignCheckpointForPlayer(
     player: Player,
     prevX: number = player.x,
-    prevY: number = player.y
+    prevY: number = player.y,
+    prevGateCoords?: Map<string, number>
   ): boolean {
     if (this.gameMode !== 'campaign' || !player.alive || this.state.status !== 'playing') {
       return false;
@@ -531,15 +710,18 @@ export class GameEngine {
     if (unreached.length === 0) return false;
 
     const activeOrder = Math.min(...unreached.map((c) => c.order));
-    const activeGates = unreached.filter((c) => c.order === activeOrder);
+    const activeGates = unreached.filter(
+      (c) => c.order === activeOrder && (!c.waveId || c.spawnTime !== undefined)
+    );
 
     for (const cp of activeGates) {
       const minSpan = Math.min(cp.start, cp.end);
       const maxSpan = Math.max(cp.start, cp.end);
+      const prevGateCoord = prevGateCoords?.get(cp.id) ?? cp.coord;
       let passed = false;
 
       if (cp.axis === 'horizontal') {
-        const crossed = (prevY - cp.coord) * (player.y - cp.coord) <= 0;
+        const crossed = (prevY - prevGateCoord) * (player.y - cp.coord) <= 0;
         const touching = Math.abs(player.y - cp.coord) <= player.radius;
         if (crossed || touching) {
           let crossX = player.x;
@@ -552,7 +734,7 @@ export class GameEngine {
           }
         }
       } else {
-        const crossed = (prevX - cp.coord) * (player.x - cp.coord) <= 0;
+        const crossed = (prevX - prevGateCoord) * (player.x - cp.coord) <= 0;
         const touching = Math.abs(player.x - cp.coord) <= player.radius;
         if (crossed || touching) {
           let crossY = player.y;
@@ -574,7 +756,7 @@ export class GameEngine {
         player.gatesCleared = (player.gatesCleared || 0) + 1;
         this.state.nextCheckpointIndex = checkpoints.filter((c) => c.reached).length;
 
-        if (checkpoints.every((c) => c.reached)) {
+        if (checkpoints.every((c) => c.reached) && this.campaignWaveQueue.length === 0 && this.state.obstacles.length === 0) {
           const level = getCampaignLevel(this.campaignLevelNumber);
           const timeBonus = Math.max(0, Math.round((level.parTimeSeconds - this.state.elapsedTime) * 25));
           player.score += level.clearBonusPoints + timeBonus;
@@ -590,11 +772,11 @@ export class GameEngine {
     return false;
   }
 
-  private checkCampaignCheckpointsForAll() {
+  private checkCampaignCheckpointsForAll(prevGateCoords?: Map<string, number>) {
     for (const id in this.state.players) {
       const p = this.state.players[id];
       if (p.alive) {
-        if (this.checkCampaignCheckpointForPlayer(p)) {
+        if (this.checkCampaignCheckpointForPlayer(p, p.x, p.y, prevGateCoords)) {
           return;
         }
       }
@@ -706,11 +888,75 @@ export class GameEngine {
     }
 
     if (this.gameMode === 'campaign') {
-      this.updateCampaignObstacles();
+      // Spawn scheduled offscreen campaign waves
+      if (this.campaignWaveQueue.length > 0) {
+        const due = this.campaignWaveQueue.filter((w) => this.state.elapsedTime >= w.triggerAt);
+        this.campaignWaveQueue = this.campaignWaveQueue.filter((w) => this.state.elapsedTime < w.triggerAt);
+        for (const item of due) {
+          this.spawnCampaignWave(item.wave);
+        }
+      }
+
+      // Advance moving gates & check if a sweeping gate passed a stationary player or exited unreached
+      const prevGateCoords = new Map<string, number>();
+      if (this.state.checkpoints) {
+        for (const cp of this.state.checkpoints) {
+          if (cp.spawnTime !== undefined && cp.travelSign && cp.speed) {
+            prevGateCoords.set(cp.id, cp.coord);
+            cp.coord += cp.travelSign * cp.speed * dt;
+          }
+        }
+      }
+
+      if (this.campaignObstacleSpecs.size > 0) {
+        this.updateCampaignObstacles();
+      } else {
+        this.updateObstacles(dt);
+      }
+
       this.checkCollisions();
       if ((this.state.status as string) === 'playing') {
-        this.checkCampaignCheckpointsForAll();
+        this.checkCampaignCheckpointsForAll(prevGateCoords);
       }
+
+      // Fail if any unreached moving gate exited the arena completely
+      if ((this.state.status as string) === 'playing' && this.state.checkpoints) {
+        for (const cp of this.state.checkpoints) {
+          if (!cp.reached && cp.spawnTime !== undefined && cp.travelSign) {
+            const halfBound = cp.axis === 'horizontal' ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
+            const exitLimit = halfBound + GAME_CONFIG.obstacles.spawnDistanceOffset + 24;
+            if (cp.coord * cp.travelSign > exitLimit) {
+              this.state.campaignResult = 'failed';
+              for (const pid in this.state.players) {
+                this.state.players[pid].alive = false;
+              }
+              this.endGame(null);
+              break;
+            }
+          }
+        }
+      }
+
+      // Clear level once all scheduled waves have spawned, all gates are cleared, and arena is clear
+      if (
+        (this.state.status as string) === 'playing' &&
+        this.campaignWaveQueue.length === 0 &&
+        this.state.obstacles.length === 0 &&
+        this.state.checkpoints &&
+        this.state.checkpoints.every((c) => c.reached)
+      ) {
+        const level = getCampaignLevel(this.campaignLevelNumber);
+        const aliveWinner = Object.values(this.state.players).find((p) => p.alive) || Object.values(this.state.players)[0];
+        const timeBonus = Math.max(0, Math.round((level.parTimeSeconds - this.state.elapsedTime) * 25));
+        if (aliveWinner) {
+          aliveWinner.score += level.clearBonusPoints + timeBonus;
+        }
+        this.state.campaignClearBonus = level.clearBonusPoints;
+        this.state.campaignTimeBonus = timeBonus;
+        this.state.campaignResult = 'cleared';
+        this.endGame(aliveWinner);
+      }
+
       if (this.onStateUpdateCallback) {
         this.onStateUpdateCallback(this.state);
       }

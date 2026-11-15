@@ -281,6 +281,48 @@ function applyCampaignConfig(body: any) {
     },
     clearBonusPoints: Math.max(0, Math.round(Number(lvl.clearBonusPoints ?? 500))),
     parTimeSeconds: Math.max(5, Math.round(Number(lvl.parTimeSeconds ?? 25))),
+    waves: Array.isArray(lvl.waves)
+      ? lvl.waves.map((w: any, wIdx: number) => {
+          const side = ['north', 'south', 'east', 'west'].includes(w.side) ? w.side : 'north';
+          const isVert = side === 'north' || side === 'south';
+          const latLimit = isVert ? 225 : 400;
+          const validPatterns = [
+            'single-gap-wall',
+            'double-gap-wall',
+            'sweeping-half-wall',
+            'staggered-blocks',
+            'orb-cluster',
+            'diagonal-spinner',
+          ];
+          const patternType = validPatterns.includes(w.patternType) ? w.patternType : 'single-gap-wall';
+          return {
+            id: String(w.id || `wave-${idx + 1}-${wIdx + 1}`),
+            order: Math.max(1, Math.round(Number(w.order ?? wIdx + 1))),
+            delayAfterPrev: Math.max(0, Math.min(30, Number(w.delayAfterPrev ?? 1.5))),
+            side,
+            patternType,
+            speed: Math.max(40, Math.min(600, Number(w.speed ?? 175))),
+            gapCenter: Math.max(-latLimit, Math.min(latLimit, Number(w.gapCenter ?? 0))),
+            gapSize: Math.max(60, Math.min(400, Number(w.gapSize ?? 120))),
+            barThickness: Math.max(8, Math.min(48, Number(w.barThickness ?? 18))),
+            color: w.color ? String(w.color).slice(0, 24) : undefined,
+            attachedGates: Array.isArray(w.attachedGates)
+              ? w.attachedGates.map((g: any, gIdx: number) => {
+                  const s = Number(g.start ?? -60);
+                  const e = Number(g.end ?? 60);
+                  return {
+                    id: String(g.id || `gate-${idx + 1}-${wIdx + 1}-${gIdx + 1}`),
+                    order: Math.max(1, Math.round(Number(g.order ?? wIdx + 1))),
+                    start: Math.max(-latLimit, Math.min(latLimit, Math.min(s, e))),
+                    end: Math.max(-latLimit, Math.min(latLimit, Math.max(s, e))),
+                    points: Math.max(0, Math.round(Number(g.points ?? 200))),
+                    label: g.label ? String(g.label).slice(0, 24) : undefined,
+                  };
+                })
+              : [],
+          };
+        })
+      : [],
     checkpoints: Array.isArray(lvl.checkpoints)
       ? lvl.checkpoints.map((cp: any, cpIdx: number) => {
           const axis = cp.axis === 'vertical' ? 'vertical' : 'horizontal';

@@ -275,45 +275,73 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.lineTo(0, 16);
       ctx.stroke();
 
-      // 2b. Campaign Mode: Draw structured gate guide path & glowing sequential checkpoints
+      // 2b. Campaign Mode: Draw structured or wave-attached glowing numbered checkpoint gates
       if (currentState.gameMode === 'campaign' && currentState.checkpoints && currentState.checkpoints.length > 0) {
         const cps = currentState.checkpoints;
+        const spawnPerfMapGates = obstacleSpawnPerfRef.current;
         const unreachedOrders = cps.filter((c) => !c.reached).map((c) => c.order);
         const activeOrder = unreachedOrders.length > 0 ? Math.min(...unreachedOrders) : Infinity;
 
         const ordered = [...cps].sort((a, b) => a.order - b.order);
-        const gateMid = (cp: (typeof cps)[number]) => {
+        const getGateCoord = (cp: (typeof cps)[number]) => {
+          if (cp.waveId && cp.spawnTime !== undefined && cp.spawnCoord !== undefined && cp.travelSign && cp.speed) {
+            const key = 'gate:' + cp.id;
+            let spMs = spawnPerfMapGates.get(key);
+            if (spMs === undefined) {
+              spMs = now - Math.max(0, currentState.elapsedTime - cp.spawnTime) * 1000;
+              spawnPerfMapGates.set(key, spMs);
+            } else if (currentState.status === 'paused') {
+              spMs += frameDt * 1000;
+              spawnPerfMapGates.set(key, spMs);
+            }
+            const ageSec = Math.max(0, (now - spMs) / 1000);
+            return cp.spawnCoord + cp.travelSign * cp.speed * ageSec;
+          }
+          return cp.coord;
+        };
+
+        const hasStaticGates = ordered.some((c) => !c.waveId);
+        const gateMid = (cp: (typeof cps)[number], coordVal: number) => {
           const mid = (cp.start + cp.end) / 2;
-          return cp.axis === 'vertical' ? { x: cp.coord, y: mid } : { x: mid, y: cp.coord };
+          return cp.axis === 'vertical' ? { x: coordVal, y: mid } : { x: mid, y: coordVal };
         };
 
         ctx.save();
-        ctx.strokeStyle = 'rgba(34, 211, 238, 0.22)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([6, 6]);
         ctx.beginPath();
-        if (currentState.campaignSpawn) {
-          ctx.moveTo(currentState.campaignSpawn.x, currentState.campaignSpawn.y);
-        } else {
-          const firstMid = gateMid(ordered[0]);
-          ctx.moveTo(firstMid.x, firstMid.y);
+        ctx.rect(-halfW, -halfH, arenaWidth, arenaHeight);
+        ctx.clip();
+
+        if (hasStaticGates) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(34, 211, 238, 0.22)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([6, 6]);
+          ctx.beginPath();
+          if (currentState.campaignSpawn) {
+            ctx.moveTo(currentState.campaignSpawn.x, currentState.campaignSpawn.y);
+          } else {
+            const firstMid = gateMid(ordered[0], ordered[0].coord);
+            ctx.moveTo(firstMid.x, firstMid.y);
+          }
+          for (const cp of ordered) {
+            const m = gateMid(cp, cp.coord);
+            ctx.lineTo(m.x, m.y);
+          }
+          ctx.stroke();
+          ctx.restore();
         }
-        for (const cp of ordered) {
-          const m = gateMid(cp);
-          ctx.lineTo(m.x, m.y);
-        }
-        ctx.stroke();
-        ctx.restore();
 
         const pulse = 0.5 + 0.5 * Math.sin(now * 0.006);
         ordered.forEach((cp) => {
+          if (cp.waveId && cp.spawnTime === undefined) return; // Wave not spawned yet
+          const coordVal = getGateCoord(cp);
           const isCleared = Boolean(cp.reached);
           const isCurrent = !isCleared && cp.order === activeOrder;
-          const x1 = cp.axis === 'horizontal' ? cp.start : cp.coord;
-          const y1 = cp.axis === 'horizontal' ? cp.coord : cp.start;
-          const x2 = cp.axis === 'horizontal' ? cp.end : cp.coord;
-          const y2 = cp.axis === 'horizontal' ? cp.coord : cp.end;
-          const mid = gateMid(cp);
+          const x1 = cp.axis === 'horizontal' ? cp.start : coordVal;
+          const y1 = cp.axis === 'horizontal' ? coordVal : cp.start;
+          const x2 = cp.axis === 'horizontal' ? cp.end : coordVal;
+          const y2 = cp.axis === 'horizontal' ? coordVal : cp.end;
+          const mid = gateMid(cp, coordVal);
 
           ctx.save();
           if (isCleared) {
@@ -362,6 +390,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.fillText(isCleared ? '✓' : String(cp.order), mid.x, mid.y);
           ctx.restore();
         });
+        ctx.restore();
       }
 
       // 3. Draw Obstacles using Hardware VSync Linear Equation (Endless) or Server Patrol State (Campaign)
@@ -401,15 +430,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           spawnPerfMap.set(obs.id, spawnPerfMs);
         }
 
-        const isCampaign = currentState.gameMode === 'campaign';
         const ageSec = Math.max(0, (now - spawnPerfMs) / 1000);
         const baseX = obs.spawnX !== undefined ? obs.spawnX : obs.x;
         const baseY = obs.spawnY !== undefined ? obs.spawnY : obs.y;
-        const drawX = isCampaign ? obs.x : baseX + obs.vx * ageSec;
-        const drawY = isCampaign ? obs.y : baseY + obs.vy * ageSec;
+        const drawX = baseX + obs.vx * ageSec;
+        const drawY = baseY + obs.vy * ageSec;
 
         const baseRot = obs.spawnRotation !== undefined ? obs.spawnRotation : (obs.rotation || 0);
-        const currentRot = isCampaign ? (obs.rotation || 0) : baseRot + (obs.rotationSpeed || 0) * ageSec;
+        const currentRot = baseRot + (obs.rotationSpeed || 0) * ageSec;
 
         // Frame-exact local collision check against the exact drawn wall coordinates (zero desync)
         if (
@@ -498,7 +526,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       // Prune despawned obstacle IDs
       if (spawnPerfMap.size > activeIds.size + 10) {
         for (const id of spawnPerfMap.keys()) {
-          if (!activeIds.has(id)) {
+          if (!activeIds.has(id) && !id.startsWith('gate:')) {
             spawnPerfMap.delete(id);
           }
         }

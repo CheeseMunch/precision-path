@@ -41,6 +41,14 @@ export interface Obstacle {
 
 export type GameMode = 'endless' | 'campaign';
 
+export type CampaignPatternType =
+  | 'single-gap-wall'
+  | 'double-gap-wall'
+  | 'sweeping-half-wall'
+  | 'staggered-blocks'
+  | 'orb-cluster'
+  | 'diagonal-spinner';
+
 export interface CampaignCheckpoint {
   id: string;
   order: number;
@@ -51,6 +59,34 @@ export interface CampaignCheckpoint {
   points: number;
   label?: string;
   reached?: boolean;
+  waveId?: string;
+  speed?: number;
+  travelSign?: number;
+  spawnCoord?: number;
+  spawnTime?: number;
+}
+
+export interface CampaignWaveGateSpec {
+  id: string;
+  order: number;
+  start: number;
+  end: number;
+  points: number;
+  label?: string;
+}
+
+export interface CampaignWaveSpec {
+  id: string;
+  order: number;
+  delayAfterPrev: number;
+  side: 'north' | 'south' | 'east' | 'west';
+  patternType: CampaignPatternType;
+  speed: number;
+  gapCenter: number;
+  gapSize: number;
+  barThickness?: number;
+  color?: string;
+  attachedGates: CampaignWaveGateSpec[];
 }
 
 export interface CampaignObstacleSpec {
@@ -77,6 +113,7 @@ export interface CampaignLevelConfig {
   spawn: { x: number; y: number };
   clearBonusPoints: number;
   parTimeSeconds: number;
+  waves: CampaignWaveSpec[];
   obstacles: CampaignObstacleSpec[];
   checkpoints: CampaignCheckpoint[];
 }
