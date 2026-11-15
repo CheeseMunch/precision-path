@@ -217,8 +217,8 @@ class SoundSystem {
     // Stop background music immediately right before "GAME!" plays
     this.stopMusic();
     if (!this.enabled) return;
-    // Play the announcer "GAME!" voice effect when the game ends (lowered to 82%)
-    this.playClip(this.gameAudio, 0.82);
+    // Play the announcer "GAME!" voice effect when the game ends (lowered to 74%)
+    this.playClip(this.gameAudio, 0.74);
   }
 
   public playVictory() {
