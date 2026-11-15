@@ -8,6 +8,7 @@ class SoundSystem {
   private readyAudio: HTMLAudioElement | null = null;
   private goAudio: HTMLAudioElement | null = null;
   private gameAudio: HTMLAudioElement | null = null;
+  private failureAudio: HTMLAudioElement | null = null;
   private bgmAudio: HTMLAudioElement | null = null;
   private musicActive: boolean = false;
   private musicPaused: boolean = false;
@@ -26,6 +27,8 @@ class SoundSystem {
       this.goAudio.preload = 'auto';
       this.gameAudio = new Audio('/sounds/game.mp3');
       this.gameAudio.preload = 'auto';
+      this.failureAudio = new Audio('/sounds/failure.mp3');
+      this.failureAudio.preload = 'auto';
       this.bgmAudio = new Audio('/sounds/bgm.mp3');
       this.bgmAudio.preload = 'auto';
       this.bgmAudio.loop = true;
@@ -195,11 +198,17 @@ class SoundSystem {
     }
   }
 
+  public playFailure() {
+    if (!this.enabled) return;
+    // Play the announcer "Failure..." voice effect when a player is eliminated in multiplayer
+    this.playClip(this.failureAudio);
+  }
+
   public playCollision() {
     // Stop background music immediately right before "GAME!" plays
     this.stopMusic();
     if (!this.enabled) return;
-    // Play the announcer "GAME!" voice effect when you lose
+    // Play the announcer "GAME!" voice effect when the game ends
     this.playClip(this.gameAudio);
   }
 

@@ -246,6 +246,21 @@ export class GameEngine {
     }
   }
 
+  public returnToWaitingRoom() {
+    this.stop();
+    this.resetGame();
+    this.state.status = 'lobby';
+    for (const id in this.state.players) {
+      const p = this.state.players[id];
+      p.alive = true;
+      p.x = 0;
+      p.y = 0;
+    }
+    if (this.onStateUpdateCallback) {
+      this.onStateUpdateCallback(this.state);
+    }
+  }
+
   public startCountdown() {
     this.stop();
     this.resetGame();
@@ -1102,18 +1117,12 @@ export class GameEngine {
 
     const alivePlayers = playerList.filter((p) => p.alive);
 
-    if (playerList.length > 1) {
-      if (alivePlayers.length === 1) {
-        this.endGame(alivePlayers[0]);
-      } else if (alivePlayers.length === 0) {
-        const longestSurvivor =
-          [...playerList].sort((a, b) => b.survivedTime - a.survivedTime)[0] || null;
-        this.endGame(longestSurvivor);
-      }
-    } else {
-      if (alivePlayers.length === 0) {
-        this.endGame(playerList[0]);
-      }
+    // Let the last remaining player in multiplayer keep playing until all players are eliminated
+    if (alivePlayers.length === 0) {
+      const longestSurvivor =
+        [...playerList].sort((a, b) => b.survivedTime - a.survivedTime || b.score - a.score)[0] ||
+        null;
+      this.endGame(longestSurvivor);
     }
   }
 

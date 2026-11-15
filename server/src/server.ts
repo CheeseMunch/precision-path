@@ -293,15 +293,23 @@ io.on('connection', (socket) => {
     socket.emit('roomLeft');
   });
 
-  // Start Game (Host only)
+  // Start Game / Play Again in persistent lobby
   socket.on('startGame', () => {
     const room = roomManager.getRoomBySocketId(socket.id);
     if (!room) return;
 
     const player = room.engine.state.players[socket.id];
-    if (player && player.isHost && room.engine.state.status !== 'playing' && room.engine.state.status !== 'countdown') {
+    if (player && room.engine.state.status !== 'playing' && room.engine.state.status !== 'countdown') {
       room.engine.startCountdown();
     }
+  });
+
+  // Return persistent room to Waiting Room lobby without remaking the room
+  socket.on('returnToWaitingRoom', () => {
+    const room = roomManager.getRoomBySocketId(socket.id);
+    if (!room) return;
+
+    room.engine.returnToWaitingRoom();
   });
 
   // Toggle Pause (ESC key or HUD button)

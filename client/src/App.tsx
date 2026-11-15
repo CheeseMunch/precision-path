@@ -115,17 +115,29 @@ export const App: React.FC = () => {
         sound.resumeMusic();
       }
 
-      // Stop music and play "GAME!" voice clip if local player was just eliminated
+      // Handle elimination & Game Over audio:
+      // - In multiplayer, if local player dies while others are still alive (or loses), play "Failure..."
+      // - When the match ends (gameover), stop music and play "GAME!"
       if (me && wasAliveRef.current && !me.alive) {
         wasAliveRef.current = false;
         setShowReadyGo(false);
-        sound.stopMusic();
-        sound.playCollision();
+
+        const isMultiplayer = playersArr.length > 1;
+        if (isMultiplayer && state.status !== 'gameover') {
+          sound.playFailure();
+        } else {
+          sound.stopMusic();
+          sound.playCollision();
+        }
       }
 
-      if (state.status === 'gameover') {
+      if (state.status === 'gameover' && lastStatusRef.current !== 'gameover') {
         sound.stopMusic();
         setShowReadyGo(false);
+        // If local player was already eliminated earlier in multiplayer, play "GAME!" when the match finally ends
+        if (!me || !wasAliveRef.current) {
+          sound.playCollision();
+        }
       }
 
       // Play victory sound if multiplayer match ends with us as winner
@@ -197,6 +209,12 @@ export const App: React.FC = () => {
   const handleStartGame = () => {
     if (!socket) return;
     socket.emit('startGame');
+  };
+
+  const handleReturnToWaitingRoom = () => {
+    if (!socket) return;
+    sound.stopMusic();
+    socket.emit('returnToWaitingRoom');
   };
 
   const handleSendInput = useCallback((input: ClientInput) => {
@@ -378,6 +396,7 @@ export const App: React.FC = () => {
               gameState={gameState}
               myPlayerId={myPlayerId}
               onPlayAgain={handleStartGame}
+              onReturnToWaitingRoom={handleReturnToWaitingRoom}
               onReturnToLobby={handleLeaveRoom}
             />
           )}

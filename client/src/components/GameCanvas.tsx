@@ -399,16 +399,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       }
 
-      // 7. Draw Players (Zero-Latency Local Prediction + Smooth Remote Interpolation)
+      // 7. Draw Players (Eliminated players disappear completely)
       const lerpAlpha = Math.min(1, frameDt * 28);
       for (const id in currentState.players) {
         const player = currentState.players[id];
+        if (!player.alive) {
+          delete remotePlayerPosRef.current[id];
+          continue;
+        }
         const isMe = id === currentMyId;
 
         let drawX = player.x;
         let drawY = player.y;
 
-        if (isMe && player.alive && localPlayerPosRef.current) {
+        if (isMe && localPlayerPosRef.current) {
           drawX = localPlayerPosRef.current.x;
           drawY = localPlayerPosRef.current.y;
         } else {
@@ -426,37 +430,25 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.save();
         ctx.translate(drawX, drawY);
 
-        if (!player.alive) {
-          // Ghost mode (Eliminated)
-          ctx.globalAlpha = 0.35;
+        // Outer circle
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+        ctx.fillStyle = player.color;
+        ctx.fill();
+
+        // Inner white core for sharp focus
+        ctx.beginPath();
+        ctx.arc(0, 0, player.radius * 0.45, 0, Math.PI * 2);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+
+        // Pulsing halo on local player
+        if (isMe) {
           ctx.beginPath();
-          ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
-          ctx.fillStyle = '#666';
-          ctx.fill();
-          ctx.strokeStyle = '#999';
-          ctx.setLineDash([4, 4]);
+          ctx.arc(0, 0, player.radius + 5 + Math.sin(pulse * 1.8) * 2, 0, Math.PI * 2);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+          ctx.lineWidth = 1.5;
           ctx.stroke();
-        } else {
-          // Outer circle
-          ctx.beginPath();
-          ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
-          ctx.fillStyle = player.color;
-          ctx.fill();
-
-          // Inner white core for sharp focus
-          ctx.beginPath();
-          ctx.arc(0, 0, player.radius * 0.45, 0, Math.PI * 2);
-          ctx.fillStyle = '#ffffff';
-          ctx.fill();
-
-          // Pulsing halo on local player
-          if (isMe) {
-            ctx.beginPath();
-            ctx.arc(0, 0, player.radius + 5 + Math.sin(pulse * 1.8) * 2, 0, Math.PI * 2);
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-          }
         }
 
         // Player Name Label ("YOU" for local player, name for others)
