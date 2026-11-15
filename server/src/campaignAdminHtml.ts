@@ -192,6 +192,8 @@ export function renderCampaignAdminPage(adminToken: string): string {
     let dragSpawn = false;
     let dragDummy = false;
     let dummyPos = { x: 0, y: 120 };
+    let ripples = [];
+    let popups = [];
     let hoverOpening = null; // { waveIdx, start, end }
 
     const canvas = document.getElementById('editorCanvas');
@@ -554,6 +556,16 @@ export function renderCampaignAdminPage(adminToken: string): string {
           const { totalDuration } = computeWaveSchedule(lvl);
           if (simTime > totalDuration) simTime = 0;
         }
+        ripples = ripples.filter((r) => {
+          r.radius += (r.maxRadius - r.radius) * Math.min(1, dt * 14);
+          r.alpha -= dt * 2.7;
+          return r.alpha > 0.02;
+        });
+        popups = popups.filter((p) => {
+          p.y -= dt * 54;
+          p.alpha -= dt * 1.35;
+          return p.alpha > 0.02;
+        });
       }
       lastRafMs = nowMs;
       updateScrubberUI();
@@ -966,6 +978,26 @@ export function renderCampaignAdminPage(adminToken: string): string {
       ctx.fillText(dummyHit ? 'HIT!' : 'DUMMY', 0, -PLAYER_RADIUS - 8);
       ctx.restore();
 
+      // Teleport ripples & popups
+      for (const r of ripples) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(0, 240, 255, ' + r.alpha + ')';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, r.radius, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      for (const p of popups) {
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, p.alpha);
+        ctx.fillStyle = p.color;
+        ctx.font = 'bold 11px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(p.text, p.x, p.y);
+        ctx.restore();
+      }
+
       ctx.restore();
     }
 
@@ -1040,7 +1072,21 @@ export function renderCampaignAdminPage(adminToken: string): string {
           renderWaveInspector();
           drawCanvas();
         }
+        return;
       }
+
+      // Click anywhere else on the map to teleport the dummy ball (same as real game)
+      const cx = Math.max(-HALF_W + PLAYER_RADIUS, Math.min(HALF_W - PLAYER_RADIUS, x));
+      const cy = Math.max(-HALF_H + PLAYER_RADIUS, Math.min(HALF_H - PLAYER_RADIUS, y));
+      const dist = Math.hypot(cx - dummyPos.x, cy - dummyPos.y);
+      dummyPos.x = cx;
+      dummyPos.y = cy;
+      dragDummy = true;
+      if (dist > 38) {
+        ripples.push({ x: cx, y: cy, radius: 8, maxRadius: 34, alpha: 0.9 });
+        popups.push({ x: cx, y: cy - 22, text: 'TELEPORT', color: '#00f0ff', alpha: 0.9 });
+      }
+      drawCanvas();
     });
 
     canvas.addEventListener('pointermove', (e) => {
