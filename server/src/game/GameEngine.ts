@@ -14,8 +14,12 @@ export class GameEngine {
     coord: number;
     speed: number;
     tier: GameTier;
-    resolvedPlayers: Set<string>;
-    teleportedPlayers: Set<string>;
+    gates: Array<{
+      start: number;
+      end: number;
+      scoredPlayers: Set<string>;
+    }>;
+    lastPlayerRel: Map<string, number>;
   }> = [];
   private tickRate = GAME_CONFIG.engine.serverTickRate;
   private obstacleSpawnTimer = 0;
@@ -179,26 +183,52 @@ export class GameEngine {
     const jumpDist = Math.hypot(newX - oldX, newY - oldY);
     const didTeleport = Boolean(input.isTeleport) || jumpDist > 52;
 
-    if (didTeleport && this.state.status === 'playing') {
-      // Any gate wave that the player teleports over (or lands directly on) yields 0 points
+    player.x = newX;
+    player.y = newY;
+
+    if (this.state.status === 'playing') {
+      // Check immediate collision at new position before evaluating gate crossings
+      for (const obs of this.state.obstacles) {
+        if (this.isColliding(player, obs)) {
+          player.alive = false;
+          this.checkPlayerStatus();
+          return;
+        }
+      }
+
       for (const wave of this.gateWaves) {
-        if (wave.resolvedPlayers.has(playerId)) continue;
         const oldCoord = wave.isVertical ? oldY : oldX;
         const newCoord = wave.isVertical ? newY : newX;
+        const prevRel =
+          wave.lastPlayerRel.get(playerId) ?? (oldCoord - wave.coord) * wave.travelSign;
+        const currRel = (newCoord - wave.coord) * wave.travelSign;
 
-        const relOld = (oldCoord - wave.coord) * wave.travelSign;
-        const relNew = (newCoord - wave.coord) * wave.travelSign;
+        if (didTeleport) {
+          // Teleporting across or right onto a wave plane awards 0 points; sync relative side
+          if (Math.abs(currRel) < 28) {
+            wave.lastPlayerRel.set(playerId, prevRel > 0 ? -1 : 1);
+          } else {
+            wave.lastPlayerRel.set(playerId, currRel);
+          }
+        } else {
+          const crossedForward = prevRel > 0 && currRel <= 0;
+          const crossedBackward = prevRel < 0 && currRel >= 0;
 
-        // If player jumped across the gate wave plane or teleported right onto it
-        if ((relOld >= -18 && relNew <= 28) || Math.abs(newCoord - wave.coord) < 38) {
-          wave.teleportedPlayers.add(playerId);
-          wave.resolvedPlayers.add(playerId);
+          if (crossedForward || crossedBackward) {
+            const denom = Math.abs(prevRel - currRel);
+            const t = denom > 0.0001 ? Math.abs(prevRel) / denom : 0.5;
+            const oldLat = wave.isVertical ? oldX : oldY;
+            const newLat = wave.isVertical ? newX : newY;
+            const crossLat = oldLat + (newLat - oldLat) * t;
+
+            this.scoreGateOpeningAt(wave, player, crossLat);
+            wave.lastPlayerRel.set(playerId, currRel === 0 ? (prevRel > 0 ? -0.01 : 0.01) : currRel);
+          } else {
+            wave.lastPlayerRel.set(playerId, currRel);
+          }
         }
       }
     }
-
-    player.x = newX;
-    player.y = newY;
   }
 
   public togglePause(playerId: string) {
@@ -553,22 +583,6 @@ export class GameEngine {
 
     const barThickness = GAME_CONFIG.obstacles.barThickness;
 
-    // Register this wave for gate-passage scoring (0 points if player teleports over it)
-    const halfBound = isVerticalTravel ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
-    const spawnDist = halfBound + GAME_CONFIG.obstacles.spawnDistanceOffset;
-    const travelSign = direction === 'north' || direction === 'west' ? 1 : -1;
-    this.gateWaves.push({
-      id: crypto.randomUUID(),
-      direction,
-      isVertical: isVerticalTravel,
-      travelSign,
-      coord: -travelSign * spawnDist,
-      speed: safeSpeed,
-      tier,
-      resolvedPlayers: new Set(),
-      teleportedPlayers: new Set(),
-    });
-
     const dirColors: Record<string, string> = {
       north: '#ff2a6d', // Neon Crimson
       south: '#ff7700', // Neon Amber
@@ -585,6 +599,7 @@ export class GameEngine {
           [{ start: gapCenter - gapSize / 2, end: gapCenter + gapSize / 2 }],
           barThickness,
           safeSpeed,
+          tier,
           color
         );
         break;
@@ -609,6 +624,7 @@ export class GameEngine {
           gaps,
           barThickness,
           safeSpeed,
+          tier,
           color
         );
         break;
@@ -625,6 +641,7 @@ export class GameEngine {
           [{ start: openStart, end: openEnd }],
           barThickness + 2,
           safeSpeed,
+          tier,
           color
         );
         break;
@@ -644,6 +661,7 @@ export class GameEngine {
           ],
           barThickness + 2,
           safeSpeed,
+          tier,
           color
         );
         break;
@@ -654,12 +672,14 @@ export class GameEngine {
         const orbRadius = 12;
         const orbCount = isVerticalTravel ? 4 : 5;
         const usableHalf = lateralHalfSpan - 28;
+        const spawnedOrbs: number[] = [];
         for (let i = 0; i < orbCount; i++) {
           const orbLat = -usableHalf + (i / (orbCount - 1)) * (usableHalf * 2);
           // Skip any orb that falls inside the guaranteed safe opening
           if (Math.abs(orbLat - gapCenter) < gapSize * 0.6 + orbRadius) {
             continue;
           }
+          spawnedOrbs.push(orbLat);
           this.addLocalCircleObstacle(
             direction,
             orbLat,
@@ -670,9 +690,65 @@ export class GameEngine {
             '#ffea00'
           );
         }
+
+        // Compute the open intervals between orbs so each opening can be scored independently
+        const orbGaps: Array<{ start: number; end: number }> = [];
+        let cursor = -lateralHalfSpan;
+        for (const lat of spawnedOrbs.sort((a, b) => a - b)) {
+          const gapEnd = lat - orbRadius;
+          if (gapEnd - cursor >= 24) {
+            orbGaps.push({ start: cursor, end: gapEnd });
+          }
+          cursor = lat + orbRadius;
+        }
+        if (lateralHalfSpan - cursor >= 24) {
+          orbGaps.push({ start: cursor, end: lateralHalfSpan });
+        }
+        this.registerGateWave(direction, safeSpeed, tier, orbGaps);
         break;
       }
     }
+  }
+
+  /**
+   * Registers a gate wave with all of its individual navigable openings so passing through
+   * multiple openings on the same line (e.g. going through Gate 1 and back through Gate 2)
+   * awards +100 points for each opening.
+   */
+  private registerGateWave(
+    direction: ObstacleDirection,
+    speed: number,
+    tier: GameTier,
+    gaps: Array<{ start: number; end: number }>
+  ) {
+    const isVerticalTravel = direction === 'north' || direction === 'south';
+    const halfBound = isVerticalTravel ? this.ARENA_HEIGHT / 2 : this.ARENA_WIDTH / 2;
+    const spawnDist = halfBound + GAME_CONFIG.obstacles.spawnDistanceOffset;
+    const travelSign = direction === 'north' || direction === 'west' ? 1 : -1;
+    const startCoord = -travelSign * spawnDist;
+
+    const lastPlayerRel = new Map<string, number>();
+    for (const id in this.state.players) {
+      const p = this.state.players[id];
+      const pCoord = isVerticalTravel ? p.y : p.x;
+      lastPlayerRel.set(id, (pCoord - startCoord) * travelSign);
+    }
+
+    this.gateWaves.push({
+      id: crypto.randomUUID(),
+      direction,
+      isVertical: isVerticalTravel,
+      travelSign,
+      coord: startCoord,
+      speed,
+      tier,
+      gates: gaps.map((g) => ({
+        start: g.start,
+        end: g.end,
+        scoredPlayers: new Set<string>(),
+      })),
+      lastPlayerRel,
+    });
   }
 
   /**
@@ -686,6 +762,7 @@ export class GameEngine {
     rawGaps: Array<{ start: number; end: number }>,
     thickness: number,
     speed: number,
+    tier: GameTier,
     color: string
   ) {
     // Normalize and clamp gaps to [-lateralHalfSpan, +lateralHalfSpan]
@@ -733,6 +810,9 @@ export class GameEngine {
       const segCenter = cursor + tailLength / 2;
       this.addLocalRectObstacle(direction, segCenter, 0, tailLength, thickness, speed, 0, color);
     }
+
+    // Register all merged gap openings for independent per-gate scoring
+    this.registerGateWave(direction, speed, tier, mergedGaps);
   }
 
   /**
@@ -909,8 +989,39 @@ export class GameEngine {
   }
 
   /**
-   * Advances gate wave planes and awards +100 points to any alive player who navigated
-   * through the gate without teleporting over it.
+   * Credits +100 points for the specific gate opening at `lateralCoord` if the player
+   * has not already scored that specific gate opening on this wave line.
+   */
+  private scoreGateOpeningAt(
+    wave: (typeof this.gateWaves)[number],
+    player: Player,
+    lateralCoord: number
+  ) {
+    let matchedGate: (typeof wave.gates)[number] | null = null;
+    let bestDist = Infinity;
+
+    for (const gate of wave.gates) {
+      if (lateralCoord >= gate.start - 16 && lateralCoord <= gate.end + 16) {
+        matchedGate = gate;
+        break;
+      }
+      const dist = Math.min(Math.abs(lateralCoord - gate.start), Math.abs(lateralCoord - gate.end));
+      if (dist < bestDist && dist <= 40) {
+        bestDist = dist;
+        matchedGate = gate;
+      }
+    }
+
+    if (matchedGate && !matchedGate.scoredPlayers.has(player.id)) {
+      matchedGate.scoredPlayers.add(player.id);
+      player.score += 100;
+      player.gatesCleared = (player.gatesCleared || 0) + 1;
+    }
+  }
+
+  /**
+   * Advances gate wave planes and awards +100 points per individual gate opening crossed
+   * (supporting going through Gate 1 and looping back through Gate 2 on the same wave line).
    */
   private updateGateWaves(dt: number) {
     const despawnLimitX = this.ARENA_WIDTH / 2 + 90;
@@ -922,18 +1033,21 @@ export class GameEngine {
 
       for (const id in this.state.players) {
         const p = this.state.players[id];
-        if (!p.alive || wave.resolvedPlayers.has(id)) continue;
+        if (!p.alive) continue;
 
         const playerCoord = wave.isVertical ? p.y : p.x;
-        const rel = (playerCoord - wave.coord) * wave.travelSign;
+        const currRel = (playerCoord - wave.coord) * wave.travelSign;
+        const prevRel = wave.lastPlayerRel.get(id) ?? currRel;
 
-        // Wave plane has passed the player's center without killing them
-        if (rel <= 0) {
-          wave.resolvedPlayers.add(id);
-          if (!wave.teleportedPlayers.has(id)) {
-            p.score += 100;
-            p.gatesCleared = (p.gatesCleared || 0) + 1;
-          }
+        const crossedForward = prevRel > 0 && currRel <= 0;
+        const crossedBackward = prevRel < 0 && currRel >= 0;
+
+        if (crossedForward || crossedBackward) {
+          const lateralCoord = wave.isVertical ? p.x : p.y;
+          this.scoreGateOpeningAt(wave, p, lateralCoord);
+          wave.lastPlayerRel.set(id, currRel === 0 ? (prevRel > 0 ? -0.01 : 0.01) : currRel);
+        } else {
+          wave.lastPlayerRel.set(id, currRel);
         }
       }
 
