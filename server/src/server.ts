@@ -470,9 +470,6 @@ app.get('/db-admin', (req, res) => {
             ⬆ Import JSON
             <input type="file" accept=".json" onchange="importConfigJson(event)" class="hidden" />
           </label>
-          <button onclick="resetConfig()" class="px-4 py-2.5 bg-red-950/60 hover:bg-red-900/60 border border-red-500/40 text-red-300 font-bold rounded-lg text-xs uppercase tracking-wider transition">
-            ↺ Reset Defaults
-          </button>
         </div>
       </div>
 

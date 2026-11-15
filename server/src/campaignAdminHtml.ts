@@ -41,9 +41,6 @@ export function renderCampaignAdminPage(adminToken: string): string {
         <a href="/db-admin" class="px-3 py-2 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold rounded-lg text-xs uppercase tracking-wider border border-gray-700 transition">
           &larr; DB &amp; Endless Admin
         </a>
-        <button onclick="resetCampaignConfig()" class="px-3 py-2 bg-rose-950/70 hover:bg-rose-900 text-rose-200 font-bold rounded-lg text-xs uppercase tracking-wider border border-rose-500/40 transition">
-          Reset Defaults
-        </button>
         <button onclick="saveCampaignConfig()" class="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-black rounded-lg text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/20 transition">
           Save All Levels
         </button>
