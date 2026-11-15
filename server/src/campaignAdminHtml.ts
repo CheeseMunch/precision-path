@@ -561,7 +561,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
         levelNumber: nextNum,
         name: 'Level ' + nextNum + ' Sector',
         storyName: (curLevel() && curLevel().storyName) ? curLevel().storyName : 'Story 1',
-        description: 'Custom wave sequence',
+        description: '',
         spawn: { x: 0, y: 120 },
         clearBonusPoints: 500,
         parTimeSeconds: 20,
@@ -799,7 +799,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
         levelNumber: nextNum,
         name: 'Level ' + nextNum + ' Sector',
         storyName: targetName,
-        description: 'Custom wave sequence',
+        description: '',
         spawn: { x: 0, y: 120 },
         clearBonusPoints: 500,
         parTimeSeconds: 20,
@@ -1070,7 +1070,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
       patterns.push({
         id: 'pattern-' + Date.now(),
         name: 'Custom Pattern ' + nextNum,
-        description: 'Reusable wave combo',
+        description: '',
         waves: [
           {
             id: 'pw-' + Date.now(),
