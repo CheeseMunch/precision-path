@@ -332,11 +332,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
 
         const pulse = 0.5 + 0.5 * Math.sin(now * 0.006);
+        const firstActiveGate = ordered.find((c) => !c.reached && c.order === activeOrder);
+        const activeGateId = firstActiveGate ? firstActiveGate.id : null;
         ordered.forEach((cp) => {
           if (cp.waveId && cp.spawnTime === undefined) return; // Wave not spawned yet
           const coordVal = getGateCoord(cp);
           const isCleared = Boolean(cp.reached);
-          const isCurrent = !isCleared && cp.order === activeOrder;
+          const isCurrent = !isCleared && cp.id === activeGateId;
           const x1 = cp.axis === 'horizontal' ? cp.start : coordVal;
           const y1 = cp.axis === 'horizontal' ? coordVal : cp.start;
           const x2 = cp.axis === 'horizontal' ? cp.end : coordVal;
@@ -345,6 +347,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
           ctx.save();
           if (isCleared) {
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
             ctx.strokeStyle = 'rgba(16, 185, 129, 0.35)';
             ctx.lineWidth = 2;
           } else if (isCurrent) {
@@ -353,6 +357,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             ctx.strokeStyle = `rgba(52, 211, 153, ${0.75 + pulse * 0.25})`;
             ctx.lineWidth = 4.5;
           } else {
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
             ctx.strokeStyle = 'rgba(148, 163, 184, 0.4)';
             ctx.lineWidth = 2;
             ctx.setLineDash([6, 5]);

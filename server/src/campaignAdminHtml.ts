@@ -273,6 +273,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
     let dummyPos = { x: 0, y: 120 };
     let ripples = [];
     let popups = [];
+    let clearedPreviewGateIds = new Set();
     let hoverOpening = null; // { waveIdx, start, end }
 
     const canvas = document.getElementById('editorCanvas');
@@ -906,6 +907,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
       isPlaying = false;
       simTime = 0;
       lastRafMs = null;
+      clearedPreviewGateIds.clear();
       const lvl = activeContainer();
       dummyPos = (lvl && lvl.spawn) ? { x: lvl.spawn.x, y: lvl.spawn.y } : { x: 0, y: 120 };
       document.getElementById('btnPlayPause').innerHTML = '&#9654; Play';
@@ -937,7 +939,10 @@ export function renderCampaignAdminPage(adminToken: string): string {
         const lvl = activeContainer();
         if (lvl) {
           const { totalDuration } = computeWaveSchedule(lvl);
-          if (simTime > totalDuration) simTime = 0;
+          if (simTime > totalDuration) {
+            simTime = 0;
+            clearedPreviewGateIds.clear();
+          }
         }
         ripples = ripples.filter((r) => {
           r.radius += (r.maxRadius - r.radius) * Math.min(1, dt * 14);
@@ -1320,6 +1325,41 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
       const { items } = computeWaveSchedule(lvl);
       const selWave = lvl.waves && lvl.waves[selectedWaveIdx];
+
+      const getActivePreviewGateId = () => {
+        const upcomingGates = [];
+        for (const it of items) {
+          if (simTime > it.spawnAt + it.duration) continue;
+          for (const g of (it.wave.attachedGates || [])) {
+            if (!clearedPreviewGateIds.has(g.id)) upcomingGates.push(g);
+          }
+        }
+        upcomingGates.sort((a, b) => Number(a.order) - Number(b.order));
+        return upcomingGates.length ? upcomingGates[0].id : null;
+      };
+
+      // Sequential dummy-ball gate clearing (matches GameEngine.ts active gate progression)
+      let activeGateId = getActivePreviewGateId();
+      if (activeGateId) {
+        for (const item of items) {
+          const tSince = simTime - item.spawnAt;
+          if (tSince < 0 || tSince > item.duration) continue;
+          const w = item.wave;
+          const activeGate = (w.attachedGates || []).find((g) => g.id === activeGateId);
+          if (!activeGate) continue;
+          const geom = computeWaveGeometry(w, tSince);
+          const coordVal = geom.isVert ? dummyPos.y : dummyPos.x;
+          const perpVal = geom.isVert ? dummyPos.x : dummyPos.y;
+          const minSpan = Math.min(activeGate.start, activeGate.end);
+          const maxSpan = Math.max(activeGate.start, activeGate.end);
+          if (Math.abs(coordVal - geom.coord) <= PLAYER_RADIUS + 4 && perpVal >= minSpan && perpVal <= maxSpan) {
+            clearedPreviewGateIds.add(activeGate.id);
+            popups.push({ x: dummyPos.x, y: dummyPos.y - 24, text: '+' + (activeGate.points || 200), color: '#34d399', alpha: 1 });
+            activeGateId = getActivePreviewGateId();
+          }
+        }
+      }
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() * 0.006);
       for (const item of items) {
         const tSince = simTime - item.spawnAt;
         if (tSince < 0 || tSince > item.duration) continue;
@@ -1391,19 +1431,50 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
           ctx.save();
           if (attached) {
-            ctx.strokeStyle = isHov ? '#ffffff' : '#34d399';
-            ctx.shadowColor = '#10b981';
-            ctx.shadowBlur = 14;
-            ctx.lineWidth = 4.5;
-            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            const isCleared = clearedPreviewGateIds.has(attached.id);
+            const isCurrent = !isCleared && attached.id === activeGateId;
 
+            if (isCleared) {
+              ctx.shadowColor = 'transparent';
+              ctx.shadowBlur = 0;
+              ctx.strokeStyle = isHov ? '#ffffff' : 'rgba(16, 185, 129, 0.35)';
+              ctx.lineWidth = 2;
+            } else if (isCurrent) {
+              ctx.shadowColor = '#10b981';
+              ctx.shadowBlur = 16 + pulse * 10;
+              ctx.strokeStyle = isHov ? '#ffffff' : 'rgba(52, 211, 153, ' + (0.75 + pulse * 0.25) + ')';
+              ctx.lineWidth = 4.5;
+            } else {
+              ctx.shadowColor = 'transparent';
+              ctx.shadowBlur = 0;
+              ctx.strokeStyle = isHov ? '#ffffff' : 'rgba(148, 163, 184, 0.4)';
+              ctx.lineWidth = 2;
+              ctx.setLineDash([6, 5]);
+            }
+
+            ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+            ctx.setLineDash([]);
+
+            // Gate end-posts
+            ctx.fillStyle = isCleared ? 'rgba(16, 185, 129, 0.45)' : isCurrent ? '#6ee7b7' : 'rgba(148, 163, 184, 0.5)';
+            ctx.beginPath(); ctx.arc(x1, y1, isCurrent ? 4.5 : 3, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(x2, y2, isCurrent ? 4.5 : 3, 0, Math.PI * 2); ctx.fill();
+
+            // Gate Number badge
             ctx.shadowBlur = 0;
-            ctx.beginPath(); ctx.arc(midX, midY, 12, 0, Math.PI * 2);
-            ctx.fillStyle = '#065f46'; ctx.fill();
-            ctx.lineWidth = 2; ctx.strokeStyle = '#34d399'; ctx.stroke();
-            ctx.fillStyle = '#ffffff'; ctx.font = 'bold 11px monospace';
+            ctx.beginPath(); ctx.arc(midX, midY, isCurrent ? 13 : 11, 0, Math.PI * 2);
+            ctx.fillStyle = isCleared ? 'rgba(6, 78, 59, 0.7)' : isCurrent ? '#065f46' : 'rgba(15, 23, 42, 0.85)';
+            ctx.fill();
+            ctx.lineWidth = isCurrent ? 2.5 : 1.5;
+            ctx.strokeStyle = isCleared ? 'rgba(16, 185, 129, 0.5)' : isCurrent ? '#34d399' : 'rgba(148, 163, 184, 0.45)';
+            ctx.stroke();
+
+            ctx.fillStyle = isCleared ? 'rgba(110, 231, 183, 0.85)' : '#ffe600';
+            ctx.shadowColor = isCleared ? 'transparent' : '#ffe600';
+            ctx.shadowBlur = isCleared ? 0 : isCurrent ? 10 : 5;
+            ctx.font = 'bold 12px Orbitron, monospace';
             ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-            ctx.fillText(String(attached.order), midX, midY);
+            ctx.fillText(isCleared ? '\u2713' : String(attached.order), midX, midY);
           } else {
             ctx.strokeStyle = isHov ? '#6ee7b7' : 'rgba(52, 211, 153, 0.32)';
             ctx.lineWidth = isHov ? 4 : 2;

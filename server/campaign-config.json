@@ -133,36 +133,28 @@
           "barThickness": 18,
           "attachedGates": [
             {
-              "id": "gate-1794760636846",
+              "id": "gate-1794760676379",
               "order": 6,
               "start": -185,
-              "end": 185,
+              "end": -78,
               "points": 200,
               "label": "GATE 6"
             },
             {
-              "id": "gate-1794760676379",
+              "id": "gate-1794760677189",
               "order": 7,
-              "start": -185,
-              "end": -78,
+              "start": -54,
+              "end": 54,
               "points": 200,
               "label": "GATE 7"
             },
             {
-              "id": "gate-1794760677189",
-              "order": 8,
-              "start": -54,
-              "end": 54,
-              "points": 200,
-              "label": "GATE 8"
-            },
-            {
               "id": "gate-1794760678677",
-              "order": 9,
+              "order": 8,
               "start": 78,
               "end": 185,
               "points": 200,
-              "label": "GATE 9"
+              "label": "GATE 8"
             }
           ]
         }
@@ -171,132 +163,93 @@
       "obstacles": []
     },
     {
-      "id": "level-2",
+      "id": "level-1794762955641",
       "levelNumber": 2,
-      "name": "Spinner Gauntlet",
-      "description": "Cross dual-opening barriers, dodge incoming orbs and spinners, and hit every numbered gate.",
+      "name": "Level 2 Sector",
+      "description": "Custom wave sequence",
       "spawn": {
         "x": 0,
-        "y": 150
+        "y": 120
       },
-      "clearBonusPoints": 750,
-      "parTimeSeconds": 24,
+      "clearBonusPoints": 500,
+      "parTimeSeconds": 20,
       "waves": [
         {
-          "id": "l2-w1",
+          "id": "wave-1794762969935",
           "order": 1,
-          "delayAfterPrev": 0.4,
+          "delayAfterPrev": 0.5,
           "side": "north",
-          "patternType": "double-gap-wall",
-          "speed": 195,
-          "gapCenter": -115,
-          "gapSize": 110,
+          "patternType": "orb-cluster",
+          "speed": 175,
+          "gapCenter": 0,
+          "gapSize": 60,
           "barThickness": 18,
-          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "l2-g1a",
+              "id": "gate-1794762988424",
               "order": 1,
-              "start": -170,
-              "end": -60,
-              "points": 250,
-              "label": "GATE 1L"
+              "start": -185,
+              "end": -78,
+              "points": 200,
+              "label": "GATE 1"
             },
             {
-              "id": "l2-g1b",
-              "order": 1,
-              "start": 10,
-              "end": 120,
-              "points": 250,
-              "label": "GATE 1R"
-            }
-          ]
-        },
-        {
-          "id": "l2-w2",
-          "order": 2,
-          "delayAfterPrev": 2,
-          "side": "south",
-          "patternType": "orb-cluster",
-          "speed": 185,
-          "gapCenter": 80,
-          "gapSize": 115,
-          "barThickness": 18,
-          "color": "#ffea00",
-          "attachedGates": [
-            {
-              "id": "l2-g2",
-              "order": 2,
-              "start": 10,
-              "end": 150,
-              "points": 250,
-              "label": "GATE 2"
-            }
-          ]
-        },
-        {
-          "id": "l2-w3",
-          "order": 3,
-          "delayAfterPrev": 2.1,
-          "side": "west",
-          "patternType": "diagonal-spinner",
-          "speed": 170,
-          "gapCenter": 0,
-          "gapSize": 120,
-          "barThickness": 16,
-          "color": "#b800ff",
-          "attachedGates": [
-            {
-              "id": "l2-g3",
-              "order": 3,
-              "start": 88,
-              "end": 400,
-              "points": 250,
-              "label": "GATE 3"
-            }
-          ]
-        },
-        {
-          "id": "l2-w4",
-          "order": 4,
-          "delayAfterPrev": 2.2,
-          "side": "north",
-          "patternType": "staggered-blocks",
-          "speed": 215,
-          "gapCenter": -40,
-          "gapSize": 110,
-          "barThickness": 20,
-          "color": "#05d5fa",
-          "attachedGates": [
-            {
-              "id": "l2-g4",
+              "id": "gate-1794763020617",
               "order": 4,
-              "start": -95,
-              "end": 15,
-              "points": 250,
+              "start": 78,
+              "end": 185,
+              "points": 200,
               "label": "GATE 4"
             }
           ]
         },
         {
-          "id": "l2-w5",
-          "order": 5,
-          "delayAfterPrev": 2.2,
-          "side": "east",
-          "patternType": "single-gap-wall",
-          "speed": 200,
-          "gapCenter": -120,
-          "gapSize": 115,
+          "id": "wave-1794762980555",
+          "order": 2,
+          "delayAfterPrev": 0.5,
+          "side": "north",
+          "patternType": "orb-cluster",
+          "speed": 175,
+          "gapCenter": 0,
+          "gapSize": 60,
           "barThickness": 18,
-          "color": "#ff7700",
           "attachedGates": [
             {
-              "id": "l2-g5",
+              "id": "gate-1794763024140",
               "order": 5,
-              "start": -178,
-              "end": -62,
-              "points": 400,
-              "label": "FINISH"
+              "start": -54,
+              "end": 54,
+              "points": 200,
+              "label": "GATE 5"
+            }
+          ]
+        },
+        {
+          "id": "wave-1794762981627",
+          "order": 3,
+          "delayAfterPrev": 0.5,
+          "side": "north",
+          "patternType": "orb-cluster",
+          "speed": 175,
+          "gapCenter": 0,
+          "gapSize": 60,
+          "barThickness": 18,
+          "attachedGates": [
+            {
+              "id": "gate-1794763013127",
+              "order": 2,
+              "start": -185,
+              "end": -78,
+              "points": 200,
+              "label": "GATE 2"
+            },
+            {
+              "id": "gate-1794763020103",
+              "order": 3,
+              "start": 78,
+              "end": 185,
+              "points": 200,
+              "label": "GATE 3"
             }
           ]
         }
@@ -304,5 +257,6 @@
       "checkpoints": [],
       "obstacles": []
     }
-  ]
+  ],
+  "patterns": []
 }
