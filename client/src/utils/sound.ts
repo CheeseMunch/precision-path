@@ -87,11 +87,11 @@ class SoundSystem {
     }
   }
 
-  private playClip(audio: HTMLAudioElement | null) {
+  private playClip(audio: HTMLAudioElement | null, scale: number = 1) {
     if (!this.enabled || this.volume <= 0 || !audio) return;
     try {
       audio.currentTime = 0;
-      audio.volume = Math.min(1, this.baseSfxVolume * this.volume);
+      audio.volume = Math.min(1, this.baseSfxVolume * this.volume * scale);
       audio.play().catch(() => {});
     } catch {
       // Ignore autoplay errors before user gesture
@@ -217,8 +217,8 @@ class SoundSystem {
     // Stop background music immediately right before "GAME!" plays
     this.stopMusic();
     if (!this.enabled) return;
-    // Play the announcer "GAME!" voice effect when the game ends
-    this.playClip(this.gameAudio);
+    // Play the announcer "GAME!" voice effect when the game ends (slightly lowered by ~8%)
+    this.playClip(this.gameAudio, 0.92);
   }
 
   public playVictory() {
