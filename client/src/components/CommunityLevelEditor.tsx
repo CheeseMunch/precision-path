@@ -242,6 +242,8 @@ export const CommunityLevelEditor: React.FC<CommunityLevelEditorProps> = ({
   simTimeRef.current = simTime;
   const isPlayingRef = useRef(isPlaying);
   isPlayingRef.current = isPlaying;
+  const selectedWaveIdxRef = useRef(selectedWaveIdx);
+  selectedWaveIdxRef.current = selectedWaveIdx;
 
   const dummyPosRef = useRef({ x: 0, y: 120 });
   const dragSpawnRef = useRef(false);
@@ -310,28 +312,50 @@ export const CommunityLevelEditor: React.FC<CommunityLevelEditorProps> = ({
           // Active waves
           let dummyHit = false;
           const dPos = dummyPosRef.current;
+          const selWave = cur.waves && cur.waves[selectedWaveIdxRef.current];
           for (const item of sched.items) {
             if (t < item.spawnAt || t > item.spawnAt + item.duration) continue;
-            const geom = computeWaveGeometry(item.wave, t - item.spawnAt);
+            const w = item.wave;
+            const isSelWave = Boolean(selWave && w.id === selWave.id);
+            const geom = computeWaveGeometry(w, t - item.spawnAt);
+
+            ctx.save();
+            ctx.globalAlpha = selWave ? (isSelWave ? 1.0 : 0.42) : 1.0;
+            ctx.fillStyle = geom.color;
+            ctx.shadowColor = isSelWave ? '#ffffff' : geom.color;
+            ctx.shadowBlur = isSelWave ? 18 : 8;
 
             for (const r of geom.rects) {
               ctx.save();
               ctx.translate(r.x, r.y);
               if (r.rot) ctx.rotate(r.rot);
-              ctx.fillStyle = geom.color;
-              ctx.strokeStyle = 'rgba(255,255,255,0.35)';
-              ctx.lineWidth = 1;
               if (r.isOrb) {
                 ctx.beginPath();
                 ctx.arc(0, 0, r.w / 2, 0, Math.PI * 2);
                 ctx.fill();
-                ctx.stroke();
+                if (isSelWave) {
+                  ctx.strokeStyle = '#ffffff';
+                  ctx.lineWidth = 3;
+                  ctx.stroke();
+                } else {
+                  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+                  ctx.lineWidth = 1;
+                  ctx.stroke();
+                }
                 if (Math.hypot(dPos.x - r.x, dPos.y - r.y) < HITBOX_RADIUS + r.w / 2) dummyHit = true;
               } else {
                 ctx.beginPath();
                 ctx.roundRect(-r.w / 2, -r.h / 2, r.w, r.h, 3);
                 ctx.fill();
-                ctx.stroke();
+                if (isSelWave) {
+                  ctx.strokeStyle = '#ffffff';
+                  ctx.lineWidth = 3;
+                  ctx.strokeRect(-r.w / 2 - 1, -r.h / 2 - 1, r.w + 2, r.h + 2);
+                } else {
+                  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+                  ctx.lineWidth = 1;
+                  ctx.stroke();
+                }
                 let px = dPos.x - r.x;
                 let py = dPos.y - r.y;
                 if (r.rot) {
@@ -348,6 +372,28 @@ export const CommunityLevelEditor: React.FC<CommunityLevelEditorProps> = ({
               }
               ctx.restore();
             }
+
+            if (isSelWave) {
+              const anchor = geom.rects[0];
+              if (anchor) {
+                ctx.shadowBlur = 0;
+                const lx = Math.max(-HALF_W + 42, Math.min(HALF_W - 42, anchor.x));
+                const ly = anchor.y - 22;
+                ctx.fillStyle = '#0f172a';
+                ctx.strokeStyle = '#22d3ee';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.roundRect(lx - 34, ly - 10, 68, 18, 4);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 10px monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`WAVE #${w.order}`, lx, ly - 1);
+              }
+            }
+            ctx.restore();
 
             // Hover highlight on opening
             const hov = hoverOpeningRef.current;
@@ -543,6 +589,20 @@ export const CommunityLevelEditor: React.FC<CommunityLevelEditorProps> = ({
   const handleCanvasPointerUp = () => {
     dragDummyRef.current = false;
     dragSpawnRef.current = false;
+  };
+
+  const jumpToWave = (waveId: string) => {
+    const item = schedule.items.find((it) => it.wave.id === waveId);
+    if (!item) return;
+    const w = item.wave;
+    const isVert = w.side === 'north' || w.side === 'south';
+    const halfBound = isVert ? HALF_H : HALF_W;
+    const centerOffset = (halfBound + SPAWN_OFFSET) / Math.max(40, Number(w.speed || 175));
+    setIsPlaying(false);
+    isPlayingRef.current = false;
+    const jumpT = item.spawnAt + centerOffset;
+    setSimTime(jumpT);
+    simTimeRef.current = jumpT;
   };
 
   const addWave = () => {
@@ -878,12 +938,7 @@ export const CommunityLevelEditor: React.FC<CommunityLevelEditorProps> = ({
                         key={w.id}
                         onClick={() => {
                           setSelectedWaveIdx(origIdx);
-                          const item = schedule.items.find((it) => it.wave.id === w.id);
-                          if (item) {
-                            const jumpT = item.spawnAt + 0.5;
-                            setSimTime(jumpT);
-                            simTimeRef.current = jumpT;
-                          }
+                          jumpToWave(w.id);
                         }}
                         className={`flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs cursor-pointer border ${
                           isSel
