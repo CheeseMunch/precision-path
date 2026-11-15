@@ -1,4 +1,4 @@
-import type { GameTier } from './types.js';
+import type { GameTier, ObstacleDirection } from './types.js';
 
 export type ObstaclePatternType =
   | 'single-gap-wall'
@@ -7,6 +7,20 @@ export type ObstaclePatternType =
   | 'staggered-blocks'
   | 'orb-cluster'
   | 'diagonal-spinner';
+
+export type RoundDirectionMode =
+  | 'custom'
+  | 'random-axis-round'
+  | 'random-axis-wave'
+  | 'random-vertical'
+  | 'random-horizontal'
+  | 'random-single'
+  | 'all';
+
+export interface RoundDirectionConfig {
+  mode: RoundDirectionMode;
+  directions: ObstacleDirection[];
+}
 
 export interface ObstacleTypeConfig {
   /** Whether this obstacle archetype is active in procedural generation */
@@ -65,6 +79,20 @@ export const GAME_CONFIG = {
       3: 7, // Round 3 (3 directions)
       4: 7, // Round 4 (4 directions)
     } as Record<number, number>,
+
+    /** Per-round direction configuration overrides */
+    tierDirections: {
+      1: { mode: 'custom', directions: ['north'] },
+      2: { mode: 'custom', directions: ['north', 'south'] },
+      3: { mode: 'custom', directions: ['north', 'south', 'east'] },
+      4: { mode: 'all', directions: ['north', 'south', 'east', 'west'] },
+    } as Record<number, RoundDirectionConfig>,
+
+    /** Direction configuration for Endless Mode */
+    endlessDirections: {
+      mode: 'all',
+      directions: ['north', 'south', 'east', 'west'],
+    } as RoundDirectionConfig,
 
     /** Pre-match countdown timer in seconds (1s READY.. -> GO!) */
     startCountdownDuration: 1,
@@ -274,4 +302,20 @@ export function getPreEndlessDuration(): number {
     total += getTierDuration(r);
   }
   return total;
+}
+
+/**
+ * Returns the configured directional wave settings for a given round/tier.
+ */
+export function getRoundDirectionConfig(tier: number, isEndless?: boolean): RoundDirectionConfig {
+  if (isEndless) {
+    return GAME_CONFIG.rounds.endlessDirections ?? { mode: 'all', directions: ['north', 'south', 'east', 'west'] };
+  }
+  if (GAME_CONFIG.rounds.tierDirections && GAME_CONFIG.rounds.tierDirections[tier]) {
+    return GAME_CONFIG.rounds.tierDirections[tier];
+  }
+  if (tier === 1) return { mode: 'custom', directions: ['north'] };
+  if (tier === 2) return { mode: 'custom', directions: ['north', 'south'] };
+  if (tier === 3) return { mode: 'custom', directions: ['north', 'south', 'east'] };
+  return { mode: 'all', directions: ['north', 'south', 'east', 'west'] };
 }
