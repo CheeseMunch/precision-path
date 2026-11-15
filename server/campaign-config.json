@@ -267,7 +267,7 @@
       "description": "",
       "spawn": {
         "x": 0,
-        "y": 0
+        "y": 120
       },
       "clearBonusPoints": 500,
       "parTimeSeconds": 20,
@@ -275,20 +275,20 @@
         {
           "id": "t3-w1",
           "order": 1,
-          "delayAfterPrev": 0.5,
-          "side": "west",
+          "delayAfterPrev": 0.4,
+          "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 145,
-          "gapCenter": -120,
-          "gapSize": 135,
+          "speed": 170,
+          "gapCenter": -125,
+          "gapSize": 120,
           "barThickness": 18,
-          "color": "#05d5fa",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "t3-g1",
               "order": 1,
-              "start": -187,
-              "end": -53,
+              "start": -185,
+              "end": -65,
               "points": 100,
               "label": "GATE 1"
             }
@@ -297,20 +297,20 @@
         {
           "id": "t3-w2",
           "order": 2,
-          "delayAfterPrev": 1.8,
-          "side": "east",
+          "delayAfterPrev": 1.15,
+          "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 145,
-          "gapCenter": 120,
-          "gapSize": 135,
+          "speed": 170,
+          "gapCenter": 125,
+          "gapSize": 120,
           "barThickness": 18,
-          "color": "#d300c5",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "t3-g2",
               "order": 2,
-              "start": 53,
-              "end": 187,
+              "start": 65,
+              "end": 185,
               "points": 100,
               "label": "GATE 2"
             }
@@ -319,20 +319,20 @@
         {
           "id": "t3-w3",
           "order": 3,
-          "delayAfterPrev": 1.8,
-          "side": "south",
+          "delayAfterPrev": 1.15,
+          "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 165,
+          "speed": 170,
           "gapCenter": 0,
-          "gapSize": 130,
+          "gapSize": 120,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "t3-g3",
               "order": 3,
-              "start": -65,
-              "end": 65,
+              "start": -60,
+              "end": 60,
               "points": 100,
               "label": "GATE 3"
             }
@@ -341,20 +341,42 @@
         {
           "id": "t3-w4",
           "order": 4,
-          "delayAfterPrev": 1.8,
-          "side": "north",
-          "patternType": "sweeping-half-wall",
-          "speed": 165,
-          "gapCenter": -90,
-          "gapSize": 135,
+          "delayAfterPrev": 1.5,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 170,
+          "gapCenter": -110,
+          "gapSize": 120,
           "barThickness": 18,
-          "color": "#ff2a6d",
+          "color": "#ff7700",
           "attachedGates": [
             {
               "id": "t3-g4",
               "order": 4,
-              "start": -225,
-              "end": -22,
+              "start": -170,
+              "end": -50,
+              "points": 100,
+              "label": "GATE 4"
+            }
+          ]
+        },
+        {
+          "id": "t3-w5",
+          "order": 5,
+          "delayAfterPrev": 1.15,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 170,
+          "gapCenter": 110,
+          "gapSize": 120,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "t3-g5",
+              "order": 5,
+              "start": 50,
+              "end": 170,
               "points": 100,
               "label": "FINISH"
             }
@@ -367,12 +389,12 @@
     {
       "id": "level-training-4",
       "levelNumber": 4,
-      "name": "Split Choice",
+      "name": "Rotational Dodge",
       "storyName": "Training",
       "description": "",
       "spawn": {
         "x": 0,
-        "y": 100
+        "y": 0
       },
       "clearBonusPoints": 500,
       "parTimeSeconds": 20,
@@ -380,86 +402,116 @@
         {
           "id": "t4-w1",
           "order": 1,
-          "delayAfterPrev": 0.5,
+          "delayAfterPrev": 0.4,
           "side": "north",
-          "patternType": "double-gap-wall",
-          "speed": 165,
-          "gapCenter": -85,
-          "gapSize": 110,
+          "patternType": "diagonal-spinner",
+          "speed": 175,
+          "gapCenter": -40,
+          "gapSize": 100,
+          "barThickness": 16,
+          "color": "#b800ff",
+          "attachedGates": []
+        },
+        {
+          "id": "t4-w2",
+          "order": 2,
+          "delayAfterPrev": 0.9,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 175,
+          "gapCenter": 90,
+          "gapSize": 125,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "t4-g1",
               "order": 1,
-              "start": -137,
-              "end": -33,
+              "start": 27,
+              "end": 153,
               "points": 100,
               "label": "GATE 1"
             }
           ]
         },
         {
-          "id": "t4-w2",
-          "order": 2,
-          "delayAfterPrev": 1.8,
+          "id": "t4-w3",
+          "order": 3,
+          "delayAfterPrev": 1.2,
+          "side": "west",
+          "patternType": "diagonal-spinner",
+          "speed": 170,
+          "gapCenter": 60,
+          "gapSize": 100,
+          "barThickness": 16,
+          "color": "#b800ff",
+          "attachedGates": []
+        },
+        {
+          "id": "t4-w4",
+          "order": 4,
+          "delayAfterPrev": 1.1,
+          "side": "east",
+          "patternType": "diagonal-spinner",
+          "speed": 170,
+          "gapCenter": -60,
+          "gapSize": 100,
+          "barThickness": 16,
+          "color": "#b800ff",
+          "attachedGates": []
+        },
+        {
+          "id": "t4-w5",
+          "order": 5,
+          "delayAfterPrev": 1,
           "side": "south",
-          "patternType": "double-gap-wall",
-          "speed": 165,
-          "gapCenter": -85,
-          "gapSize": 110,
+          "patternType": "single-gap-wall",
+          "speed": 175,
+          "gapCenter": -90,
+          "gapSize": 125,
           "barThickness": 18,
           "color": "#ff7700",
           "attachedGates": [
             {
               "id": "t4-g2",
               "order": 2,
-              "start": 25,
-              "end": 129,
+              "start": -153,
+              "end": -27,
               "points": 100,
               "label": "GATE 2"
             }
           ]
         },
         {
-          "id": "t4-w3",
-          "order": 3,
-          "delayAfterPrev": 1.8,
+          "id": "t4-w6",
+          "order": 6,
+          "delayAfterPrev": 1.1,
+          "side": "south",
+          "patternType": "diagonal-spinner",
+          "speed": 180,
+          "gapCenter": 30,
+          "gapSize": 100,
+          "barThickness": 16,
+          "color": "#b800ff",
+          "attachedGates": []
+        },
+        {
+          "id": "t4-w7",
+          "order": 7,
+          "delayAfterPrev": 1.1,
           "side": "north",
-          "patternType": "staggered-blocks",
-          "speed": 170,
-          "gapCenter": 0,
+          "patternType": "sweeping-half-wall",
+          "speed": 180,
+          "gapCenter": 60,
           "gapSize": 125,
           "barThickness": 18,
-          "color": "#ff2a6d",
+          "color": "#05d5fa",
           "attachedGates": [
             {
               "id": "t4-g3",
               "order": 3,
-              "start": -62,
-              "end": 62,
-              "points": 100,
-              "label": "GATE 3"
-            }
-          ]
-        },
-        {
-          "id": "t4-w4",
-          "order": 4,
-          "delayAfterPrev": 1.8,
-          "side": "east",
-          "patternType": "sweeping-half-wall",
-          "speed": 150,
-          "gapCenter": 80,
-          "gapSize": 130,
-          "barThickness": 18,
-          "color": "#d300c5",
-          "attachedGates": [
-            {
-              "id": "t4-g4",
-              "order": 4,
-              "start": 15,
-              "end": 400,
+              "start": -3,
+              "end": 225,
               "points": 100,
               "label": "FINISH"
             }
@@ -472,12 +524,12 @@
     {
       "id": "level-training-5",
       "levelNumber": 5,
-      "name": "Crosswind Warmup",
+      "name": "Orb Entry",
       "storyName": "Training",
       "description": "",
       "spawn": {
         "x": 0,
-        "y": 120
+        "y": 140
       },
       "clearBonusPoints": 500,
       "parTimeSeconds": 20,
@@ -485,67 +537,54 @@
         {
           "id": "t5-w1",
           "order": 1,
-          "delayAfterPrev": 0.5,
+          "delayAfterPrev": 0.4,
           "side": "north",
           "patternType": "single-gap-wall",
           "speed": 175,
-          "gapCenter": 80,
-          "gapSize": 130,
+          "gapCenter": 0,
+          "gapSize": 115,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "t5-g1",
               "order": 1,
-              "start": 15,
-              "end": 145,
+              "start": -57,
+              "end": 57,
               "points": 100,
-              "label": "GATE 1"
+              "label": "ENTRY"
             }
           ]
         },
         {
           "id": "t5-w2",
           "order": 2,
-          "delayAfterPrev": 1.5,
-          "side": "west",
-          "patternType": "diagonal-spinner",
-          "speed": 165,
+          "delayAfterPrev": 1,
+          "side": "north",
+          "patternType": "orb-cluster",
+          "speed": 180,
           "gapCenter": 0,
-          "gapSize": 100,
-          "barThickness": 16,
-          "color": "#b800ff",
-          "attachedGates": []
-        },
-        {
-          "id": "t5-w3",
-          "order": 3,
-          "delayAfterPrev": 1.6,
-          "side": "south",
-          "patternType": "sweeping-half-wall",
-          "speed": 175,
-          "gapCenter": -80,
-          "gapSize": 130,
+          "gapSize": 60,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#ffea00",
           "attachedGates": [
             {
               "id": "t5-g2",
               "order": 2,
-              "start": -225,
-              "end": -15,
+              "start": -185,
+              "end": -78,
               "points": 100,
               "label": "GATE 2"
             }
           ]
         },
         {
-          "id": "t5-w4",
-          "order": 4,
-          "delayAfterPrev": 1.8,
+          "id": "t5-w3",
+          "order": 3,
+          "delayAfterPrev": 0.65,
           "side": "north",
           "patternType": "orb-cluster",
-          "speed": 170,
+          "speed": 180,
           "gapCenter": 0,
           "gapSize": 60,
           "barThickness": 18,
@@ -554,16 +593,30 @@
             {
               "id": "t5-g3",
               "order": 3,
-              "start": -54,
-              "end": 54,
+              "start": 78,
+              "end": 185,
               "points": 100,
               "label": "GATE 3"
-            },
+            }
+          ]
+        },
+        {
+          "id": "t5-w4",
+          "order": 4,
+          "delayAfterPrev": 0.65,
+          "side": "north",
+          "patternType": "orb-cluster",
+          "speed": 180,
+          "gapCenter": 0,
+          "gapSize": 60,
+          "barThickness": 18,
+          "color": "#ffea00",
+          "attachedGates": [
             {
               "id": "t5-g4",
               "order": 4,
-              "start": 78,
-              "end": 185,
+              "start": -54,
+              "end": 54,
               "points": 100,
               "label": "FINISH"
             }
@@ -1539,6 +1592,225 @@
           "barThickness": 16,
           "color": "#b800ff",
           "attachedGates": []
+        }
+      ]
+    },
+    {
+      "id": "pat-north-3step-ladder",
+      "name": "North 3-Step Ladder",
+      "description": "",
+      "waves": [
+        {
+          "id": "pn3-w1",
+          "order": 1,
+          "delayAfterPrev": 0.4,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 205,
+          "gapCenter": -130,
+          "gapSize": 105,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
+            {
+              "id": "pn3-g1",
+              "order": 1,
+              "start": -182,
+              "end": -78,
+              "points": 100,
+              "label": "GATE 1"
+            }
+          ]
+        },
+        {
+          "id": "pn3-w2",
+          "order": 2,
+          "delayAfterPrev": 0.9,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 205,
+          "gapCenter": 0,
+          "gapSize": 105,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
+            {
+              "id": "pn3-g2",
+              "order": 2,
+              "start": -52,
+              "end": 52,
+              "points": 100,
+              "label": "GATE 2"
+            }
+          ]
+        },
+        {
+          "id": "pn3-w3",
+          "order": 3,
+          "delayAfterPrev": 0.9,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 205,
+          "gapCenter": 130,
+          "gapSize": 105,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
+            {
+              "id": "pn3-g3",
+              "order": 3,
+              "start": 78,
+              "end": 182,
+              "points": 100,
+              "label": "GATE 3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pat-south-3wave-zigzag",
+      "name": "South 3-Wave Zigzag",
+      "description": "",
+      "waves": [
+        {
+          "id": "ps3-w1",
+          "order": 1,
+          "delayAfterPrev": 0.4,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 210,
+          "gapCenter": 120,
+          "gapSize": 105,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "ps3-g1",
+              "order": 1,
+              "start": 68,
+              "end": 172,
+              "points": 100,
+              "label": "GATE 1"
+            }
+          ]
+        },
+        {
+          "id": "ps3-w2",
+          "order": 2,
+          "delayAfterPrev": 0.9,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 210,
+          "gapCenter": -120,
+          "gapSize": 105,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "ps3-g2",
+              "order": 2,
+              "start": -172,
+              "end": -68,
+              "points": 100,
+              "label": "GATE 2"
+            }
+          ]
+        },
+        {
+          "id": "ps3-w3",
+          "order": 3,
+          "delayAfterPrev": 0.9,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 210,
+          "gapCenter": 40,
+          "gapSize": 105,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "ps3-g3",
+              "order": 3,
+              "start": -12,
+              "end": 92,
+              "points": 100,
+              "label": "GATE 3"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "pat-west-3gate-corridor",
+      "name": "West 3-Gate Corridor",
+      "description": "",
+      "waves": [
+        {
+          "id": "pw3-w1",
+          "order": 1,
+          "delayAfterPrev": 0.4,
+          "side": "west",
+          "patternType": "single-gap-wall",
+          "speed": 175,
+          "gapCenter": -210,
+          "gapSize": 110,
+          "barThickness": 18,
+          "color": "#05d5fa",
+          "attachedGates": [
+            {
+              "id": "pw3-g1",
+              "order": 1,
+              "start": -265,
+              "end": -155,
+              "points": 100,
+              "label": "GATE 1"
+            }
+          ]
+        },
+        {
+          "id": "pw3-w2",
+          "order": 2,
+          "delayAfterPrev": 1,
+          "side": "west",
+          "patternType": "single-gap-wall",
+          "speed": 175,
+          "gapCenter": 190,
+          "gapSize": 110,
+          "barThickness": 18,
+          "color": "#05d5fa",
+          "attachedGates": [
+            {
+              "id": "pw3-g2",
+              "order": 2,
+              "start": 135,
+              "end": 245,
+              "points": 100,
+              "label": "GATE 2"
+            }
+          ]
+        },
+        {
+          "id": "pw3-w3",
+          "order": 3,
+          "delayAfterPrev": 1,
+          "side": "west",
+          "patternType": "single-gap-wall",
+          "speed": 175,
+          "gapCenter": -30,
+          "gapSize": 110,
+          "barThickness": 18,
+          "color": "#05d5fa",
+          "attachedGates": [
+            {
+              "id": "pw3-g3",
+              "order": 3,
+              "start": -85,
+              "end": 25,
+              "points": 100,
+              "label": "GATE 3"
+            }
+          ]
         }
       ]
     }
