@@ -796,18 +796,19 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
         // Draw wave obstacles
         ctx.save();
+        ctx.globalAlpha = selWave ? (isSelWave ? 1.0 : 0.42) : 1.0;
         ctx.fillStyle = geom.color;
-        ctx.shadowColor = geom.color;
-        ctx.shadowBlur = isSelWave ? 16 : 10;
+        ctx.shadowColor = isSelWave ? '#ffffff' : geom.color;
+        ctx.shadowBlur = isSelWave ? 18 : 8;
         for (const r of geom.rects) {
           ctx.save();
           ctx.translate(r.x, r.y);
           if (r.rot) ctx.rotate(r.rot);
           ctx.fillRect(-r.w / 2, -r.h / 2, r.w, r.h);
           if (isSelWave) {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-            ctx.lineWidth = 1.5;
-            ctx.strokeRect(-r.w / 2, -r.h / 2, r.w, r.h);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(-r.w / 2 - 1, -r.h / 2 - 1, r.w + 2, r.h + 2);
           }
           ctx.restore();
         }
@@ -816,9 +817,29 @@ export function renderCampaignAdminPage(adminToken: string): string {
           ctx.arc(c.x, c.y, c.r, 0, Math.PI * 2);
           ctx.fill();
           if (isSelWave) {
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 3;
             ctx.stroke();
+          }
+        }
+        if (isSelWave) {
+          const anchor = geom.rects[0] || geom.circles[0];
+          if (anchor) {
+            ctx.shadowBlur = 0;
+            const lx = Math.max(-HALF_W + 42, Math.min(HALF_W - 42, anchor.x));
+            const ly = anchor.y - 22;
+            ctx.fillStyle = '#0f172a';
+            ctx.strokeStyle = '#22d3ee';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.roundRect(lx - 34, ly - 10, 68, 18, 4);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 10px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('WAVE #' + w.order, lx, ly - 1);
           }
         }
         ctx.restore();
