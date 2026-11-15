@@ -99,6 +99,7 @@ export const ReadyGoOverlay: React.FC<ReadyGoOverlayProps> = ({ playTrigger, onF
       <video
         ref={videoRef}
         src="/sounds/ready_go.mp4"
+        preload="auto"
         playsInline
         className="hidden"
       />

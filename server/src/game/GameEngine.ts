@@ -293,7 +293,7 @@ export class GameEngine {
       this.onStateUpdateCallback(this.state);
     }
 
-    // Hold "Ready" phase for 2.0s so the match begins right when "Go!" hits in the overlay video
+    // Hold "Ready" phase for 1.05s so the match begins right when "Go!" hits in the trimmed overlay video
     this.countdownIntervalId = setTimeout(() => {
       this.countdownIntervalId = null;
       this.state.countdownTimer = 0;
@@ -301,7 +301,7 @@ export class GameEngine {
       if (this.onStateUpdateCallback) {
         this.onStateUpdateCallback(this.state);
       }
-    }, 2000);
+    }, 1050);
   }
 
   public startGame() {
