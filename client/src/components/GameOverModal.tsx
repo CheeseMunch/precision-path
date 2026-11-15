@@ -57,8 +57,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
             </div>
           </div>
           <div>
-            <div className="text-[10px] text-gray-500 uppercase">MAX LEVEL</div>
-            <div className="text-sm font-bold text-pink-400">Level {gameState.currentTier}</div>
+            <div className="text-[10px] text-gray-500 uppercase">MAX ROUND</div>
+            <div className="text-sm font-bold text-pink-400">{gameState.isEndless ? 'Endless' : `Round ${gameState.currentTier}`}</div>
           </div>
           <div>
             <div className="text-[10px] text-gray-500 uppercase">SCORE</div>

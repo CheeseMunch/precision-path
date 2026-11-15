@@ -420,8 +420,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.save();
       ctx.beginPath();
       ctx.rect(-halfW + 1.5, -halfH + 1.5, arenaWidth - 3, arenaHeight - 3);
+      const isEndlessState = Boolean(
+        currentState.isEndless ||
+        (currentState.totalRoundsBeforeEndless ? currentState.currentTier > currentState.totalRoundsBeforeEndless : currentState.currentTier === 5)
+      );
       ctx.strokeStyle =
-        currentState.currentTier === 5 ? 'rgba(255, 0, 85, 0.85)' : 'rgba(0, 240, 255, 0.75)';
+        isEndlessState ? 'rgba(255, 0, 85, 0.85)' : 'rgba(0, 240, 255, 0.75)';
       ctx.lineWidth = 3;
       ctx.stroke();
       ctx.restore();

@@ -41,16 +41,19 @@ export const GAME_CONFIG = {
   // 1. ROUND & TIMING SETTINGS (in seconds)
   // ==========================================
   rounds: {
+    /** Total number of timed rounds before entering Endless mode (default: 4, min: 1, max: 10) */
+    totalRoundsBeforeEndless: 4,
+
     /** Default time (seconds) to survive each round before the next round starts */
     defaultRoundDurationSeconds: 7,
 
-    /** Per-round duration overrides (in seconds): Round 1 -> Round 2 -> Round 3 -> Round 4 -> Endless */
+    /** Per-round duration overrides (in seconds) */
     tierDurations: {
-      1: 7, // Round 1 (1 direction) -> Round 2 starts after 7s
-      2: 7, // Round 2 (2 directions) -> Round 3 starts after 7s
-      3: 7, // Round 3 (3 directions) -> Round 4 starts after 7s
-      4: 7, // Round 4 (4 directions) -> Endless Mode starts after 7s
-    } as Record<1 | 2 | 3 | 4, number>,
+      1: 7, // Round 1 (1 direction)
+      2: 7, // Round 2 (2 directions)
+      3: 7, // Round 3 (3 directions)
+      4: 7, // Round 4 (4 directions)
+    } as Record<number, number>,
 
     /** Pre-match countdown timer in seconds (1s READY.. -> GO!) */
     startCountdownDuration: 1,
@@ -242,9 +245,22 @@ export const GAME_CONFIG = {
 /**
  * Returns the configured duration (in seconds) for a given round/tier.
  */
-export function getTierDuration(tier: GameTier): number {
-  if (tier === 1 || tier === 2 || tier === 3 || tier === 4) {
-    return GAME_CONFIG.rounds.tierDurations[tier] ?? GAME_CONFIG.rounds.defaultRoundDurationSeconds;
+export function getTierDuration(tier: number): number {
+  const maxTimed = GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4;
+  if (tier <= maxTimed) {
+    return GAME_CONFIG.rounds.tierDurations[tier] ?? GAME_CONFIG.rounds.defaultRoundDurationSeconds ?? 7;
   }
-  return 0; // Tier 5 (Endless Mode) has no time limit
+  return 0; // Endless Mode has no time limit
+}
+
+/**
+ * Returns the sum of durations of all timed rounds before Endless mode starts.
+ */
+export function getPreEndlessDuration(): number {
+  const count = GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4;
+  let total = 0;
+  for (let r = 1; r <= count; r++) {
+    total += getTierDuration(r);
+  }
+  return total;
 }

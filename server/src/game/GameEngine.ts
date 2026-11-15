@@ -2,6 +2,7 @@ import { GameState, GameTier, Player, Obstacle, ObstacleDirection, ClientInput }
 import {
   GAME_CONFIG,
   getTierDuration,
+  getPreEndlessDuration,
   getObstacleWeight,
   ObstaclePatternType,
 } from '../../../shared/gameConfig.js';
@@ -51,6 +52,8 @@ export class GameEngine {
       status: 'lobby',
       countdownTimer: GAME_CONFIG.rounds.startCountdownDuration,
       currentTier: 1,
+      totalRoundsBeforeEndless: GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4,
+      isEndless: false,
       activeDirections: ['north'],
       tierTimeRemaining: getTierDuration(1),
       elapsedTime: 0,
@@ -64,14 +67,25 @@ export class GameEngine {
   }
 
   /**
+   * Returns true if the game has progressed past all pre-endless rounds into Endless mode.
+   */
+  public isEndlessMode(): boolean {
+    const maxTimed = GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4;
+    return Boolean(this.state.isEndless || this.state.currentTier > maxTimed);
+  }
+
+  /**
    * Returns the exact active sides for the current level:
    * - Level 1: 1 side
    * - Level 2: 2 sides
    * - Level 3: 3 sides
-   * - Level 4 & Endless (5): all 4 sides
+   * - Level 4 & Endless: all 4 sides
    */
   private getActiveSidesForTier(tier: GameTier): ObstacleDirection[] {
-    const count = tier >= 4 ? 4 : tier;
+    if (this.isEndlessMode()) {
+      return this.matchDirections.slice(0, 4);
+    }
+    const count = Math.min(4, Math.max(1, tier));
     return this.matchDirections.slice(0, count);
   }
 
@@ -337,6 +351,8 @@ export class GameEngine {
     this.state.status = 'playing';
     this.state.elapsedTime = 0;
     this.state.currentTier = 1;
+    this.state.isEndless = false;
+    this.state.totalRoundsBeforeEndless = GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4;
     this.state.activeDirections = this.getActiveSidesForTier(1);
     this.state.tierTimeRemaining = getTierDuration(1);
     this.nextWaveInterval = this.computeNextWaveInterval(1);
@@ -373,6 +389,8 @@ export class GameEngine {
     this.state.winner = null;
     this.state.pausedBy = null;
     this.state.currentTier = 1;
+    this.state.isEndless = false;
+    this.state.totalRoundsBeforeEndless = GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4;
     this.state.activeDirections = this.getActiveSidesForTier(1);
     this.state.tierTimeRemaining = getTierDuration(1);
     this.state.elapsedTime = 0;
@@ -421,12 +439,22 @@ export class GameEngine {
   }
 
   private updateTiers(dt: number) {
-    if (this.state.currentTier < 5) {
+    const maxTimed = GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4;
+    if (!this.isEndlessMode()) {
       this.state.tierTimeRemaining -= dt;
       if (this.state.tierTimeRemaining <= 0) {
-        this.state.currentTier = (this.state.currentTier + 1) as GameTier;
-        this.state.activeDirections = this.getActiveSidesForTier(this.state.currentTier);
-        this.state.tierTimeRemaining = getTierDuration(this.state.currentTier);
+        if (this.state.currentTier < maxTimed) {
+          this.state.currentTier = (this.state.currentTier + 1) as GameTier;
+          this.state.isEndless = false;
+          this.state.activeDirections = this.getActiveSidesForTier(this.state.currentTier);
+          this.state.tierTimeRemaining = getTierDuration(this.state.currentTier);
+        } else {
+          // Transition directly to Endless Mode!
+          this.state.currentTier = (maxTimed + 1) as GameTier;
+          this.state.isEndless = true;
+          this.state.activeDirections = this.getActiveSidesForTier(this.state.currentTier);
+          this.state.tierTimeRemaining = 0;
+        }
 
         // Award +500 points to every alive player for reaching the next stage
         for (const id in this.state.players) {
@@ -446,11 +474,12 @@ export class GameEngine {
   }
 
   private computeNextWaveInterval(tier: GameTier): number {
-    const base = GAME_CONFIG.obstacles.waveIntervals[tier] ?? 2.0;
-    const preEndlessDuration =
-      getTierDuration(1) + getTierDuration(2) + getTierDuration(3) + getTierDuration(4);
+    const isEndless = this.isEndlessMode();
+    const intervalTier = (isEndless ? 5 : Math.min(4, tier)) as GameTier;
+    const base = GAME_CONFIG.obstacles.waveIntervals[intervalTier] ?? 2.0;
+    const preEndlessDuration = getPreEndlessDuration();
     const endlessReduction =
-      tier === 5
+      isEndless
         ? Math.min(0.6, Math.max(0, this.state.elapsedTime - preEndlessDuration) * 0.012)
         : 0;
     const jitter = GAME_CONFIG.randomness.waveIntervalJitter;
@@ -472,6 +501,8 @@ export class GameEngine {
    * Selects an obstacle pattern archetype using per-round configured weights and minimum tier rules.
    */
   private pickProceduralObstacleType(tier: GameTier): ObstaclePatternType {
+    const isEndless = this.isEndlessMode();
+    const weightTier = (isEndless ? 5 : Math.min(4, tier)) as GameTier;
     const entries = Object.entries(GAME_CONFIG.obstacleTypes) as [
       ObstaclePatternType,
       (typeof GAME_CONFIG.obstacleTypes)[ObstaclePatternType]
@@ -481,9 +512,9 @@ export class GameEngine {
       .map(([type, cfg]) => ({
         type,
         cfg,
-        weight: getObstacleWeight(cfg, tier),
+        weight: getObstacleWeight(cfg, weightTier),
       }))
-      .filter(({ cfg, weight }) => cfg.enabled && weight > 0 && tier >= cfg.minTier);
+      .filter(({ cfg, weight }) => cfg.enabled && weight > 0 && (isEndless || tier >= cfg.minTier));
 
     if (eligible.length === 0) {
       return 'single-gap-wall';
@@ -507,17 +538,17 @@ export class GameEngine {
    * - Level 1: 1 side
    * - Level 2: 2 sides
    * - Level 3: 3 sides
-   * - Level 4 & Endless (Tier 5): all 4 sides
+   * - Level 4 & Endless: all 4 sides
    * and spawns randomized procedural obstacle patterns from those sides.
    */
   private generateProceduralWave(tier: GameTier) {
+    const isEndless = this.isEndlessMode();
     const activeSides = this.getActiveSidesForTier(tier);
     const directions: ObstacleDirection[] = this.shuffle(activeSides);
 
-    const preEndlessDuration =
-      getTierDuration(1) + getTierDuration(2) + getTierDuration(3) + getTierDuration(4);
+    const preEndlessDuration = getPreEndlessDuration();
     const endlessBonus =
-      tier === 5
+      isEndless
         ? Math.min(
             GAME_CONFIG.obstacles.endlessMaxBonusSpeed,
             Math.max(0, this.state.elapsedTime - preEndlessDuration) *
@@ -525,9 +556,10 @@ export class GameEngine {
           )
         : 0;
 
+    const maxTimed = GAME_CONFIG.rounds.totalRoundsBeforeEndless ?? 4;
     const rawSpeed =
       GAME_CONFIG.obstacles.baseSpeed +
-      tier * GAME_CONFIG.obstacles.speedPerTier +
+      Math.min(tier, maxTimed) * GAME_CONFIG.obstacles.speedPerTier +
       endlessBonus;
 
     // Pick a navigable focal zone inside the rectangular arena so multi-directional waves always leave a survivable corridor

@@ -139,13 +139,18 @@ function applyTuningConfig(body: any) {
   if (!body || typeof body !== 'object') return;
 
   if (body.rounds) {
+    if (typeof body.rounds.totalRoundsBeforeEndless === 'number') {
+      GAME_CONFIG.rounds.totalRoundsBeforeEndless = Math.max(1, Math.min(10, Math.round(body.rounds.totalRoundsBeforeEndless)));
+    }
     if (typeof body.rounds.defaultRoundDurationSeconds === 'number') {
       GAME_CONFIG.rounds.defaultRoundDurationSeconds = Math.max(2, body.rounds.defaultRoundDurationSeconds);
     }
-    if (body.rounds.tierDurations) {
-      for (const t of [1, 2, 3, 4] as const) {
-        if (typeof body.rounds.tierDurations[t] === 'number') {
-          GAME_CONFIG.rounds.tierDurations[t] = Math.max(2, body.rounds.tierDurations[t]);
+    if (body.rounds.tierDurations && typeof body.rounds.tierDurations === 'object') {
+      for (const t of Object.keys(body.rounds.tierDurations)) {
+        const numT = Number(t);
+        const val = body.rounds.tierDurations[t];
+        if (typeof val === 'number') {
+          GAME_CONFIG.rounds.tierDurations[numT] = Math.max(2, val);
         }
       }
     }
@@ -326,29 +331,39 @@ app.get('/db-admin', (req, res) => {
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- 1. Round Durations -->
+        <!-- 1. Round Durations & Progression -->
         <div class="bg-[#121520] border border-gray-800 rounded-xl p-5 flex flex-col gap-4">
           <div class="flex items-center justify-between border-b border-gray-800 pb-2">
-            <span class="text-cyan-400 font-bold uppercase text-sm">1. Round Durations (Seconds)</span>
+            <span class="text-cyan-400 font-bold uppercase text-sm">1. Round Timing & Progression</span>
             <button onclick="syncAllRounds()" class="text-[11px] text-cyan-300 hover:underline">Sync All to Round 1</button>
           </div>
-          <div class="grid grid-cols-2 gap-4 text-xs">
+
+          <!-- Total Rounds Before Endless Selector -->
+          <div class="bg-[#090b12] border border-gray-800 rounded-lg p-3 flex items-center justify-between">
             <div>
-              <div class="flex justify-between mb-1"><span>Round 1 (1 Side)</span><span id="val_r1" class="text-cyan-300 font-bold">7s</span></div>
-              <input id="inp_r1" type="range" min="2" max="45" step="1" oninput="updateLabels()" class="w-full accent-cyan-400" />
+              <div class="font-bold text-gray-200 text-xs">Total Rounds Before Endless</div>
+              <div class="text-[11px] text-gray-400">Number of timed rounds to clear before entering Endless Mode (1–10)</div>
             </div>
-            <div>
-              <div class="flex justify-between mb-1"><span>Round 2 (2 Sides)</span><span id="val_r2" class="text-cyan-300 font-bold">7s</span></div>
-              <input id="inp_r2" type="range" min="2" max="45" step="1" oninput="updateLabels()" class="w-full accent-cyan-400" />
+            <div class="flex items-center gap-2">
+              <span id="val_totalRounds" class="text-cyan-400 font-bold text-xs font-mono">4 Rounds</span>
+              <input
+                id="inp_totalRounds"
+                type="number"
+                min="1"
+                max="10"
+                step="1"
+                oninput="onTotalRoundsChange()"
+                class="w-16 bg-[#121520] border border-cyan-500/50 rounded p-1 text-center font-bold text-cyan-300 text-xs focus:outline-none focus:border-cyan-400"
+              />
             </div>
-            <div>
-              <div class="flex justify-between mb-1"><span>Round 3 (3 Sides)</span><span id="val_r3" class="text-cyan-300 font-bold">7s</span></div>
-              <input id="inp_r3" type="range" min="2" max="45" step="1" oninput="updateLabels()" class="w-full accent-cyan-400" />
+          </div>
+
+          <!-- Dynamic Round Durations List -->
+          <div>
+            <div class="text-[10px] uppercase font-bold text-gray-400 tracking-wider mb-2">
+              Round Durations (Seconds)
             </div>
-            <div>
-              <div class="flex justify-between mb-1"><span>Round 4 (4 Sides)</span><span id="val_r4" class="text-cyan-300 font-bold">7s</span></div>
-              <input id="inp_r4" type="range" min="2" max="45" step="1" oninput="updateLabels()" class="w-full accent-cyan-400" />
-            </div>
+            <div id="roundDurationsList" class="grid grid-cols-2 gap-3 text-xs"></div>
           </div>
 
           <div class="border-t border-gray-800 pt-3 mt-1">
@@ -585,10 +600,9 @@ app.get('/db-admin', (req, res) => {
 
     function populateForm(cfg) {
       currentConfig = cfg;
-      document.getElementById('inp_r1').value = cfg.rounds.tierDurations[1];
-      document.getElementById('inp_r2').value = cfg.rounds.tierDurations[2];
-      document.getElementById('inp_r3').value = cfg.rounds.tierDurations[3];
-      document.getElementById('inp_r4').value = cfg.rounds.tierDurations[4];
+      const totalRounds = cfg.rounds.totalRoundsBeforeEndless ?? 4;
+      document.getElementById('inp_totalRounds').value = totalRounds;
+      renderRoundDurationInputs(totalRounds, cfg.rounds.tierDurations, cfg.rounds.defaultRoundDurationSeconds);
 
       document.getElementById('inp_wi1').value = cfg.obstacles.waveIntervals[1];
       document.getElementById('inp_wi2').value = cfg.obstacles.waveIntervals[2];
@@ -717,11 +731,56 @@ app.get('/db-admin', (req, res) => {
       }
     }
 
+    function renderRoundDurationInputs(count, durations, defaultSec) {
+      durations = durations || (currentConfig && currentConfig.rounds && currentConfig.rounds.tierDurations) || {};
+      defaultSec = defaultSec || (currentConfig && currentConfig.rounds && currentConfig.rounds.defaultRoundDurationSeconds) || 7;
+      const container = document.getElementById('roundDurationsList');
+      if (!container) return;
+      container.innerHTML = Array.from({ length: count }, (_, i) => {
+        const r = i + 1;
+        const val = durations[r] !== undefined ? durations[r] : defaultSec;
+        const sides = Math.min(4, r);
+        const sidesLabel = sides === 1 ? '1 Side' : sides + ' Sides';
+        return \`
+          <div class="bg-[#090b12] border border-gray-800 rounded p-2.5">
+            <div class="flex justify-between mb-1">
+              <span class="text-gray-300 font-semibold">Round \${r} <span class="text-gray-500 font-normal">(\${sidesLabel})</span></span>
+              <span id="val_r\${r}" class="text-cyan-300 font-bold font-mono">\${val}s</span>
+            </div>
+            <input id="inp_r\${r}" type="range" min="2" max="45" step="1" value="\${val}" oninput="updateLabels()" class="w-full accent-cyan-400" />
+          </div>
+        \`;
+      }).join('');
+    }
+
+    function onTotalRoundsChange() {
+      const inp = document.getElementById('inp_totalRounds');
+      const val = Math.max(1, Math.min(10, Math.round(Number(inp.value) || 4)));
+      inp.value = val;
+      const currentDurations = {};
+      for (let r = 1; r <= 10; r++) {
+        const el = document.getElementById('inp_r' + r);
+        if (el) currentDurations[r] = Number(el.value);
+      }
+      renderRoundDurationInputs(val, currentDurations);
+      updateLabels();
+      updateWeightBadges();
+    }
+
     function updateLabels() {
-      document.getElementById('val_r1').textContent = document.getElementById('inp_r1').value + 's';
-      document.getElementById('val_r2').textContent = document.getElementById('inp_r2').value + 's';
-      document.getElementById('val_r3').textContent = document.getElementById('inp_r3').value + 's';
-      document.getElementById('val_r4').textContent = document.getElementById('inp_r4').value + 's';
+      const totInp = document.getElementById('inp_totalRounds');
+      const totVal = document.getElementById('val_totalRounds');
+      if (totInp && totVal) {
+        totVal.textContent = totInp.value + (Number(totInp.value) === 1 ? ' Round' : ' Rounds');
+      }
+
+      for (let r = 1; r <= 10; r++) {
+        const rInp = document.getElementById('inp_r' + r);
+        const rVal = document.getElementById('val_r' + r);
+        if (rInp && rVal) {
+          rVal.textContent = rInp.value + 's';
+        }
+      }
 
       document.getElementById('val_gapPos').textContent = Math.round(Number(document.getElementById('inp_gapPos').value) * 100) + '%';
       document.getElementById('val_gapSize').textContent = '±' + Math.round(Number(document.getElementById('inp_gapSize').value) * 100) + '%';
@@ -748,10 +807,12 @@ app.get('/db-admin', (req, res) => {
     }
 
     function syncAllRounds() {
-      const v = document.getElementById('inp_r1').value;
-      document.getElementById('inp_r2').value = v;
-      document.getElementById('inp_r3').value = v;
-      document.getElementById('inp_r4').value = v;
+      const v = document.getElementById('inp_r1')?.value || 7;
+      const totalRounds = Number(document.getElementById('inp_totalRounds')?.value) || 4;
+      for (let r = 1; r <= totalRounds; r++) {
+        const el = document.getElementById('inp_r' + r);
+        if (el) el.value = v;
+      }
       updateLabels();
     }
 
@@ -774,15 +835,20 @@ app.get('/db-admin', (req, res) => {
           };
         }
       }
+
+      const totalRounds = Math.max(1, Math.min(10, Number(document.getElementById('inp_totalRounds')?.value) || 4));
+      const tierDurations = {};
+      const r1Val = Number(document.getElementById('inp_r1')?.value) || 7;
+      for (let r = 1; r <= totalRounds; r++) {
+        const el = document.getElementById('inp_r' + r);
+        tierDurations[r] = el ? Number(el.value) : r1Val;
+      }
+
       return {
         rounds: {
-          defaultRoundDurationSeconds: Number(document.getElementById('inp_r1').value),
-          tierDurations: {
-            1: Number(document.getElementById('inp_r1').value),
-            2: Number(document.getElementById('inp_r2').value),
-            3: Number(document.getElementById('inp_r3').value),
-            4: Number(document.getElementById('inp_r4').value),
-          },
+          totalRoundsBeforeEndless: totalRounds,
+          defaultRoundDurationSeconds: r1Val,
+          tierDurations,
         },
         randomness: {
           gapPositionVariance: Number(document.getElementById('inp_gapPos').value),

@@ -9,11 +9,14 @@ interface HUDProps {
 }
 
 const TIER_LABELS: Record<number, string> = {
-  1: 'LEVEL 1',
-  2: 'LEVEL 2',
-  3: 'LEVEL 3',
-  4: 'LEVEL 4',
-  5: 'ENDLESS',
+  1: 'ROUND 1',
+  2: 'ROUND 2',
+  3: 'ROUND 3',
+  4: 'ROUND 4',
+  5: 'ROUND 5',
+  6: 'ROUND 6',
+  7: 'ROUND 7',
+  8: 'ROUND 8',
 };
 
 export const HUD: React.FC<HUDProps> = ({
@@ -25,18 +28,19 @@ export const HUD: React.FC<HUDProps> = ({
   const alivePlayers = Object.values(gameState.players).filter((p) => p.alive);
   const totalPlayers = Object.keys(gameState.players).length;
   const isPaused = gameState.status === 'paused';
+  const isEndless = Boolean(gameState.isEndless || (gameState.totalRoundsBeforeEndless ? gameState.currentTier > gameState.totalRoundsBeforeEndless : gameState.currentTier === 5));
 
   return (
     <header className="w-full h-11 px-3 bg-[#090b12] border-b border-cyber-border/70 flex items-center justify-between shrink-0 z-20 select-none">
       {/* 1. Level */}
       <div
         className={`px-2.5 py-1 rounded border text-xs font-bold font-display tracking-wider uppercase ${
-          gameState.currentTier === 5
+          isEndless
             ? 'bg-red-500/20 border-red-500 text-red-400'
             : 'bg-cyan-500/15 border-cyan-400/60 text-cyan-300'
         }`}
       >
-        {TIER_LABELS[gameState.currentTier] || `LEVEL ${gameState.currentTier}`}
+        {isEndless ? 'ENDLESS' : (TIER_LABELS[gameState.currentTier] || `ROUND ${gameState.currentTier}`)}
       </div>
 
       {/* 2. Score */}

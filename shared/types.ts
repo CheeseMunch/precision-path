@@ -1,4 +1,4 @@
-export type GameTier = 1 | 2 | 3 | 4 | 5;
+export type GameTier = number;
 
 export interface Player {
   id: string;
@@ -45,6 +45,8 @@ export interface GameState {
   pausedBy?: string | null;
   countdownTimer: number;
   currentTier: GameTier;
+  totalRoundsBeforeEndless?: number;
+  isEndless?: boolean;
   activeDirections?: ObstacleDirection[];
   tierTimeRemaining: number;
   elapsedTime: number;
