@@ -952,7 +952,6 @@ app.get('/db-admin', (req, res) => {
         }
       }
 
-      const totalRounds = Math.max(1, Math.min(10, Number(document.getElementById('inp_totalRounds')?.value) || 4));
       const tierDurations = {};
       const r1Val = Number(document.getElementById('inp_r1')?.value) || 7;
       for (let r = 1; r <= totalRounds; r++) {
