@@ -100,6 +100,10 @@ const io = new Server(server, {
 
 let orm: MikroORM | null = null;
 const roomManager = new RoomManager(io, null);
+roomManager.setOnCommunityLevelCleared((communityLevelId) => {
+  const fb = COMMUNITY_LEVELS_FALLBACK.find((l) => l.id === communityLevelId);
+  if (fb) fb.clearsCount = (fb.clearsCount || 0) + 1;
+});
 
 // REST API Endpoints
 app.get('/api/health', (req, res) => {
@@ -1698,6 +1702,7 @@ function toCommunityLevelConfig(row: CommunityLevel): CommunityLevelConfig {
     storyName: 'Community',
     description: row.description || '',
     creatorName: row.creatorName,
+    clearsCount: Number(row.clearsCount ?? 0),
     createdAt: row.createdAt ? row.createdAt.getTime() : Date.now(),
     updatedAt: row.updatedAt ? row.updatedAt.getTime() : Date.now(),
     spawn: row.levelData?.spawn || { x: 0, y: 120 },
@@ -1721,6 +1726,7 @@ function sanitizeCommunityPayload(rawLevel: any, creatorName: string, existingId
     storyName: 'Community',
     clearBonusPoints: 500,
     creatorName: cleanCreator || 'Pilot',
+    clearsCount: Number(rawLevel?.clearsCount ?? 0),
     createdAt: now,
     updatedAt: now,
   };
@@ -1830,6 +1836,7 @@ app.put('/api/community-levels/:id', async (req, res) => {
     }
     const sanitized = sanitizeCommunityPayload(rawLevel, existing.creatorName, existing.id);
     sanitized.createdAt = existing.createdAt;
+    sanitized.clearsCount = existing.clearsCount ?? 0;
     COMMUNITY_LEVELS_FALLBACK[idx] = sanitized;
     return res.json({ level: sanitized });
   } catch (err: any) {

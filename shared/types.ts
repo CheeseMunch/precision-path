@@ -130,6 +130,7 @@ export interface CampaignLevelConfig {
 
 export interface CommunityLevelConfig extends CampaignLevelConfig {
   creatorName: string;
+  clearsCount?: number;
   createdAt: number;
   updatedAt: number;
 }

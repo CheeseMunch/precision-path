@@ -496,10 +496,8 @@ export const Lobby: React.FC<LobbyProps> = ({
                             {lvl.description}
                           </div>
                         )}
-                        <div className="flex items-center gap-3 mt-1.5 text-[11px] font-mono text-slate-500">
-                          <span>Waves: {lvl.waves?.length ?? 0}</span>
-                          <span>Par: {lvl.parTimeSeconds ?? 0}s</span>
-                          <span>Bonus: {lvl.clearBonusPoints ?? 0}</span>
+                        <div className="flex items-center gap-3 mt-1.5 text-[11px] font-mono text-emerald-400/80">
+                          <span>Player Clears: {lvl.clearsCount ?? 0}</span>
                         </div>
                       </div>
 

@@ -14,6 +14,9 @@ export class CommunityLevel {
   @Property({ default: '' })
   description: string = '';
 
+  @Property({ type: 'integer', default: 0 })
+  clearsCount: number = 0;
+
   @Property({ type: 'jsonb' })
   levelData!: {
     spawn: { x: number; y: number };

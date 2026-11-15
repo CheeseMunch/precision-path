@@ -3,6 +3,7 @@ import { MikroORM } from '@mikro-orm/core';
 import { GameEngine } from './GameEngine.js';
 import { User } from '../entities/User.js';
 import { MatchHistory } from '../entities/MatchHistory.js';
+import { CommunityLevel } from '../entities/CommunityLevel.js';
 import { GameState, GameMode, LeaderboardEntry, CampaignLevelConfig } from '../../../shared/types.js';
 
 export class RoomManager {
@@ -10,6 +11,7 @@ export class RoomManager {
   private playerToRoom: Map<string, string> = new Map();
   private io: Server;
   private orm: MikroORM | null = null;
+  private onCommunityLevelCleared?: (communityLevelId: string) => void;
   // Local in-memory leaderboard fallback (empty until real players play)
   private mockLeaderboard: LeaderboardEntry[] = [];
 
@@ -20,6 +22,10 @@ export class RoomManager {
 
   public setORM(orm: MikroORM) {
     this.orm = orm;
+  }
+
+  public setOnCommunityLevelCleared(cb: (communityLevelId: string) => void) {
+    this.onCommunityLevelCleared = cb;
   }
 
   public createRoom(
@@ -124,10 +130,31 @@ export class RoomManager {
       },
       onGameOver: async (state) => {
         this.io.to(roomId).emit('gameState', state);
+        if (state.communityLevelId && state.campaignResult === 'cleared') {
+          await this.incrementCommunityLevelClears(state.communityLevelId);
+        }
         if (state.gameMode === 'campaign') return;
         await this.persistGameResults(state, persistedThisRound);
       },
     });
+  }
+
+  private async incrementCommunityLevelClears(communityLevelId: string) {
+    if (this.orm) {
+      try {
+        const em = this.orm.em.fork();
+        const row = await em.findOne(CommunityLevel, { id: communityLevelId });
+        if (row) {
+          row.clearsCount = (row.clearsCount || 0) + 1;
+          await em.flush();
+        }
+      } catch (err) {
+        console.error('Failed to increment community level clearsCount:', err);
+      }
+    }
+    if (this.onCommunityLevelCleared) {
+      this.onCommunityLevelCleared(communityLevelId);
+    }
   }
 
   private async persistSinglePlayerResult(
