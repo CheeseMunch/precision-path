@@ -33,7 +33,7 @@ class SoundSystem {
       this.failureAudio.preload = 'auto';
       this.levelCompleteAudio = new Audio('/sounds/level-complete.mp3');
       this.levelCompleteAudio.preload = 'auto';
-      this.storyCompleteAudio = new Audio('/sounds/story-complete.mp3');
+      this.storyCompleteAudio = new Audio('/sounds/story-complete.mp3?v=3');
       this.storyCompleteAudio.preload = 'auto';
       this.bgmAudio = new Audio('/sounds/bgm.mp3');
       this.bgmAudio.preload = 'auto';
