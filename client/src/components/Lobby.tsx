@@ -327,9 +327,6 @@ export const Lobby: React.FC<LobbyProps> = ({
                               {lvl.description && (
                                 <div className="text-xs text-slate-400">{lvl.description}</div>
                               )}
-                              <div className="text-[11px] font-mono text-slate-500">
-                                {lvl.checkpoints.length} Checkpoints &bull; +500 Clear Bonus
-                              </div>
                             </div>
 
                             <div className="flex flex-col items-end gap-1 shrink-0">
