@@ -42,6 +42,23 @@ All gameplay timings, arena geometry, and procedural randomness parameters live 
 
 ---
 
+## 🧱 Tech Stack (Frontend & Backend)
+
+### Frontend (`client/`)
+* **Framework & Language:** **React 19** (`react`, `react-dom` `^19.0.0`) + **TypeScript** (`^5.7.2`)
+* **Rendering Engine:** **HTML5 2D Canvas** for the arena, obstacle patterns, edge warning bars, and player rendering
+* **Styling & Icons:** **Tailwind CSS** (`^3.4.17`), **PostCSS**, **Autoprefixer**, and **Lucide React** (`^1.16.0`)
+* **Real-Time Client:** **Socket.io Client** (`^4.8.1`) for live `gameState` updates and throttled pointer/touch input
+* **Build Tooling:** **Vite** (`^6.0.7`) + `@vitejs/plugin-react` (HMR dev server on `:5173` and production bundle to `client/dist`)
+
+### Backend (`server/`)
+* **Runtime & Language:** **Node.js** + **TypeScript** (`tsx` `^4.19.2` for dev watch, `tsc` for production builds)
+* **HTTP & API Server:** **Express.js** (`^4.21.2`), **CORS** (`^2.8.5`), and **dotenv** (`^16.4.7`) serving static builds, REST endpoints (`/api/health`, `/api/leaderboard`, `/api/config`), and the localhost-only Admin Studio (`/db-admin`)
+* **Authoritative Multiplayer:** **Socket.io** (`^4.8.1`) driving the server-side `GameEngine` and `RoomManager`
+* **Database & ORM:** **MikroORM v6** (`@mikro-orm/core`, `@mikro-orm/postgresql`, `@mikro-orm/reflection` `^6.4.0`) + **`pg`** (`^8.13.1`) backed by **Embedded PostgreSQL** (`embedded-postgres` `^18.6.0-beta.19`, `.pgdata`) with automatic in-memory fallback
+
+---
+
 ## 🌐 Networking Stack & Tools Used
 
 | Layer | Tool / Technology | Purpose |
