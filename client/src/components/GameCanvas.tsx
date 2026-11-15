@@ -121,7 +121,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       if (isInitialTapOrClick) {
-        const isTeleport = currentState.gameMode !== 'campaign' && distFromPlayer > 38;
+        const isTeleport = distFromPlayer > 38;
         inputThrottleRef.current = performance.now();
         onSendInput({ x: clampedX, y: clampedY, isTeleport });
 

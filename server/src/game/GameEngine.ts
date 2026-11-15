@@ -283,14 +283,33 @@ export class GameEngine {
     const newX = Math.max(-maxX, Math.min(maxX, input.x));
     const newY = Math.max(-maxY, Math.min(maxY, input.y));
 
+    const jumpDist = Math.hypot(newX - oldX, newY - oldY);
+    const didTeleport = Boolean(input.isTeleport) || jumpDist > 52;
+
     if (this.gameMode === 'campaign') {
       if (this.state.status === 'countdown') {
         // Keep player anchored near spawn during countdown in campaign
         return;
       }
-      // Substep movement along segment so players cannot drag or teleport across walls
-      const dist = Math.hypot(newX - oldX, newY - oldY);
-      const steps = Math.max(1, Math.ceil(dist / 6));
+      if (didTeleport) {
+        // Allow teleporting past gates/walls without auto-failing or counting the gate as cleared
+        player.x = newX;
+        player.y = newY;
+        for (const obs of this.state.obstacles) {
+          if (this.isColliding(player, obs)) {
+            player.alive = false;
+            this.state.campaignResult = 'failed';
+            if (this.onPlayerEliminatedCallback) {
+              this.onPlayerEliminatedCallback(player, this.state.currentTier);
+            }
+            this.checkPlayerStatus();
+            return;
+          }
+        }
+        return;
+      }
+      // Substep normal drag movement along segment so players cannot drag across walls without colliding
+      const steps = Math.max(1, Math.ceil(jumpDist / 6));
       let prevStepX = oldX;
       let prevStepY = oldY;
       for (let s = 1; s <= steps; s++) {
@@ -318,9 +337,6 @@ export class GameEngine {
       }
       return;
     }
-
-    const jumpDist = Math.hypot(newX - oldX, newY - oldY);
-    const didTeleport = Boolean(input.isTeleport) || jumpDist > 52;
 
     player.x = newX;
     player.y = newY;
