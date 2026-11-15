@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Users, Trophy, Zap, Flag, Lock, CheckCircle2, X } from 'lucide-react';
+import { Play, Users, Trophy, Flag, Lock, CheckCircle2, X } from 'lucide-react';
 import type { CampaignLevelConfig } from '../../../shared/types';
 import { getCampaignProgress } from '../utils/campaignProgress';
 
@@ -24,6 +24,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [showCampaignModal, setShowCampaignModal] = useState(false);
   const [campaignLevels, setCampaignLevels] = useState<CampaignLevelConfig[]>([]);
   const [loadingCampaign, setLoadingCampaign] = useState(false);
+  const [selectedStoryIdx, setSelectedStoryIdx] = useState(0);
 
   const openCampaignSelect = async () => {
     setShowCampaignModal(true);
@@ -33,6 +34,31 @@ export const Lobby: React.FC<LobbyProps> = ({
       const data = await res.json();
       if (Array.isArray(data.levels)) {
         setCampaignLevels(data.levels);
+        const curProgress = getCampaignProgress(playerName);
+        const groups: Array<{ storyName: string; levels: CampaignLevelConfig[] }> = [];
+        for (const lvl of data.levels) {
+          const sName = (lvl.storyName || 'Story 1').trim();
+          const last = groups[groups.length - 1];
+          if (last && last.storyName === sName) {
+            last.levels.push(lvl);
+          } else {
+            groups.push({ storyName: sName, levels: [lvl] });
+          }
+        }
+        const frontierIdx = groups.findIndex((g) =>
+          g.levels.some((l) => l.levelNumber === curProgress.highestUnlockedLevel)
+        );
+        if (frontierIdx >= 0) {
+          setSelectedStoryIdx(frontierIdx);
+        } else {
+          let lastUnlocked = 0;
+          groups.forEach((g, idx) => {
+            if (g.levels[0] && g.levels[0].levelNumber <= curProgress.highestUnlockedLevel) {
+              lastUnlocked = idx;
+            }
+          });
+          setSelectedStoryIdx(lastUnlocked);
+        }
       }
     } catch {
       // ignore
@@ -139,20 +165,10 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
       </div>
 
-      {/* Core Rules Chips */}
-      <div className="mt-8 grid grid-cols-2 gap-3 max-w-md w-full text-center">
-        <div className="p-3.5 bg-cyber-panel/50 border border-cyber-border/40 rounded-lg">
-          <div className="text-xs font-bold text-cyan-400 font-mono">PASS THROUGH THE GATES.</div>
-        </div>
+      {/* Core Rule Chip */}
+      <div className="mt-8 max-w-md w-full text-center">
         <div className="p-3.5 bg-cyber-panel/50 border border-pink-500/40 rounded-lg">
-          <div className="text-xs font-bold text-pink-400 font-mono">SURVIVE.</div>
-        </div>
-      </div>
-
-      {/* Precision Arcade Survival chip */}
-      <div className="mt-5 text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded-full text-xs font-mono text-cyan-400 tracking-widest uppercase">
-          <Zap className="w-3.5 h-3.5 animate-pulse" /> Precision Arcade Survival
+          <div className="text-xs font-bold text-pink-400 font-mono">Don&apos;t get hit.</div>
         </div>
       </div>
 
@@ -182,29 +198,100 @@ export const Lobby: React.FC<LobbyProps> = ({
                 LOADING CAMPAIGN SECTORS...
               </div>
             ) : (
-              <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                {(() => {
-                  const groups: Array<{ storyName: string; levels: CampaignLevelConfig[] }> = [];
-                  for (const lvl of campaignLevels) {
-                    const sName = (lvl.storyName || 'Story 1').trim();
-                    const last = groups[groups.length - 1];
-                    if (last && last.storyName === sName) {
-                      last.levels.push(lvl);
-                    } else {
-                      groups.push({ storyName: sName, levels: [lvl] });
-                    }
+              (() => {
+                const groups: Array<{ storyName: string; levels: CampaignLevelConfig[] }> = [];
+                for (const lvl of campaignLevels) {
+                  const sName = (lvl.storyName || 'Story 1').trim();
+                  const last = groups[groups.length - 1];
+                  if (last && last.storyName === sName) {
+                    last.levels.push(lvl);
+                  } else {
+                    groups.push({ storyName: sName, levels: [lvl] });
                   }
-                  return groups.map((grp, gIdx) => (
-                    <div key={`${grp.storyName}-${gIdx}`} className="space-y-2">
-                      <div className="flex items-center justify-between px-1 pt-1">
-                        <span className="text-xs font-display font-bold uppercase tracking-wider text-cyan-300">
-                          {grp.storyName}
-                        </span>
-                        <span className="text-[11px] font-mono text-slate-500">
-                          {grp.levels.length} sector{grp.levels.length === 1 ? '' : 's'}
-                        </span>
-                      </div>
-                      {grp.levels.map((lvl) => {
+                }
+                if (groups.length === 0) {
+                  return (
+                    <div className="py-8 text-center text-xs font-mono text-slate-400">
+                      No campaign levels available.
+                    </div>
+                  );
+                }
+
+                const safeStoryIdx = Math.max(0, Math.min(selectedStoryIdx, groups.length - 1));
+                const activeGroup = groups[safeStoryIdx];
+                const activeStoryUnlocked = Boolean(
+                  activeGroup.levels[0] && activeGroup.levels[0].levelNumber <= progress.highestUnlockedLevel
+                );
+                const anyClearedInStory = activeGroup.levels.some((l) => Boolean(progress.completedLevels[l.levelNumber]));
+                const nextPlayableLevel =
+                  activeGroup.levels.find(
+                    (l) => l.levelNumber <= progress.highestUnlockedLevel && !progress.completedLevels[l.levelNumber]
+                  ) || activeGroup.levels[0];
+
+                return (
+                  <div className="space-y-4">
+                    {/* Selectable Story Tabs across the top */}
+                    <div className="flex flex-wrap gap-2 border-b border-slate-800 pb-3">
+                      {groups.map((grp, gIdx) => {
+                        const firstLvl = grp.levels[0];
+                        const storyUnlocked = Boolean(
+                          firstLvl && firstLvl.levelNumber <= progress.highestUnlockedLevel
+                        );
+                        const storyCleared =
+                          grp.levels.length > 0 &&
+                          grp.levels.every((l) => Boolean(progress.completedLevels[l.levelNumber]));
+                        const isSelected = gIdx === safeStoryIdx;
+                        return (
+                          <button
+                            key={`${grp.storyName}-${gIdx}`}
+                            disabled={!storyUnlocked}
+                            onClick={() => setSelectedStoryIdx(gIdx)}
+                            className={`px-3 py-2 rounded-lg text-xs font-display font-bold uppercase tracking-wider border transition flex items-center gap-1.5 ${
+                              !storyUnlocked
+                                ? 'bg-slate-950/60 border-slate-800/70 text-slate-500 opacity-60 cursor-not-allowed'
+                                : isSelected
+                                  ? 'bg-cyan-500/20 border-cyan-400 text-cyan-200 shadow-sm shadow-cyan-500/20 cursor-pointer'
+                                  : 'bg-slate-900/80 border-slate-700 text-slate-300 hover:border-cyan-500/50 hover:text-white cursor-pointer'
+                            }`}
+                          >
+                            {!storyUnlocked ? (
+                              <Lock className="w-3.5 h-3.5 text-slate-500" />
+                            ) : storyCleared ? (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                            ) : null}
+                            <span>{grp.storyName}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Play Story CTA */}
+                    {activeStoryUnlocked && nextPlayableLevel && (
+                      <button
+                        onClick={() => {
+                          setShowCampaignModal(false);
+                          onPlayCampaign(nextPlayableLevel.levelNumber);
+                        }}
+                        className="w-full py-3 px-4 bg-gradient-to-r from-emerald-400 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 text-black font-bold font-display rounded-xl flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition shadow-lg shadow-emerald-500/20 active:scale-[0.98] cursor-pointer"
+                      >
+                        <Play className="w-4 h-4 fill-black" />
+                        {anyClearedInStory && !activeGroup.levels.every((l) => Boolean(progress.completedLevels[l.levelNumber]))
+                          ? `Continue ${activeGroup.storyName} (Level ${nextPlayableLevel.levelNumber})`
+                          : `Play ${activeGroup.storyName}`}
+                      </button>
+                    )}
+
+                    {/* Or Select Level */}
+                    <div className="flex items-center gap-3">
+                      <div className="h-[1px] bg-slate-800 flex-1" />
+                      <span className="text-[11px] font-mono uppercase text-slate-500">
+                        Or Select Level ({activeGroup.levels.length} sector{activeGroup.levels.length === 1 ? '' : 's'})
+                      </span>
+                      <div className="h-[1px] bg-slate-800 flex-1" />
+                    </div>
+
+                    <div className="space-y-2.5 max-h-[45vh] overflow-y-auto pr-1">
+                      {activeGroup.levels.map((lvl) => {
                         const unlocked = lvl.levelNumber <= progress.highestUnlockedLevel;
                         const record = progress.completedLevels[lvl.levelNumber];
                         return (
@@ -260,9 +347,9 @@ export const Lobby: React.FC<LobbyProps> = ({
                         );
                       })}
                     </div>
-                  ));
-                })()}
-              </div>
+                  </div>
+                );
+              })()
             )}
           </div>
         </div>
