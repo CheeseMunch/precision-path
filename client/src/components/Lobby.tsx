@@ -68,6 +68,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   };
 
   const progress = getCampaignProgress(playerName);
+  const hasPilotName = playerName.trim().length > 0;
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8 relative z-10">
@@ -92,37 +93,45 @@ export const Lobby: React.FC<LobbyProps> = ({
         {/* Name Input */}
         <div>
           <label className="block text-xs uppercase tracking-wider font-mono text-gray-400 mb-2">
-            Callsign / Pilot Name
+            Pilot Name
           </label>
           <input
             type="text"
             value={playerName}
             onChange={(e) => setPlayerName(e.target.value)}
             maxLength={14}
-            placeholder="Enter username..."
+            placeholder="Create a pilot name..."
             className="w-full px-4 py-2.5 bg-[#0a0c13] border border-cyber-border rounded-lg text-white font-mono focus:outline-none focus:border-cyan-400 transition"
           />
+          {!hasPilotName && (
+            <p className="text-[11px] font-mono text-amber-400/90 mt-1.5">
+              Create a pilot name to play or join a lobby.
+            </p>
+          )}
         </div>
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-3">
           <button
             onClick={openCampaignSelect}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-400 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
+            disabled={!hasPilotName}
+            className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-400 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 disabled:opacity-40 disabled:pointer-events-none text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
           >
             <Flag className="w-4 h-4 fill-black" /> Play Campaign
           </button>
 
           <button
             onClick={() => onCreateRoom(true)}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition shadow-lg shadow-cyan-500/20 active:scale-[0.98]"
+            disabled={!hasPilotName}
+            className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-40 disabled:pointer-events-none text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition shadow-lg shadow-cyan-500/20 active:scale-[0.98]"
           >
             <Play className="w-4 h-4 fill-black" /> Play Solo Endless
           </button>
 
           <button
             onClick={() => onCreateRoom(false)}
-            className="w-full py-3 px-4 bg-cyber-panel hover:bg-[#1a1f30] border border-cyan-500/40 text-cyan-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition active:scale-[0.98]"
+            disabled={!hasPilotName}
+            className="w-full py-3 px-4 bg-cyber-panel hover:bg-[#1a1f30] disabled:opacity-40 disabled:pointer-events-none border border-cyan-500/40 text-cyan-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition active:scale-[0.98]"
           >
             <Users className="w-4 h-4" /> Create Multiplayer Lobby
           </button>
@@ -147,7 +156,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           />
           <button
             onClick={() => onJoinRoom(joinCode)}
-            disabled={!joinCode.trim()}
+            disabled={!hasPilotName || !joinCode.trim()}
             className="px-5 py-2 bg-cyber-panel hover:bg-cyan-500 hover:text-black border border-cyber-border hover:border-cyan-400 disabled:opacity-40 disabled:hover:bg-cyber-panel disabled:hover:text-white rounded-lg text-xs font-mono font-bold uppercase transition"
           >
             Join

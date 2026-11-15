@@ -18,7 +18,7 @@ export const App: React.FC = () => {
   const [connected, setConnected] = useState(false);
   const [myPlayerId, setMyPlayerId] = useState<string>('');
   const [playerName, setPlayerName] = useState<string>(() => {
-    return localStorage.getItem('precision_player_name') || `Pilot_${Math.floor(Math.random() * 900 + 100)}`;
+    return localStorage.getItem('precision_player_name') || '';
   });
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -34,7 +34,12 @@ export const App: React.FC = () => {
   const lastUiSyncSignatureRef = useRef<string>('');
 
   useEffect(() => {
-    localStorage.setItem('precision_player_name', playerName);
+    const trimmed = playerName.trim();
+    if (trimmed) {
+      localStorage.setItem('precision_player_name', playerName);
+    } else {
+      localStorage.removeItem('precision_player_name');
+    }
   }, [playerName]);
 
   useEffect(() => {
@@ -231,14 +236,16 @@ export const App: React.FC = () => {
   }, [gameState, showLeaderboard, handleTogglePause]);
 
   const handleCreateRoom = (solo: boolean = false) => {
-    if (!socket) return;
-    socket.emit('createRoom', { playerName, autoStart: solo, gameMode: 'endless' });
+    const cleanName = playerName.trim();
+    if (!socket || !cleanName) return;
+    socket.emit('createRoom', { playerName: cleanName, autoStart: solo, gameMode: 'endless' });
   };
 
   const handlePlayCampaign = (levelNumber: number) => {
-    if (!socket) return;
+    const cleanName = playerName.trim();
+    if (!socket || !cleanName) return;
     socket.emit('createRoom', {
-      playerName,
+      playerName: cleanName,
       autoStart: true,
       gameMode: 'campaign',
       campaignLevel: levelNumber,
@@ -251,8 +258,9 @@ export const App: React.FC = () => {
   };
 
   const handleJoinRoom = (roomCode: string) => {
-    if (!socket || !roomCode.trim()) return;
-    socket.emit('joinRoom', { roomId: roomCode.trim().toUpperCase(), playerName });
+    const cleanName = playerName.trim();
+    if (!socket || !roomCode.trim() || !cleanName) return;
+    socket.emit('joinRoom', { roomId: roomCode.trim().toUpperCase(), playerName: cleanName });
   };
 
   const handleStartGame = () => {
