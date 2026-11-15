@@ -3,8 +3,8 @@ class SoundSystem {
   public enabled: boolean = true;
   // Default volume set to 30% (0.30)
   public volume: number = 0.3;
-  private readonly baseBgmVolume = 0.22;
-  private readonly baseSfxVolume = 0.72;
+  private readonly baseBgmVolume = 0.14;
+  private readonly baseSfxVolume = 0.95;
   private readyAudio: HTMLAudioElement | null = null;
   private goAudio: HTMLAudioElement | null = null;
   private gameAudio: HTMLAudioElement | null = null;
