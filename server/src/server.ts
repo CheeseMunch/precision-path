@@ -1268,25 +1268,27 @@ async function bootstrap() {
     const pgDataDir = path.resolve(__dirname, '../../.pgdata');
     const pgBinDir = path.resolve(__dirname, '../../node_modules/@embedded-postgres/windows-x64/native/bin');
     const pgCtl = path.join(pgBinDir, 'pg_ctl.exe');
-    const postgresExe = path.join(pgBinDir, 'postgres.exe');
     const initDb = path.join(pgBinDir, 'initdb.exe');
+    const pgLogFile = path.resolve(__dirname, '../../postgres.log');
 
     if (fs.existsSync(pgCtl)) {
       try {
         if (!fs.existsSync(path.join(pgDataDir, 'PG_VERSION'))) {
           console.log('[PostgreSQL] Initializing local PostgreSQL cluster...');
-          execFileSync(initDb, ['-D', pgDataDir, '-U', 'postgres', '-A', 'trust', '-E', 'UTF8'], { stdio: 'ignore' });
+          execFileSync(initDb, ['-D', pgDataDir, '-U', 'postgres', '-A', 'trust', '-E', 'UTF8'], {
+            stdio: 'ignore',
+            windowsHide: true,
+          });
         }
-        execFileSync(pgCtl, ['-D', pgDataDir, 'status'], { stdio: 'ignore' });
+        execFileSync(pgCtl, ['-D', pgDataDir, 'status'], { stdio: 'ignore', windowsHide: true });
         console.log('[PostgreSQL] Local PostgreSQL cluster is running on port 5432');
       } catch {
         console.log('[PostgreSQL] Starting local PostgreSQL cluster on 127.0.0.1:5432...');
-        const child = spawn(postgresExe, ['-D', pgDataDir, '-p', '5432', '-h', '127.0.0.1'], {
-          detached: true,
-          stdio: 'ignore',
-        });
-        child.unref();
-        await new Promise((r) => setTimeout(r, 1500));
+        execFileSync(
+          pgCtl,
+          ['-D', pgDataDir, '-l', pgLogFile, '-o', '-p 5432 -h 127.0.0.1', 'start', '-w'],
+          { stdio: 'ignore', windowsHide: true }
+        );
       }
     }
 
