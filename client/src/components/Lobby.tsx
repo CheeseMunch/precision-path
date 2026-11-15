@@ -28,11 +28,14 @@ export const Lobby: React.FC<LobbyProps> = ({
         <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded-full text-xs font-mono text-cyan-400 mb-3 tracking-widest uppercase">
           <Zap className="w-3.5 h-3.5 animate-pulse" /> Precision Arcade Survival
         </div>
-        <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white font-display mb-2 drop-shadow-md">
+        <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white font-display mb-1 drop-shadow-md">
           PRECISION<span className="text-cyan-400">PATH</span>
         </h1>
+        <div className="text-xs font-mono uppercase tracking-[0.25em] text-cyan-300/80 mb-3">
+          CheeseMunch Studios
+        </div>
         <p className="text-gray-400 text-sm md:text-base max-w-md mx-auto">
-          Pass through the gates to rack up points and survive converging obstacle waves across 4 stages into Endless mode.
+          Pass through the gates to rack up points and survive converging obstacle waves as long as you can.
         </p>
       </div>
 
