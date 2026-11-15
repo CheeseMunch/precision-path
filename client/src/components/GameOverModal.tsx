@@ -96,9 +96,8 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
         </div>
 
         {isCampaignCleared && (
-          <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-lg p-2.5 text-xs font-mono flex items-center justify-around text-emerald-300">
+          <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-lg p-2.5 text-xs font-mono flex items-center justify-center text-emerald-300">
             <span>Clear Bonus: +{gameState.campaignClearBonus || 0}</span>
-            <span>Time Bonus: +{gameState.campaignTimeBonus || 0}</span>
           </div>
         )}
 

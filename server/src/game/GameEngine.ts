@@ -53,6 +53,9 @@ export class GameEngine {
   private campaignObstacleSpecs: Map<string, CampaignObstacleSpec> = new Map();
   private campaignWaveQueue: Array<{ triggerAt: number; wave: CampaignWaveSpec }> = [];
   private campaignTransitionTimer: number | null = null;
+  private campaignLevelClearedAwarded = false;
+  private readonly CAMPAIGN_GATE_POINTS = 100;
+  private readonly CAMPAIGN_CLEAR_BONUS = 500;
 
   private onGameOverCallback?: (state: GameState) => void;
   private onTierUpCallback?: (tier: GameTier) => void;
@@ -467,6 +470,7 @@ export class GameEngine {
     this.state.campaignTimeBonus = 0;
     this.state.campaignTransitionBanner = null;
     this.campaignTransitionTimer = null;
+    this.campaignLevelClearedAwarded = false;
     this.state.activeDirections = [];
     this.state.currentTier = level.levelNumber;
     this.state.isEndless = false;
@@ -701,14 +705,16 @@ export class GameEngine {
 
   private triggerCampaignLevelClear(winner?: Player): boolean {
     const level = getCampaignLevel(this.campaignLevelNumber);
-    const timeBonus = Math.max(0, Math.round((level.parTimeSeconds - this.state.elapsedTime) * 25));
-    const bonusPoints = level.clearBonusPoints + timeBonus;
-    if (winner) {
-      winner.score += bonusPoints;
+    const bonusPoints = this.CAMPAIGN_CLEAR_BONUS;
+    if (!this.campaignLevelClearedAwarded) {
+      this.campaignLevelClearedAwarded = true;
+      if (winner) {
+        winner.score += bonusPoints;
+      }
     }
     this.campaignWaveQueue = [];
-    this.state.campaignClearBonus = level.clearBonusPoints;
-    this.state.campaignTimeBonus = timeBonus;
+    this.state.campaignClearBonus = bonusPoints;
+    this.state.campaignTimeBonus = 0;
 
     const totalLevels = CAMPAIGN_CONFIG.levels.length;
     const curStory = (level.storyName || 'Story 1').trim();
@@ -796,7 +802,7 @@ export class GameEngine {
         for (const g of activeGates) {
           g.reached = true;
         }
-        player.score += cp.points;
+        player.score += this.CAMPAIGN_GATE_POINTS;
         player.gatesCleared = (player.gatesCleared || 0) + 1;
         this.state.nextCheckpointIndex = checkpoints.filter((c) => c.reached).length;
 
