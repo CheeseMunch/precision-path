@@ -19,16 +19,16 @@
           "side": "north",
           "patternType": "single-gap-wall",
           "speed": 175,
-          "gapCenter": -110,
+          "gapCenter": 0,
           "gapSize": 125,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "l1-g1",
+              "id": "gate-1794761358267",
               "order": 1,
-              "start": -172,
-              "end": -48,
+              "start": -62,
+              "end": 63,
               "points": 200,
               "label": "GATE 1"
             }
@@ -40,7 +40,7 @@
           "delayAfterPrev": 2,
           "side": "west",
           "patternType": "single-gap-wall",
-          "speed": 165,
+          "speed": 100,
           "gapCenter": -90,
           "gapSize": 130,
           "barThickness": 18,
@@ -84,7 +84,7 @@
           "delayAfterPrev": 2.2,
           "side": "east",
           "patternType": "single-gap-wall",
-          "speed": 175,
+          "speed": 100,
           "gapCenter": 80,
           "gapSize": 130,
           "barThickness": 18,
@@ -99,10 +99,76 @@
               "label": "FINISH"
             }
           ]
+        },
+        {
+          "id": "wave-1794760602696",
+          "order": 5,
+          "delayAfterPrev": 1.8,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 175,
+          "gapCenter": 0,
+          "gapSize": 125,
+          "barThickness": 18,
+          "attachedGates": [
+            {
+              "id": "gate-1794760615254",
+              "order": 5,
+              "start": -62,
+              "end": 63,
+              "points": 200,
+              "label": "GATE 5"
+            }
+          ]
+        },
+        {
+          "id": "wave-1794760625534",
+          "order": 6,
+          "delayAfterPrev": 1.8,
+          "side": "south",
+          "patternType": "orb-cluster",
+          "speed": 175,
+          "gapCenter": 0,
+          "gapSize": 60,
+          "barThickness": 18,
+          "attachedGates": [
+            {
+              "id": "gate-1794760636846",
+              "order": 6,
+              "start": -185,
+              "end": 185,
+              "points": 200,
+              "label": "GATE 6"
+            },
+            {
+              "id": "gate-1794760676379",
+              "order": 7,
+              "start": -185,
+              "end": -78,
+              "points": 200,
+              "label": "GATE 7"
+            },
+            {
+              "id": "gate-1794760677189",
+              "order": 8,
+              "start": -54,
+              "end": 54,
+              "points": 200,
+              "label": "GATE 8"
+            },
+            {
+              "id": "gate-1794760678677",
+              "order": 9,
+              "start": 78,
+              "end": 185,
+              "points": 200,
+              "label": "GATE 9"
+            }
+          ]
         }
       ],
-      "obstacles": [],
-      "checkpoints": []
+      "checkpoints": [],
+      "obstacles": []
     },
     {
       "id": "level-2",
@@ -235,8 +301,8 @@
           ]
         }
       ],
-      "obstacles": [],
-      "checkpoints": []
+      "checkpoints": [],
+      "obstacles": []
     }
   ]
 }

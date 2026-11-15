@@ -61,7 +61,13 @@ export function renderCampaignAdminPage(adminToken: string): string {
     <!-- Level / Pattern Tabs -->
     <div class="cyber-panel rounded-xl p-3 flex flex-wrap items-center justify-between gap-2">
       <div id="levelTabs" class="flex flex-wrap items-center gap-2"></div>
-      <div id="levelTabActions" class="flex items-center gap-2">
+      <div id="levelTabActions" class="flex flex-wrap items-center gap-1.5">
+        <button id="btnMoveLevelLeft" onclick="moveLevel(-1)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-35 disabled:pointer-events-none text-slate-200 border border-slate-600 rounded-lg text-xs font-bold transition" title="Move current level earlier">
+          &larr;
+        </button>
+        <button id="btnMoveLevelRight" onclick="moveLevel(1)" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 disabled:opacity-35 disabled:pointer-events-none text-slate-200 border border-slate-600 rounded-lg text-xs font-bold transition" title="Move current level later">
+          &rarr;
+        </button>
         <button onclick="addLevel()" class="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition">
           + Add Level
         </button>
@@ -119,7 +125,12 @@ export function renderCampaignAdminPage(adminToken: string): string {
       <div class="lg:col-span-6 space-y-4">
         <!-- Level Metadata -->
         <div id="levelMetaPanel" class="cyber-panel rounded-xl p-4 space-y-3">
-          <div class="text-xs font-bold uppercase tracking-wider text-cyan-300">Level Settings</div>
+          <div class="flex items-center justify-between gap-2">
+            <div class="text-xs font-bold uppercase tracking-wider text-cyan-300">Level Settings</div>
+            <button onclick="saveCurrentLevel()" class="px-3 py-1 bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-200 border border-cyan-500/40 rounded-lg text-[11px] font-bold uppercase tracking-wider transition">
+              Save This Level
+            </button>
+          </div>
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-[11px] text-slate-400 mb-1">Level Name</label>
@@ -463,7 +474,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
       }
     }
 
-    async function saveCampaignConfig() {
+    async function saveCampaignConfig(silent) {
       levels.forEach((lvl, idx) => {
         lvl.levelNumber = idx + 1;
         if (!lvl.id) lvl.id = 'level-' + (idx + 1);
@@ -481,37 +492,44 @@ export function renderCampaignAdminPage(adminToken: string): string {
         if (!res.ok) throw new Error(data.error || 'Save failed');
         levels = data.levels;
         if (Array.isArray(data.patterns)) patterns = data.patterns;
+        currentLevelIdx = Math.max(0, Math.min(currentLevelIdx, levels.length - 1));
+        currentPatternIdx = Math.max(0, Math.min(currentPatternIdx, Math.max(0, patterns.length - 1)));
         renderAll();
-        showBanner('Saved ' + levels.length + ' level(s) and ' + patterns.length + ' pattern(s) to campaign-config.json!', false);
+        if (!silent) {
+          showBanner('Saved ' + levels.length + ' level(s) and ' + patterns.length + ' pattern(s) to campaign-config.json!', false);
+        }
       } catch (err) {
         showBanner('Error saving config: ' + err.message, true);
       }
     }
 
-    async function resetCampaignConfig() {
-      if (!confirm('Reset all campaign levels back to defaults?')) return;
+    async function saveCurrentLevel() {
+      const lvl = curLevel();
+      if (!lvl) return;
       try {
-        const res = await fetch('/api/campaign-config/reset', {
+        const res = await fetch('/api/campaign-config/level', {
           method: 'POST',
-          headers: { 'x-admin-token': ADMIN_TOKEN },
+          headers: { 'Content-Type': 'application/json', 'x-admin-token': ADMIN_TOKEN },
+          body: JSON.stringify({ level: lvl }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Reset failed');
-        levels = data.levels;
-        currentLevelIdx = 0;
-        selectedWaveIdx = 0;
-        resetPlayback();
+        if (!res.ok) throw new Error(data.error || 'Save level failed');
+        if (Array.isArray(data.levels)) {
+          levels = data.levels;
+          const idx = levels.findIndex((l) => l.id === data.level?.id);
+          if (idx >= 0) currentLevelIdx = idx;
+        }
         renderAll();
-        showBanner('Campaign config reset to built-in defaults.', false);
+        showBanner('Saved "' + lvl.name + '" (Level ' + (currentLevelIdx + 1) + ') to campaign-config.json!', false);
       } catch (err) {
-        showBanner('Error resetting config: ' + err.message, true);
+        showBanner('Error saving level: ' + err.message, true);
       }
     }
 
     function addLevel() {
       const nextNum = levels.length + 1;
       levels.push({
-        id: 'level-' + nextNum,
+        id: 'level-' + Date.now(),
         levelNumber: nextNum,
         name: 'Level ' + nextNum + ' Sector',
         description: 'Custom wave sequence',
@@ -539,17 +557,48 @@ export function renderCampaignAdminPage(adminToken: string): string {
       selectedWaveIdx = 0;
       resetPlayback();
       renderAll();
+      saveCampaignConfig(true);
+      showBanner('Added Level ' + nextNum + ' and saved.', false);
     }
 
     function deleteCurrentLevel() {
       if (levels.length <= 1) return showBanner('At least 1 level must remain.', true);
-      if (!confirm('Delete ' + curLevel().name + '?')) return;
+      const name = curLevel().name;
+      if (!confirm('Are you sure you want to delete "' + name + '"?')) return;
       levels.splice(currentLevelIdx, 1);
       levels.forEach((l, i) => { l.levelNumber = i + 1; });
       currentLevelIdx = Math.max(0, currentLevelIdx - 1);
       selectedWaveIdx = 0;
       resetPlayback();
       renderAll();
+      saveCampaignConfig(true);
+      showBanner('Deleted "' + name + '" and saved.', false);
+    }
+
+    function moveLevel(delta) {
+      const targetIdx = currentLevelIdx + delta;
+      if (targetIdx < 0 || targetIdx >= levels.length) return;
+      const [moved] = levels.splice(currentLevelIdx, 1);
+      levels.splice(targetIdx, 0, moved);
+      levels.forEach((l, i) => { l.levelNumber = i + 1; });
+      currentLevelIdx = targetIdx;
+      renderAll();
+      saveCampaignConfig(true);
+    }
+
+    let draggedLevelIdx = null;
+    function reorderLevelByDrop(fromIdx, toIdx) {
+      if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
+      const activeId = curLevel() ? curLevel().id : null;
+      const [moved] = levels.splice(fromIdx, 1);
+      levels.splice(toIdx, 0, moved);
+      levels.forEach((l, i) => { l.levelNumber = i + 1; });
+      if (activeId) {
+        const newIdx = levels.findIndex((l) => l.id === activeId);
+        if (newIdx >= 0) currentLevelIdx = newIdx;
+      }
+      renderAll();
+      saveCampaignConfig(true);
     }
 
     function updateLevelMeta(field, val) {
@@ -959,12 +1008,27 @@ export function renderCampaignAdminPage(adminToken: string): string {
       const c = document.getElementById('levelTabs');
       c.innerHTML = '';
       if (viewMode === 'levels') {
+        const btnLeft = document.getElementById('btnMoveLevelLeft');
+        const btnRight = document.getElementById('btnMoveLevelRight');
+        if (btnLeft) btnLeft.disabled = currentLevelIdx <= 0;
+        if (btnRight) btnRight.disabled = currentLevelIdx >= levels.length - 1;
         levels.forEach((lvl, idx) => {
           const b = document.createElement('button');
+          b.draggable = true;
           b.className = 'px-3 py-1.5 rounded-lg text-xs font-bold transition border ' +
             (idx === currentLevelIdx ? 'bg-cyan-500 text-black border-cyan-400' : 'bg-slate-900 text-slate-300 border-slate-700 hover:border-cyan-500/50');
           b.textContent = 'L' + (idx + 1) + ': ' + lvl.name;
+          b.title = 'Click to edit, drag to reorder';
           b.onclick = () => { currentLevelIdx = idx; selectedWaveIdx = 0; selectedWaveIds.clear(); resetPlayback(); renderAll(); };
+          b.ondragstart = (ev) => { draggedLevelIdx = idx; ev.dataTransfer.effectAllowed = 'move'; };
+          b.ondragover = (ev) => { ev.preventDefault(); b.classList.add('ring-2', 'ring-cyan-400'); };
+          b.ondragleave = () => { b.classList.remove('ring-2', 'ring-cyan-400'); };
+          b.ondrop = (ev) => {
+            ev.preventDefault();
+            b.classList.remove('ring-2', 'ring-cyan-400');
+            reorderLevelByDrop(draggedLevelIdx, idx);
+            draggedLevelIdx = null;
+          };
           c.appendChild(b);
         });
       } else {

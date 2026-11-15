@@ -87,7 +87,7 @@ function hasValidAdminToken(req: express.Request): boolean {
 }
 
 app.use(cors());
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({ limit: '2mb' }));
 
 const io = new Server(server, {
   maxHttpBufferSize: 16384, // 16KB max packet size against DoS
@@ -315,59 +315,62 @@ function sanitizeCampaignWaves(rawWaves: any[], idPrefix: string): CampaignWaveS
     : [];
 }
 
+function sanitizeCampaignLevel(lvl: any, idx: number): CampaignLevelConfig {
+  return {
+    id: String(lvl?.id || `level-${idx + 1}`),
+    levelNumber: idx + 1,
+    name: String(lvl?.name || `Level ${idx + 1}`).slice(0, 60),
+    description: String(lvl?.description || '').slice(0, 160),
+    spawn: {
+      x: Math.max(-210, Math.min(210, Number(lvl?.spawn?.x ?? 0))),
+      y: Math.max(-385, Math.min(385, Number(lvl?.spawn?.y ?? 340))),
+    },
+    clearBonusPoints: Math.max(0, Math.round(Number(lvl?.clearBonusPoints ?? 500))),
+    parTimeSeconds: Math.max(5, Math.round(Number(lvl?.parTimeSeconds ?? 25))),
+    waves: sanitizeCampaignWaves(lvl?.waves, `lvl-${idx + 1}`),
+    checkpoints: Array.isArray(lvl?.checkpoints)
+      ? lvl.checkpoints.map((cp: any, cpIdx: number) => {
+          const axis = cp.axis === 'vertical' ? 'vertical' : 'horizontal';
+          const coordLimit = axis === 'horizontal' ? 400 : 225;
+          const spanLimit = axis === 'horizontal' ? 225 : 400;
+          const rawStart = Number(cp.start ?? -80);
+          const rawEnd = Number(cp.end ?? 80);
+          return {
+            id: String(cp.id || `cp-${idx + 1}-${cpIdx + 1}`),
+            order: Math.max(1, Math.round(Number(cp.order ?? cpIdx + 1))),
+            axis,
+            coord: Math.max(-coordLimit, Math.min(coordLimit, Number(cp.coord ?? 0))),
+            start: Math.max(-spanLimit, Math.min(spanLimit, Math.min(rawStart, rawEnd))),
+            end: Math.max(-spanLimit, Math.min(spanLimit, Math.max(rawStart, rawEnd))),
+            points: Math.max(0, Math.round(Number(cp.points ?? 100))),
+            label: cp.label ? String(cp.label).slice(0, 24) : undefined,
+          };
+        })
+      : [],
+    obstacles: Array.isArray(lvl?.obstacles)
+      ? lvl.obstacles.map((obs: any, oIdx: number) => ({
+          id: String(obs.id || `obs-${idx + 1}-${oIdx + 1}`),
+          type: obs.type === 'circle' ? 'circle' : 'rectangle',
+          x: Math.max(-225, Math.min(225, Number(obs.x ?? 0))),
+          y: Math.max(-400, Math.min(400, Number(obs.y ?? 0))),
+          width: obs.width !== undefined ? Math.max(8, Math.min(450, Number(obs.width))) : undefined,
+          height: obs.height !== undefined ? Math.max(8, Math.min(450, Number(obs.height))) : undefined,
+          radius: obs.radius !== undefined ? Math.max(6, Math.min(120, Number(obs.radius))) : undefined,
+          rotation: Number(obs.rotation ?? 0),
+          rotationSpeed: Number(obs.rotationSpeed ?? 0),
+          patrolAxis: obs.patrolAxis === 'x' || obs.patrolAxis === 'y' ? obs.patrolAxis : 'none',
+          patrolRange: Math.max(0, Math.min(350, Number(obs.patrolRange ?? 0))),
+          patrolSpeed: Number(obs.patrolSpeed ?? 0),
+          color: obs.color ? String(obs.color).slice(0, 24) : '#ff2a6d',
+        }))
+      : [],
+  };
+}
+
 function applyCampaignConfig(body: any) {
   if (!body) return;
   if (Array.isArray(body.levels) && body.levels.length > 0) {
-    const sanitized: CampaignLevelConfig[] = body.levels.map((lvl: any, idx: number) => ({
-      id: String(lvl.id || `level-${idx + 1}`),
-      levelNumber: idx + 1,
-      name: String(lvl.name || `Level ${idx + 1}`).slice(0, 60),
-      description: String(lvl.description || '').slice(0, 160),
-      spawn: {
-        x: Math.max(-210, Math.min(210, Number(lvl.spawn?.x ?? 0))),
-        y: Math.max(-385, Math.min(385, Number(lvl.spawn?.y ?? 340))),
-      },
-      clearBonusPoints: Math.max(0, Math.round(Number(lvl.clearBonusPoints ?? 500))),
-      parTimeSeconds: Math.max(5, Math.round(Number(lvl.parTimeSeconds ?? 25))),
-      waves: sanitizeCampaignWaves(lvl.waves, `lvl-${idx + 1}`),
-      checkpoints: Array.isArray(lvl.checkpoints)
-        ? lvl.checkpoints.map((cp: any, cpIdx: number) => {
-            const axis = cp.axis === 'vertical' ? 'vertical' : 'horizontal';
-            const coordLimit = axis === 'horizontal' ? 400 : 225;
-            const spanLimit = axis === 'horizontal' ? 225 : 400;
-            const rawStart = Number(cp.start ?? -80);
-            const rawEnd = Number(cp.end ?? 80);
-            return {
-              id: String(cp.id || `cp-${idx + 1}-${cpIdx + 1}`),
-              order: Math.max(1, Math.round(Number(cp.order ?? cpIdx + 1))),
-              axis,
-              coord: Math.max(-coordLimit, Math.min(coordLimit, Number(cp.coord ?? 0))),
-              start: Math.max(-spanLimit, Math.min(spanLimit, Math.min(rawStart, rawEnd))),
-              end: Math.max(-spanLimit, Math.min(spanLimit, Math.max(rawStart, rawEnd))),
-              points: Math.max(0, Math.round(Number(cp.points ?? 100))),
-              label: cp.label ? String(cp.label).slice(0, 24) : undefined,
-            };
-          })
-        : [],
-      obstacles: Array.isArray(lvl.obstacles)
-        ? lvl.obstacles.map((obs: any, oIdx: number) => ({
-            id: String(obs.id || `obs-${idx + 1}-${oIdx + 1}`),
-            type: obs.type === 'circle' ? 'circle' : 'rectangle',
-            x: Math.max(-225, Math.min(225, Number(obs.x ?? 0))),
-            y: Math.max(-400, Math.min(400, Number(obs.y ?? 0))),
-            width: obs.width !== undefined ? Math.max(8, Math.min(450, Number(obs.width))) : undefined,
-            height: obs.height !== undefined ? Math.max(8, Math.min(450, Number(obs.height))) : undefined,
-            radius: obs.radius !== undefined ? Math.max(6, Math.min(120, Number(obs.radius))) : undefined,
-            rotation: Number(obs.rotation ?? 0),
-            rotationSpeed: Number(obs.rotationSpeed ?? 0),
-            patrolAxis: obs.patrolAxis === 'x' || obs.patrolAxis === 'y' ? obs.patrolAxis : 'none',
-            patrolRange: Math.max(0, Math.min(350, Number(obs.patrolRange ?? 0))),
-            patrolSpeed: Number(obs.patrolSpeed ?? 0),
-            color: obs.color ? String(obs.color).slice(0, 24) : '#ff2a6d',
-          }))
-        : [],
-    }));
-    CAMPAIGN_CONFIG.levels = sanitized;
+    CAMPAIGN_CONFIG.levels = body.levels.map((lvl: any, idx: number) => sanitizeCampaignLevel(lvl, idx));
   }
 
   if (Array.isArray(body.patterns)) {
@@ -1661,13 +1664,25 @@ app.post('/api/campaign-config', (req, res) => {
   res.json(CAMPAIGN_CONFIG);
 });
 
-app.post('/api/campaign-config/reset', (req, res) => {
+app.post('/api/campaign-config/level', (req, res) => {
   if (!isDirectLocalhost(req) || !hasValidAdminToken(req)) {
     return res.status(403).json({ error: 'Campaign configuration is restricted to authenticated localhost admin access.' });
   }
-  applyCampaignConfig({ levels: JSON.parse(JSON.stringify(DEFAULT_CAMPAIGN_LEVELS)) });
+  const rawLevel = req.body?.level;
+  if (!rawLevel || typeof rawLevel !== 'object') {
+    return res.status(400).json({ error: 'Missing level payload.' });
+  }
+  const existingIdx = CAMPAIGN_CONFIG.levels.findIndex((l) => l.id === rawLevel.id);
+  const targetIdx = existingIdx >= 0 ? existingIdx : CAMPAIGN_CONFIG.levels.length;
+  const sanitized = sanitizeCampaignLevel(rawLevel, targetIdx);
+  if (existingIdx >= 0) {
+    CAMPAIGN_CONFIG.levels[existingIdx] = sanitized;
+  } else {
+    CAMPAIGN_CONFIG.levels.push(sanitized);
+  }
+  CAMPAIGN_CONFIG.levels.forEach((l, i) => { l.levelNumber = i + 1; });
   saveCampaignConfigToDisk();
-  res.json(CAMPAIGN_CONFIG);
+  res.json({ level: sanitized, levels: CAMPAIGN_CONFIG.levels });
 });
 
 // Serve built React frontend in production / Docker / Coolify single-container mode
