@@ -224,14 +224,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     canvas.height = LOGICAL_HEIGHT * dpr;
 
     let lastFrameTime = performance.now();
+    let simNow = lastFrameTime;
 
-    const render = (now: number) => {
-      const frameDt = Math.min(0.05, Math.max(0.001, (now - lastFrameTime) / 1000));
-      lastFrameTime = now;
+    const render = (rafNow: number) => {
+      const rawDtMs = Math.max(0, rafNow - lastFrameTime);
+      lastFrameTime = rafNow;
 
       const currentState = liveGameStateRef?.current || gameStateRef.current;
       const currentMyId = myPlayerIdRef.current;
       const isPlaying = currentState.status === 'playing';
+      const isPaused = currentState.status === 'paused';
+      const frameDt = isPaused ? 0 : Math.min(0.05, Math.max(0.001, rawDtMs / 1000));
+      if (!isPaused) {
+        simNow += rawDtMs;
+      }
+      const now = simNow;
 
       const width = LOGICAL_WIDTH;
       const height = LOGICAL_HEIGHT;
@@ -309,9 +316,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             let spMs = spawnPerfMapGates.get(key);
             if (spMs === undefined) {
               spMs = now - Math.max(0, currentState.elapsedTime - cp.spawnTime) * 1000;
-              spawnPerfMapGates.set(key, spMs);
-            } else if (currentState.status === 'paused') {
-              spMs += frameDt * 1000;
               spawnPerfMapGates.set(key, spMs);
             }
             const ageSec = Math.max(0, (now - spMs) / 1000);
@@ -429,14 +433,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       const spawnPerfMap = obstacleSpawnPerfRef.current;
       const activeIds = new Set<string>();
-      const frameDeltaMs = frameDt * 1000;
-
-      // If game is paused, shift birth timestamps forward by frameDeltaMs so walls freeze in place cleanly
-      if (currentState.status === 'paused') {
-        for (const [id, t0] of spawnPerfMap.entries()) {
-          spawnPerfMap.set(id, t0 + frameDeltaMs);
-        }
-      }
 
       const mePlayer = currentState.players[currentMyId];
       const mePos = localPlayerPosRef.current || (mePlayer ? { x: mePlayer.x, y: mePlayer.y } : null);
