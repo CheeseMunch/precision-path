@@ -86,6 +86,8 @@ export interface CampaignWaveSpec {
   gapSize: number;
   barThickness?: number;
   color?: string;
+  patternGroupId?: string;
+  patternGroupName?: string;
   attachedGates: CampaignWaveGateSpec[];
 }
 

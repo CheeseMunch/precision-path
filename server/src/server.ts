@@ -294,6 +294,8 @@ function sanitizeCampaignWaves(rawWaves: any[], idPrefix: string): CampaignWaveS
           gapSize: Math.max(60, Math.min(400, Number(w.gapSize ?? 120))),
           barThickness: Math.max(8, Math.min(48, Number(w.barThickness ?? 18))),
           color: w.color ? String(w.color).slice(0, 24) : undefined,
+          patternGroupId: w.patternGroupId ? String(w.patternGroupId).slice(0, 64) : undefined,
+          patternGroupName: w.patternGroupName ? String(w.patternGroupName).slice(0, 48) : undefined,
           attachedGates: Array.isArray(w.attachedGates)
             ? w.attachedGates.map((g: any, gIdx: number) => {
                 const s = Number(g.start ?? -60);

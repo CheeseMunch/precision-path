@@ -199,6 +199,22 @@ export function renderCampaignAdminPage(adminToken: string): string {
               <span id="waveCountLabel" class="text-[11px] font-mono text-slate-400">0 waves</span>
             </div>
           </div>
+          <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-900/60 border border-slate-800 rounded-lg px-2.5 py-1.5">
+            <div class="flex items-center gap-1.5">
+              <button id="btnSelectAllWaves" onclick="toggleSelectAllWaves()" class="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 rounded text-[11px] font-bold transition">
+                Select All
+              </button>
+              <span id="selectedWavesCountLabel" class="text-[11px] font-mono text-slate-400">0 selected</span>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button id="btnDupSelected" onclick="duplicateSelectedWaves()" disabled class="px-2 py-0.5 bg-cyan-600/20 hover:bg-cyan-600/35 disabled:opacity-40 disabled:pointer-events-none text-cyan-200 border border-cyan-500/40 rounded text-[11px] font-bold transition">
+                Duplicate
+              </button>
+              <button id="btnDelSelected" onclick="deleteSelectedWaves()" disabled class="px-2 py-0.5 bg-rose-600/20 hover:bg-rose-600/35 disabled:opacity-40 disabled:pointer-events-none text-rose-200 border border-rose-500/40 rounded text-[11px] font-bold transition">
+                Delete
+              </button>
+            </div>
+          </div>
           <div id="waveList" class="space-y-1.5 max-h-48 overflow-y-auto pr-1"></div>
         </div>
 
@@ -590,13 +606,20 @@ export function renderCampaignAdminPage(adminToken: string): string {
       }
     }
 
-    function cloneWavesForInsert(sourceWaves, startOrder, nextGateOrdStart) {
+    function cloneWavesForInsert(sourceWaves, startOrder, nextGateOrdStart, groupMeta) {
       const stamp = Date.now() + '-' + Math.floor(Math.random() * 10000);
       let gOrd = nextGateOrdStart;
       return (sourceWaves || []).slice().sort((a, b) => a.order - b.order).map((w, idx) => {
         const cloned = JSON.parse(JSON.stringify(w));
         cloned.id = 'wave-' + stamp + '-' + idx;
         cloned.order = startOrder + idx;
+        if (groupMeta) {
+          cloned.patternGroupId = groupMeta.id;
+          cloned.patternGroupName = groupMeta.name;
+        } else {
+          delete cloned.patternGroupId;
+          delete cloned.patternGroupName;
+        }
         cloned.attachedGates = (cloned.attachedGates || []).map((g, gIdx) => ({
           ...g,
           id: 'gate-' + stamp + '-' + idx + '-' + gIdx,
@@ -618,12 +641,127 @@ export function renderCampaignAdminPage(adminToken: string): string {
       }
       if (!target.waves) target.waves = [];
       const maxOrd = target.waves.length ? Math.max(...target.waves.map((w) => Number(w.order || 1))) : 0;
-      const inserted = cloneWavesForInsert(pat.waves, maxOrd + 1, nextGateOrder(target));
+      const groupMeta = { id: 'pg-' + Date.now() + '-' + Math.floor(Math.random() * 1000), name: pat.name };
+      const inserted = cloneWavesForInsert(pat.waves, maxOrd + 1, nextGateOrder(target), groupMeta);
       target.waves.push(...inserted);
       selectedWaveIdx = target.waves.length - inserted.length;
       renderAll();
       if (inserted[0]) jumpToWave(inserted[0].id);
       showBanner('Inserted "' + pat.name + '" (' + inserted.length + ' waves).', false);
+    }
+
+    function removePatternGroup(groupId) {
+      const target = activeContainer();
+      if (!target || !target.waves) return;
+      const before = target.waves.length;
+      target.waves = target.waves.filter((w) => {
+        if (w.patternGroupId === groupId) {
+          selectedWaveIds.delete(w.id);
+          return false;
+        }
+        return true;
+      });
+      const removed = before - target.waves.length;
+      if (removed === 0) return;
+      selectedWaveIdx = Math.max(0, Math.min(selectedWaveIdx, target.waves.length - 1));
+      renderAll();
+      showBanner('Removed ' + removed + ' wave(s) from inserted pattern.', false);
+    }
+
+    function toggleSelectAllWaves() {
+      const target = activeContainer();
+      if (!target || !target.waves || target.waves.length === 0) return;
+      const allSelected = target.waves.every((w) => selectedWaveIds.has(w.id));
+      selectedWaveIds.clear();
+      if (!allSelected) {
+        target.waves.forEach((w) => selectedWaveIds.add(w.id));
+      }
+      renderWaveList();
+    }
+
+    function duplicateSelectedWaves() {
+      const target = activeContainer();
+      if (!target || !target.waves) return;
+      const ordered = getOrderedWaves(target);
+      const chosen = ordered.filter((w) => selectedWaveIds.has(w.id));
+      if (chosen.length === 0) return;
+      const maxOrd = target.waves.length ? Math.max(...target.waves.map((w) => Number(w.order || 1))) : 0;
+      const dupes = cloneWavesForInsert(chosen, maxOrd + 1, nextGateOrder(target));
+      target.waves.push(...dupes);
+      selectedWaveIds.clear();
+      dupes.forEach((w) => selectedWaveIds.add(w.id));
+      selectedWaveIdx = target.waves.length - dupes.length;
+      renderAll();
+      if (dupes[0]) jumpToWave(dupes[0].id);
+      showBanner('Duplicated ' + dupes.length + ' wave(s).', false);
+    }
+
+    function deleteSelectedWaves() {
+      const target = activeContainer();
+      if (!target || !target.waves || selectedWaveIds.size === 0) return;
+      const count = target.waves.filter((w) => selectedWaveIds.has(w.id)).length;
+      if (count === 0) return;
+      if (!confirm('Delete ' + count + ' selected wave(s)?')) return;
+      target.waves = target.waves.filter((w) => !selectedWaveIds.has(w.id));
+      selectedWaveIds.clear();
+      selectedWaveIdx = Math.max(0, Math.min(selectedWaveIdx, target.waves.length - 1));
+      renderAll();
+      showBanner('Deleted ' + count + ' wave(s).', false);
+    }
+
+    function applyOrderedWaves(target, newOrdered, focusWaveId) {
+      newOrdered.forEach((w, i) => { w.order = i + 1; });
+      target.waves = newOrdered;
+      if (focusWaveId) {
+        const idx = target.waves.findIndex((w) => w.id === focusWaveId);
+        if (idx >= 0) selectedWaveIdx = idx;
+      }
+      renderAll();
+    }
+
+    function moveWaveInSchedule(waveId, delta) {
+      const target = activeContainer();
+      if (!target || !target.waves) return;
+      const ordered = getOrderedWaves(target);
+      const idx = ordered.findIndex((w) => w.id === waveId);
+      const nextIdx = idx + delta;
+      if (idx < 0 || nextIdx < 0 || nextIdx >= ordered.length) return;
+      const [moved] = ordered.splice(idx, 1);
+      ordered.splice(nextIdx, 0, moved);
+      applyOrderedWaves(target, ordered, moved.id);
+    }
+
+    let draggedWaveId = null;
+    function reorderWaveByDrop(fromId, toId) {
+      if (!fromId || !toId || fromId === toId) return;
+      const target = activeContainer();
+      if (!target || !target.waves) return;
+      const ordered = getOrderedWaves(target);
+      const fromIdx = ordered.findIndex((w) => w.id === fromId);
+      const toIdx = ordered.findIndex((w) => w.id === toId);
+      if (fromIdx < 0 || toIdx < 0) return;
+      const [moved] = ordered.splice(fromIdx, 1);
+      ordered.splice(toIdx, 0, moved);
+      applyOrderedWaves(target, ordered, moved.id);
+    }
+
+    function updateBulkActionUI(ordered) {
+      const total = ordered ? ordered.length : 0;
+      const selCount = ordered ? ordered.filter((w) => selectedWaveIds.has(w.id)).length : 0;
+      const lbl = document.getElementById('selectedWavesCountLabel');
+      const btnAll = document.getElementById('btnSelectAllWaves');
+      const btnDup = document.getElementById('btnDupSelected');
+      const btnDel = document.getElementById('btnDelSelected');
+      if (lbl) lbl.textContent = selCount + ' selected';
+      if (btnAll) btnAll.textContent = (total > 0 && selCount === total) ? 'Clear' : 'Select All';
+      if (btnDup) {
+        btnDup.disabled = selCount === 0;
+        btnDup.textContent = selCount > 0 ? 'Duplicate (' + selCount + ')' : 'Duplicate';
+      }
+      if (btnDel) {
+        btnDel.disabled = selCount === 0;
+        btnDel.textContent = selCount > 0 ? 'Delete (' + selCount + ')' : 'Delete';
+      }
     }
 
     function saveSelectedOrAllAsPattern() {
@@ -847,37 +985,79 @@ export function renderCampaignAdminPage(adminToken: string): string {
       listEl.innerHTML = '';
       if (!lvl) {
         document.getElementById('waveCountLabel').textContent = '0 waves';
+        updateBulkActionUI([]);
         return;
       }
       const ordered = getOrderedWaves(lvl);
       document.getElementById('waveCountLabel').textContent = ordered.length + ' wave(s)';
 
       let acc = 0;
-      ordered.forEach((w) => {
+      ordered.forEach((w, ordIdx) => {
         acc += Number(w.delayAfterPrev || 0);
         const origIdx = lvl.waves.indexOf(w);
         const isSel = origIdx === selectedWaveIdx;
         const isChecked = selectedWaveIds.has(w.id);
         const row = document.createElement('div');
-        row.className = 'flex items-center justify-between px-2.5 py-2 rounded-lg text-xs cursor-pointer border ' +
+        row.draggable = true;
+        row.className = 'flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-xs cursor-pointer border ' +
           (isSel ? 'bg-cyan-950/60 border-cyan-400 text-cyan-100' : 'bg-slate-900/80 border-slate-800 hover:border-slate-600');
         const gateCount = (w.attachedGates || []).length;
+        const patBadge = w.patternGroupId
+          ? '<button type="button" data-rm-group="' + w.patternGroupId + '" class="px-1.5 py-0.5 rounded bg-violet-500/20 hover:bg-rose-500/30 text-violet-200 hover:text-rose-200 border border-violet-500/30 text-[10px] font-semibold transition" title="Remove entire inserted pattern">' +
+              (w.patternGroupName || 'Pattern') + ' &times;' +
+            '</button>'
+          : '';
         row.innerHTML =
-          '<div class="flex items-center gap-2">' +
-            '<input type="checkbox" class="accent-violet-400 cursor-pointer" ' + (isChecked ? 'checked' : '') + ' title="Select wave to save as pattern" />' +
-            '<span class="px-1.5 py-0.5 rounded bg-slate-800 font-mono text-cyan-300 font-bold">#' + w.order + '</span>' +
-            '<span class="uppercase font-bold text-rose-300">' + w.side + '</span>' +
-            '<span class="text-slate-300">' + w.patternType + '</span>' +
+          '<div class="flex items-center gap-1.5 min-w-0">' +
+            '<span class="text-slate-500 cursor-grab select-none px-0.5" title="Drag to reorder">&#8942;&#8942;</span>' +
+            '<input type="checkbox" class="accent-violet-400 cursor-pointer shrink-0" ' + (isChecked ? 'checked' : '') + ' title="Select wave for duplicate / delete / save pattern" />' +
+            '<span class="px-1.5 py-0.5 rounded bg-slate-800 font-mono text-cyan-300 font-bold shrink-0">#' + w.order + '</span>' +
+            '<span class="uppercase font-bold text-rose-300 shrink-0">' + w.side + '</span>' +
+            '<span class="text-slate-300 truncate">' + w.patternType + '</span>' +
+            patBadge +
           '</div>' +
-          '<div class="flex items-center gap-2 font-mono text-[11px]">' +
+          '<div class="flex items-center gap-1.5 font-mono text-[11px] shrink-0">' +
             '<span class="text-slate-400">@' + acc.toFixed(1) + 's</span>' +
-            '<span class="px-1.5 py-0.5 rounded ' + (gateCount ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500') + '">' + gateCount + ' gate</span>' +
+            '<span class="px-1.5 py-0.5 rounded ' + (gateCount ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-800 text-slate-500') + '">' + gateCount + 'g</span>' +
+            '<button type="button" data-move="-1" ' + (ordIdx === 0 ? 'disabled' : '') + ' class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200" title="Move up">&uarr;</button>' +
+            '<button type="button" data-move="1" ' + (ordIdx === ordered.length - 1 ? 'disabled' : '') + ' class="px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-slate-200" title="Move down">&darr;</button>' +
           '</div>';
         const cb = row.querySelector('input[type="checkbox"]');
         cb.onclick = (ev) => {
           ev.stopPropagation();
           if (cb.checked) selectedWaveIds.add(w.id);
           else selectedWaveIds.delete(w.id);
+          updateBulkActionUI(ordered);
+        };
+        const rmBtn = row.querySelector('[data-rm-group]');
+        if (rmBtn) {
+          rmBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            removePatternGroup(w.patternGroupId);
+          };
+        }
+        row.querySelectorAll('[data-move]').forEach((btn) => {
+          btn.onclick = (ev) => {
+            ev.stopPropagation();
+            moveWaveInSchedule(w.id, Number(btn.dataset.move));
+          };
+        });
+        row.ondragstart = (ev) => {
+          draggedWaveId = w.id;
+          ev.dataTransfer.effectAllowed = 'move';
+        };
+        row.ondragover = (ev) => {
+          ev.preventDefault();
+          row.classList.add('ring-1', 'ring-cyan-400');
+        };
+        row.ondragleave = () => {
+          row.classList.remove('ring-1', 'ring-cyan-400');
+        };
+        row.ondrop = (ev) => {
+          ev.preventDefault();
+          row.classList.remove('ring-1', 'ring-cyan-400');
+          reorderWaveByDrop(draggedWaveId, w.id);
+          draggedWaveId = null;
         };
         row.onclick = () => {
           selectedWaveIdx = origIdx;
@@ -887,6 +1067,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
         };
         listEl.appendChild(row);
       });
+      updateBulkActionUI(ordered);
     }
 
     function renderWaveInspector() {
@@ -918,7 +1099,12 @@ export function renderCampaignAdminPage(adminToken: string): string {
         selectedWaveIdx = Math.max(0, selectedWaveIdx - 1);
         renderAll();
       }, true);
-      actionsEl.append(btnDup, btnDel);
+      if (w.patternGroupId) {
+        const btnRmPat = makeActionBtn('Remove Pattern', () => removePatternGroup(w.patternGroupId), true);
+        actionsEl.append(btnDup, btnDel, btnRmPat);
+      } else {
+        actionsEl.append(btnDup, btnDel);
+      }
 
       bodyEl.innerHTML = '';
       const grid = document.createElement('div');
