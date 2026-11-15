@@ -293,7 +293,7 @@ export class GameEngine {
       this.onStateUpdateCallback(this.state);
     }
 
-    // Hold "Ready" phase for 1.05s so the match begins right when "Go!" hits in the trimmed overlay video
+    // Hold countdown for the full 2.05s duration of the trimmed "Ready... Go!" video so walls only start after it ends
     this.countdownIntervalId = setTimeout(() => {
       this.countdownIntervalId = null;
       this.state.countdownTimer = 0;
@@ -301,7 +301,7 @@ export class GameEngine {
       if (this.onStateUpdateCallback) {
         this.onStateUpdateCallback(this.state);
       }
-    }, 1050);
+    }, 2050);
   }
 
   public startGame() {

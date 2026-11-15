@@ -285,7 +285,7 @@ export const App: React.FC = () => {
               onFinished={() => {
                 setShowReadyGo(false);
                 if (
-                  gameState.status === 'playing' &&
+                  (gameState.status === 'playing' || gameState.status === 'countdown') &&
                   gameState.players[myPlayerId]?.alive !== false
                 ) {
                   sound.startMusic();
