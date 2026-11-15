@@ -1134,10 +1134,11 @@ export class GameEngine {
 
     // Let the last remaining player in multiplayer keep playing until all players are eliminated
     if (alivePlayers.length === 0) {
-      const longestSurvivor =
-        [...playerList].sort((a, b) => b.survivedTime - a.survivedTime || b.score - a.score)[0] ||
+      // Win condition: highest points first, then survival time as tiebreaker
+      const topWinner =
+        [...playerList].sort((a, b) => b.score - a.score || b.survivedTime - a.survivedTime)[0] ||
         null;
-      this.endGame(longestSurvivor);
+      this.endGame(topWinner);
     }
   }
 

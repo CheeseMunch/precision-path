@@ -19,8 +19,9 @@ export const GameOverModal: React.FC<GameOverModalProps> = ({
 }) => {
   const myPlayer = gameState.players[myPlayerId];
   const isWinner = gameState.winner?.id === myPlayerId;
+  // Win condition & standings order: highest points first, then survival time if tied
   const playersList = Object.values(gameState.players).sort(
-    (a, b) => b.survivedTime - a.survivedTime || b.score - a.score
+    (a, b) => b.score - a.score || b.survivedTime - a.survivedTime
   );
   const isSolo = playersList.length === 1;
 

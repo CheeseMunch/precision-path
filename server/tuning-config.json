@@ -13,9 +13,9 @@
     "seed": null,
     "gapPositionVariance": 0.68,
     "gapSizeVariance": 0.22,
-    "speedVariance": 0.15,
+    "speedVariance": 0.16,
     "waveIntervalJitter": 0.18,
-    "staggerVariance": 0.25,
+    "staggerVariance": 0.26,
     "randomizeRound1Direction": true
   },
   "obstacleTypes": {
