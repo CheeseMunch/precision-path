@@ -164,16 +164,36 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   };
 
   const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (isDraggingRef.current) return; // Handled by window mousemove so dragging slides smoothly past walls
     const coords = toArenaCoords(e.clientX, e.clientY);
     if (coords) {
       localPointerRef.current = coords;
     }
-    if (isDraggingRef.current && (e.buttons & 1) === 1) {
-      sendMoveOrTeleport(e.clientX, e.clientY, false);
-    } else {
-      isDraggingRef.current = false;
-    }
   };
+
+  useEffect(() => {
+    const onWindowMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return;
+      if ((e.buttons & 1) !== 1) {
+        isDraggingRef.current = false;
+        return;
+      }
+      sendMoveOrTeleport(e.clientX, e.clientY, false);
+    };
+
+    const onWindowMouseUp = () => {
+      isDraggingRef.current = false;
+    };
+
+    window.addEventListener('mousemove', onWindowMouseMove);
+    window.addEventListener('mouseup', onWindowMouseUp);
+    window.addEventListener('blur', onWindowMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onWindowMouseMove);
+      window.removeEventListener('mouseup', onWindowMouseUp);
+      window.removeEventListener('blur', onWindowMouseUp);
+    };
+  }, [sendMoveOrTeleport]);
 
   const onTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (e.touches.length > 0) {
@@ -749,7 +769,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         height={LOGICAL_HEIGHT}
         onMouseDown={onMouseDown}
         onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
         onMouseMove={onMouseMove}
         onTouchMove={onTouchMove}
         onTouchStart={onTouchStart}
