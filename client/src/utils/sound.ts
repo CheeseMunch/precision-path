@@ -219,7 +219,7 @@ class SoundSystem {
   public playStoryComplete() {
     this.stopMusic();
     if (!this.enabled) return;
-    this.playClip(this.storyCompleteAudio, 0.9);
+    this.playClip(this.storyCompleteAudio, 0.72);
   }
 
   public playCollision() {
