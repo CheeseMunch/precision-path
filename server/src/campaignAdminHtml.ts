@@ -95,7 +95,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
         <div class="flex items-center justify-between text-[11px] text-slate-400">
           <span id="cursorCoords">X: 0, Y: 0</span>
-          <span>Drag SPAWN circle to reposition player start</span>
+          <span>Drag DUMMY ball anytime to test collisions &amp; gates (turns red on hit)</span>
         </div>
       </div>
 
@@ -179,6 +179,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
     const HALF_H = ARENA_H / 2;
     const SPAWN_OFFSET = 18;
     const PLAYER_RADIUS = 13;
+    const HITBOX_RADIUS = 6.5;
 
     let levels = [];
     let currentLevelIdx = 0;
@@ -189,6 +190,8 @@ export function renderCampaignAdminPage(adminToken: string): string {
     let isPlaying = false;
     let lastRafMs = null;
     let dragSpawn = false;
+    let dragDummy = false;
+    let dummyPos = { x: 0, y: 120 };
     let hoverOpening = null; // { waveIdx, start, end }
 
     const canvas = document.getElementById('editorCanvas');
@@ -516,6 +519,10 @@ export function renderCampaignAdminPage(adminToken: string): string {
       isPlaying = false;
       simTime = 0;
       lastRafMs = null;
+      const lvl = curLevel();
+      if (lvl && lvl.spawn) {
+        dummyPos = { x: lvl.spawn.x, y: lvl.spawn.y };
+      }
       document.getElementById('btnPlayPause').innerHTML = '&#9654; Play';
       updateScrubberUI();
       drawCanvas();
@@ -885,19 +892,78 @@ export function renderCampaignAdminPage(adminToken: string): string {
         }
       }
 
-      // Player Spawn
+      // Player Spawn (dashed ring)
       ctx.save();
+      ctx.setLineDash([4, 3]);
       ctx.beginPath();
-      ctx.arc(lvl.spawn.x, lvl.spawn.y, PLAYER_RADIUS, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(34, 211, 238, 0.35)';
-      ctx.fill();
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = '#22d3ee';
+      ctx.arc(lvl.spawn.x, lvl.spawn.y, PLAYER_RADIUS + 3, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(34, 211, 238, 0.55)';
+      ctx.lineWidth = 1.5;
       ctx.stroke();
-      ctx.fillStyle = '#cffafe';
+      ctx.setLineDash([]);
+      ctx.fillStyle = 'rgba(207, 250, 254, 0.75)';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('SPAWN', lvl.spawn.x, lvl.spawn.y + 24);
+      ctx.restore();
+
+      // Dummy Test Ball collision check against active waves (never stops timeline)
+      let dummyHit = false;
+      for (const item of items) {
+        const tSince = simTime - item.spawnAt;
+        if (tSince < 0 || tSince > item.duration) continue;
+        const geom = computeWaveGeometry(item.wave, tSince);
+        for (const r of geom.rects) {
+          const hw = r.w / 2;
+          const hh = r.h / 2;
+          let px = dummyPos.x - r.x;
+          let py = dummyPos.y - r.y;
+          if (r.rot) {
+            const cos = Math.cos(-r.rot);
+            const sin = Math.sin(-r.rot);
+            const rx = px * cos - py * sin;
+            const ry = px * sin + py * cos;
+            px = rx;
+            py = ry;
+          }
+          const cx = Math.max(-hw, Math.min(px, hw));
+          const cy = Math.max(-hh, Math.min(py, hh));
+          const dx = px - cx;
+          const dy = py - cy;
+          if (dx * dx + dy * dy < HITBOX_RADIUS * HITBOX_RADIUS) {
+            dummyHit = true;
+            break;
+          }
+        }
+        if (!dummyHit) {
+          for (const c of geom.circles) {
+            if (Math.hypot(dummyPos.x - c.x, dummyPos.y - c.y) < HITBOX_RADIUS + c.r) {
+              dummyHit = true;
+              break;
+            }
+          }
+        }
+        if (dummyHit) break;
+      }
+
+      // Draw Dummy Test Ball (turns red on hit, cyan when clear)
+      ctx.save();
+      ctx.translate(dummyPos.x, dummyPos.y);
+      ctx.shadowColor = dummyHit ? '#ef4444' : '#22d3ee';
+      ctx.shadowBlur = dummyHit ? 20 : 12;
+      ctx.beginPath();
+      ctx.arc(0, 0, PLAYER_RADIUS, 0, Math.PI * 2);
+      ctx.fillStyle = dummyHit ? '#ef4444' : '#22d3ee';
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(0, 0, PLAYER_RADIUS * 0.45, 0, Math.PI * 2);
+      ctx.fillStyle = dummyHit ? '#fee2e2' : '#ffffff';
+      ctx.fill();
+      ctx.fillStyle = dummyHit ? '#fca5a5' : '#cffafe';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText('SPAWN', lvl.spawn.x, lvl.spawn.y - 18);
+      ctx.fillText(dummyHit ? 'HIT!' : 'DUMMY', 0, -PLAYER_RADIUS - 8);
       ctx.restore();
 
       ctx.restore();
@@ -936,6 +1002,11 @@ export function renderCampaignAdminPage(adminToken: string): string {
       const lvl = curLevel();
       if (!lvl) return;
       const { x, y } = getCanvasCoords(e);
+
+      if (Math.hypot(x - dummyPos.x, y - dummyPos.y) <= 18) {
+        dragDummy = true;
+        return;
+      }
 
       if (Math.hypot(x - lvl.spawn.x, y - lvl.spawn.y) <= 18) {
         dragSpawn = true;
@@ -978,6 +1049,13 @@ export function renderCampaignAdminPage(adminToken: string): string {
       const lvl = curLevel();
       if (!lvl) return;
 
+      if (dragDummy) {
+        dummyPos.x = Math.max(-HALF_W + PLAYER_RADIUS, Math.min(HALF_W - PLAYER_RADIUS, x));
+        dummyPos.y = Math.max(-HALF_H + PLAYER_RADIUS, Math.min(HALF_H - PLAYER_RADIUS, y));
+        drawCanvas();
+        return;
+      }
+
       if (dragSpawn) {
         lvl.spawn.x = Math.max(-HALF_W + 15, Math.min(HALF_W - 15, Math.round(x / 10) * 10));
         lvl.spawn.y = Math.max(-HALF_H + 15, Math.min(HALF_H - 15, Math.round(y / 10) * 10));
@@ -989,7 +1067,7 @@ export function renderCampaignAdminPage(adminToken: string): string {
       if (!isPlaying) drawCanvas();
     });
 
-    window.addEventListener('pointerup', () => { dragSpawn = false; });
+    window.addEventListener('pointerup', () => { dragSpawn = false; dragDummy = false; });
 
     loadConfig();
   </script>
