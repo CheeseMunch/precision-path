@@ -184,6 +184,9 @@ export function renderCampaignAdminPage(adminToken: string): string {
               <button onclick="insertBundledPattern()" class="px-4 py-1.5 bg-violet-500 hover:bg-violet-400 text-black font-black rounded-lg text-xs uppercase tracking-wider shrink-0 transition">
                 + Add Pattern
               </button>
+              <button id="btnDeleteBundledPattern" onclick="deleteSelectedBundledPattern()" class="px-3 py-1.5 bg-rose-600/20 hover:bg-rose-600/35 disabled:opacity-40 disabled:pointer-events-none text-rose-300 border border-rose-500/40 rounded-lg text-xs font-bold uppercase tracking-wider shrink-0 transition" title="Delete selected pattern from library">
+                Delete
+              </button>
             </div>
           </div>
         </div>
@@ -587,13 +590,27 @@ export function renderCampaignAdminPage(adminToken: string): string {
     function deleteCurrentPattern() {
       const pat = curPattern();
       if (!pat) return;
-      if (!confirm('Delete pattern "' + pat.name + '"?')) return;
+      if (!confirm('Are you sure you want to delete pattern "' + pat.name + '"?')) return;
       patterns.splice(currentPatternIdx, 1);
       currentPatternIdx = Math.max(0, currentPatternIdx - 1);
       selectedWaveIdx = 0;
       selectedWaveIds.clear();
       resetPlayback();
       renderAll();
+      showBanner('Deleted pattern "' + pat.name + '". Click Save All Config to persist.', false);
+    }
+
+    function deleteSelectedBundledPattern() {
+      const sel = document.getElementById('bundledPatternSelect');
+      const patId = sel ? sel.value : '';
+      const idx = patterns.findIndex((p) => p.id === patId);
+      if (idx < 0) return;
+      const pat = patterns[idx];
+      if (!confirm('Are you sure you want to delete pattern "' + pat.name + '"?')) return;
+      patterns.splice(idx, 1);
+      currentPatternIdx = Math.max(0, Math.min(currentPatternIdx, patterns.length - 1));
+      renderAll();
+      showBanner('Deleted pattern "' + pat.name + '". Click Save All Config to persist.', false);
     }
 
     function updatePatternMeta(field, val) {
@@ -917,9 +934,11 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
     function renderBundledPatternSelect() {
       const sel = document.getElementById('bundledPatternSelect');
+      const delBtn = document.getElementById('btnDeleteBundledPattern');
       if (!sel) return;
       const prev = sel.value;
       sel.innerHTML = '';
+      if (delBtn) delBtn.disabled = !patterns.length;
       if (!patterns.length) {
         const o = document.createElement('option');
         o.value = '';
