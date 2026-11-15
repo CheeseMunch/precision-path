@@ -369,41 +369,74 @@ app.get('/db-admin', (req, res) => {
         </div>
 
         <!-- 2. Procedural Randomness -->
-        <div class="bg-[#121520] border border-gray-800 rounded-xl p-5 flex flex-col gap-3.5 text-xs">
+        <div class="bg-[#121520] border border-gray-800 rounded-xl p-5 flex flex-col gap-4 text-xs">
           <div class="border-b border-gray-800 pb-2 text-cyan-400 font-bold uppercase text-sm">
             2. Procedural Randomness Tuning
           </div>
 
           <div>
-            <div class="flex justify-between mb-1"><span>Gap Position Spread</span><span id="val_gapPos" class="text-cyan-300 font-bold">68%</span></div>
+            <div class="flex justify-between mb-1">
+              <span class="font-semibold text-gray-200">Gap Position Spread</span>
+              <span id="val_gapPos" class="text-cyan-300 font-bold">68%</span>
+            </div>
             <input id="inp_gapPos" type="range" min="0.1" max="0.9" step="0.02" oninput="updateLabels()" class="w-full accent-cyan-400" />
+            <p class="text-[11px] text-gray-400 mt-1 leading-normal">
+              Controls how far gate openings can spawn away from the arena center. Higher values push gates closer to the perimeter edges; lower values keep openings centered.
+            </p>
           </div>
 
           <div>
-            <div class="flex justify-between mb-1"><span>Gap Width Variance</span><span id="val_gapSize" class="text-cyan-300 font-bold">±22%</span></div>
+            <div class="flex justify-between mb-1">
+              <span class="font-semibold text-gray-200">Gap Width Variance</span>
+              <span id="val_gapSize" class="text-cyan-300 font-bold">±22%</span>
+            </div>
             <input id="inp_gapSize" type="range" min="0" max="0.45" step="0.02" oninput="updateLabels()" class="w-full accent-cyan-400" />
+            <p class="text-[11px] text-gray-400 mt-1 leading-normal">
+              Random variation applied to gate opening widths on each wave line. Creates a dynamic mix of tight narrow gates and wider passages.
+            </p>
           </div>
 
           <div>
-            <div class="flex justify-between mb-1"><span>Wave Speed Variance</span><span id="val_speedVar" class="text-cyan-300 font-bold">±15%</span></div>
+            <div class="flex justify-between mb-1">
+              <span class="font-semibold text-gray-200">Wave Speed Variance</span>
+              <span id="val_speedVar" class="text-cyan-300 font-bold">±15%</span>
+            </div>
             <input id="inp_speedVar" type="range" min="0" max="0.45" step="0.02" oninput="updateLabels()" class="w-full accent-cyan-400" />
+            <p class="text-[11px] text-gray-400 mt-1 leading-normal">
+              Random speed fluctuation applied to each obstacle wave, ensuring lines don't all travel at identical robotic velocities.
+            </p>
           </div>
 
           <div>
-            <div class="flex justify-between mb-1"><span>Wave Timing Jitter</span><span id="val_jitter" class="text-cyan-300 font-bold">±18%</span></div>
+            <div class="flex justify-between mb-1">
+              <span class="font-semibold text-gray-200">Wave Timing Jitter</span>
+              <span id="val_jitter" class="text-cyan-300 font-bold">±18%</span>
+            </div>
             <input id="inp_jitter" type="range" min="0" max="0.4" step="0.02" oninput="updateLabels()" class="w-full accent-cyan-400" />
+            <p class="text-[11px] text-gray-400 mt-1 leading-normal">
+              Random time jitter between successive wave spawns to prevent players from relying on a predictable rhythmic spawn metronome.
+            </p>
           </div>
 
           <div>
-            <div class="flex justify-between mb-1"><span>Multi-Side Stagger Variance</span><span id="val_stagVar" class="text-cyan-300 font-bold">±25%</span></div>
+            <div class="flex justify-between mb-1">
+              <span class="font-semibold text-gray-200">Multi-Side Stagger Variance</span>
+              <span id="val_stagVar" class="text-cyan-300 font-bold">±25%</span>
+            </div>
             <input id="inp_stagVar" type="range" min="0" max="0.45" step="0.02" oninput="updateLabels()" class="w-full accent-cyan-400" />
+            <p class="text-[11px] text-gray-400 mt-1 leading-normal">
+              Randomizes the stagger delay between directional walls in multi-way rounds (Rounds 2–4 & Endless), preventing walls from converging at exact uniform offsets.
+            </p>
           </div>
 
-          <div class="flex items-center justify-between pt-2 border-t border-gray-800">
-            <label class="flex items-center gap-2 cursor-pointer text-gray-200">
+          <div class="pt-2 border-t border-gray-800">
+            <label class="flex items-center gap-2 cursor-pointer text-gray-200 font-semibold">
               <input id="inp_randR1" type="checkbox" class="accent-cyan-400 w-4 h-4" />
               <span>Randomize Starting Cardinal Side Each Match</span>
             </label>
+            <p class="text-[11px] text-gray-400 mt-1 leading-normal">
+              When checked, Round 1 randomly selects which cardinal direction (North, South, East, or West) waves come from each match instead of always starting from the top.
+            </p>
           </div>
         </div>
 
