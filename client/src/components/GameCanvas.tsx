@@ -222,40 +222,48 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.fillStyle = '#090b12';
       ctx.fillRect(0, 0, width, height);
 
-      // 1. Draw Subtle Background Grid
-      ctx.save();
-      ctx.strokeStyle = '#101524';
-      ctx.lineWidth = 1;
-      const gridSize = 40;
-      for (let x = 0; x < width; x += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, height);
-        ctx.stroke();
-      }
-      for (let y = 0; y < height; y += gridSize) {
-        ctx.beginPath();
-        ctx.moveTo(0, y);
-        ctx.lineTo(width, y);
-        ctx.stroke();
-      }
-      ctx.restore();
-
       ctx.save();
       ctx.translate(centerX, centerY);
 
-      // 2. Inner Rectangular Guide Frames & Center Crosshair
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.06)';
+      // 1. Draw Symmetrical Center-Aligned Background Grid
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(-halfW, -halfH, arenaWidth, arenaHeight);
+      ctx.clip();
+
+      ctx.strokeStyle = '#111728';
       ctx.lineWidth = 1;
-      for (const scale of [0.33, 0.66]) {
-        const gw = arenaWidth * scale;
-        const gh = arenaHeight * scale;
-        ctx.beginPath();
-        ctx.roundRect(-gw / 2, -gh / 2, gw, gh, 14);
-        ctx.stroke();
+      const gridStepX = halfW / 5; // 10 equal columns across 450px (5 on each side of center)
+      const gridStepY = halfH / 8; // 16 equal rows across 800px (8 on each side of center)
+
+      // Center vertical line + symmetrical left/right pairs
+      ctx.beginPath();
+      ctx.moveTo(0, -halfH);
+      ctx.lineTo(0, halfH);
+      for (let i = 1; i < 5; i++) {
+        const x = i * gridStepX;
+        ctx.moveTo(x, -halfH);
+        ctx.lineTo(x, halfH);
+        ctx.moveTo(-x, -halfH);
+        ctx.lineTo(-x, halfH);
       }
 
-      ctx.strokeStyle = 'rgba(0, 240, 255, 0.14)';
+      // Center horizontal line + symmetrical top/bottom pairs
+      ctx.moveTo(-halfW, 0);
+      ctx.lineTo(halfW, 0);
+      for (let j = 1; j < 8; j++) {
+        const y = j * gridStepY;
+        ctx.moveTo(-halfW, y);
+        ctx.lineTo(halfW, y);
+        ctx.moveTo(-halfW, -y);
+        ctx.lineTo(halfW, -y);
+      }
+      ctx.stroke();
+      ctx.restore();
+
+      // 2. Center Crosshair (aligned directly on the (0,0) center grid intersection)
+      ctx.strokeStyle = 'rgba(0, 240, 255, 0.16)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(-16, 0);
       ctx.lineTo(16, 0);
