@@ -58,6 +58,26 @@ export function renderCampaignAdminPage(adminToken: string): string {
     <!-- Status banner -->
     <div id="statusBanner" class="hidden rounded-lg px-4 py-2 text-xs font-semibold"></div>
 
+    <!-- Story Grouping Panel -->
+    <div id="storyGroupingPanel" class="cyber-panel rounded-xl p-4 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-bold uppercase tracking-wider text-cyan-300">Story Grouping</span>
+          <span id="storySummaryLabel" class="text-[11px] font-mono text-slate-400">0 stories</span>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="newStoryNameInput" type="text" placeholder="New story name..." class="input-dark !w-44" onkeydown="if(event.key==='Enter'){event.preventDefault();createStory();}" />
+          <button onclick="createStory()" class="px-3 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+            + Create Story
+          </button>
+          <button onclick="saveCampaignConfig()" class="px-3 py-1.5 bg-cyan-500/20 hover:bg-cyan-500/35 text-cyan-200 border border-cyan-500/40 rounded-lg text-xs font-bold uppercase tracking-wider transition">
+            Save Stories &amp; Levels
+          </button>
+        </div>
+      </div>
+      <div id="storyGroupsList" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
+    </div>
+
     <!-- Level / Pattern Tabs -->
     <div class="cyber-panel rounded-xl p-3 flex flex-wrap items-center justify-between gap-2">
       <div id="levelTabs" class="flex flex-wrap items-center gap-2"></div>
@@ -262,6 +282,9 @@ export function renderCampaignAdminPage(adminToken: string): string {
 
     let levels = [];
     let patterns = [];
+    let emptyStories = [];
+    let draggedStoryIdx = null;
+    let draggedStoryLevelId = null;
     let currentLevelIdx = 0;
     let currentPatternIdx = 0;
     let viewMode = 'levels'; // 'levels' | 'patterns'
@@ -611,7 +634,435 @@ export function renderCampaignAdminPage(adminToken: string): string {
       const lvl = curLevel();
       if (!lvl) return;
       lvl[field] = val;
-      if (field === 'name') renderTabs();
+      if (field === 'name') {
+        renderTabs();
+        renderStoryGroups();
+      } else if (field === 'storyName') {
+        renderStoryGroups();
+      }
+    }
+
+    function normalizeStoryName(name) {
+      const s = String(name || '').trim().slice(0, 60);
+      return s || 'Story 1';
+    }
+
+    function getStoryGroups() {
+      const groups = [];
+      levels.forEach((lvl, idx) => {
+        const sName = normalizeStoryName(lvl.storyName);
+        const last = groups[groups.length - 1];
+        if (last && last.storyName === sName) {
+          last.levels.push({ lvl, idx });
+        } else {
+          groups.push({ storyName: sName, levels: [{ lvl, idx }] });
+        }
+      });
+      // Keep empty stories that do not yet have any levels
+      emptyStories = emptyStories.filter((name) => !groups.some((g) => g.storyName === name));
+      emptyStories.forEach((name) => {
+        groups.push({ storyName: name, levels: [], isEmpty: true });
+      });
+      return groups;
+    }
+
+    function rebuildLevelsFromPopulatedGroups(popGroups, activeId) {
+      levels = popGroups.reduce((acc, g) => acc.concat(g.levels.map((x) => x.lvl)), []);
+      levels.forEach((l, i) => { l.levelNumber = i + 1; });
+      if (activeId) {
+        const newIdx = levels.findIndex((l) => l.id === activeId);
+        if (newIdx >= 0) currentLevelIdx = newIdx;
+      }
+    }
+
+    function createStory() {
+      const inp = document.getElementById('newStoryNameInput');
+      const raw = inp ? inp.value.trim() : '';
+      const groups = getStoryGroups();
+      const name = (raw || ('Story ' + (groups.length + 1))).slice(0, 60);
+      if (groups.some((g) => g.storyName.toLowerCase() === name.toLowerCase())) {
+        return showBanner('Story "' + name + '" already exists.', true);
+      }
+      emptyStories.push(name);
+      if (inp) inp.value = '';
+      renderStoryGroups();
+      showBanner('Created story "' + name + '". Add levels or drag existing levels into it.', false);
+    }
+
+    function renameStory(groupIdx, newName) {
+      const groups = getStoryGroups();
+      const grp = groups[groupIdx];
+      if (!grp) return;
+      const trimmed = String(newName || '').trim().slice(0, 60);
+      if (!trimmed || trimmed === grp.storyName) {
+        renderStoryGroups();
+        return;
+      }
+      if (grp.isEmpty) {
+        const eIdx = emptyStories.indexOf(grp.storyName);
+        if (eIdx >= 0) {
+          if (groups.some((g, i) => i !== groupIdx && g.storyName.toLowerCase() === trimmed.toLowerCase())) {
+            showBanner('Story "' + trimmed + '" already exists.', true);
+            renderStoryGroups();
+            return;
+          }
+          emptyStories[eIdx] = trimmed;
+        }
+        renderStoryGroups();
+        return;
+      }
+      grp.levels.forEach((item) => { item.lvl.storyName = trimmed; });
+      renderAll();
+      saveCampaignConfig(true);
+      showBanner('Renamed story to "' + trimmed + '" and saved.', false);
+    }
+
+    function moveStory(groupIdx, delta) {
+      const groups = getStoryGroups();
+      const grp = groups[groupIdx];
+      if (!grp || grp.isEmpty) return;
+      const popGroups = groups.filter((g) => !g.isEmpty);
+      const popIdx = popGroups.indexOf(grp);
+      const targetIdx = popIdx + delta;
+      if (popIdx < 0 || targetIdx < 0 || targetIdx >= popGroups.length) return;
+      const activeId = curLevel() ? curLevel().id : null;
+      const [moved] = popGroups.splice(popIdx, 1);
+      popGroups.splice(targetIdx, 0, moved);
+      rebuildLevelsFromPopulatedGroups(popGroups, activeId);
+      renderAll();
+      saveCampaignConfig(true);
+    }
+
+    function reorderStoryByDrop(fromGroupIdx, toGroupIdx) {
+      if (fromGroupIdx === null || toGroupIdx === null || fromGroupIdx === toGroupIdx) return;
+      const groups = getStoryGroups();
+      const fromGrp = groups[fromGroupIdx];
+      const toGrp = groups[toGroupIdx];
+      if (!fromGrp || !toGrp || fromGrp.isEmpty || toGrp.isEmpty) return;
+      const popGroups = groups.filter((g) => !g.isEmpty);
+      const fromPop = popGroups.indexOf(fromGrp);
+      const toPop = popGroups.indexOf(toGrp);
+      if (fromPop < 0 || toPop < 0 || fromPop === toPop) return;
+      const activeId = curLevel() ? curLevel().id : null;
+      const [moved] = popGroups.splice(fromPop, 1);
+      popGroups.splice(toPop, 0, moved);
+      rebuildLevelsFromPopulatedGroups(popGroups, activeId);
+      renderAll();
+      saveCampaignConfig(true);
+    }
+
+    function deleteStory(groupIdx) {
+      const groups = getStoryGroups();
+      const grp = groups[groupIdx];
+      if (!grp) return;
+      if (grp.isEmpty) {
+        emptyStories = emptyStories.filter((n) => n !== grp.storyName);
+        renderStoryGroups();
+        showBanner('Removed empty story "' + grp.storyName + '".', false);
+        return;
+      }
+      const otherPop = groups.find((g, i) => i !== groupIdx && !g.isEmpty);
+      const otherAny = groups.find((g, i) => i !== groupIdx);
+      const fallbackName = otherPop ? otherPop.storyName : (otherAny ? otherAny.storyName : (grp.storyName === 'Unassigned' ? '' : 'Unassigned'));
+      if (!fallbackName) {
+        return showBanner('Cannot delete the only remaining story while it has levels. Create another story first.', true);
+      }
+      if (!confirm('Delete story "' + grp.storyName + '"? Its ' + grp.levels.length + ' level(s) will be moved to "' + fallbackName + '".')) return;
+      const activeId = curLevel() ? curLevel().id : null;
+      grp.levels.forEach((item) => { item.lvl.storyName = fallbackName; });
+      emptyStories = emptyStories.filter((n) => n !== fallbackName);
+      // Regroup so any levels moved into an existing story become contiguous
+      const movedSet = new Set(grp.levels.map((x) => x.lvl));
+      const remaining = levels.filter((l) => !movedSet.has(l));
+      const targetLastIdx = remaining.reduce((acc, l, i) => (normalizeStoryName(l.storyName) === fallbackName ? i : acc), -1);
+      if (targetLastIdx >= 0) {
+        remaining.splice(targetLastIdx + 1, 0, ...grp.levels.map((x) => x.lvl));
+        levels = remaining;
+      } else {
+        levels = remaining.concat(grp.levels.map((x) => x.lvl));
+      }
+      levels.forEach((l, i) => { l.levelNumber = i + 1; });
+      if (activeId) {
+        const newIdx = levels.findIndex((l) => l.id === activeId);
+        if (newIdx >= 0) currentLevelIdx = newIdx;
+      }
+      renderAll();
+      saveCampaignConfig(true);
+      showBanner('Deleted story "' + grp.storyName + '" and moved its levels to "' + fallbackName + '".', false);
+    }
+
+    function addLevelToStory(storyName) {
+      const targetName = normalizeStoryName(storyName);
+      const nextNum = levels.length + 1;
+      const newLevel = {
+        id: 'level-' + Date.now(),
+        levelNumber: nextNum,
+        name: 'Level ' + nextNum + ' Sector',
+        storyName: targetName,
+        description: 'Custom wave sequence',
+        spawn: { x: 0, y: 120 },
+        clearBonusPoints: 500,
+        parTimeSeconds: 20,
+        waves: [
+          {
+            id: 'w-' + Date.now(),
+            order: 1,
+            delayAfterPrev: 0.5,
+            side: 'north',
+            patternType: 'single-gap-wall',
+            speed: 175,
+            gapCenter: 0,
+            gapSize: 125,
+            barThickness: 18,
+            attachedGates: [{ id: 'g-' + Date.now(), order: 1, start: -62, end: 62, points: 200, label: 'GATE 1' }],
+          },
+        ],
+        obstacles: [],
+        checkpoints: [],
+      };
+      emptyStories = emptyStories.filter((n) => n !== targetName);
+      const insertAfter = levels.reduce((acc, l, i) => (normalizeStoryName(l.storyName) === targetName ? i : acc), -1);
+      const insertIdx = insertAfter >= 0 ? insertAfter + 1 : levels.length;
+      levels.splice(insertIdx, 0, newLevel);
+      levels.forEach((l, i) => { l.levelNumber = i + 1; });
+      currentLevelIdx = insertIdx;
+      selectedWaveIdx = 0;
+      resetPlayback();
+      renderAll();
+      saveCampaignConfig(true);
+      showBanner('Added "' + newLevel.name + '" to "' + targetName + '" and saved.', false);
+    }
+
+    function assignLevelToStory(levelId, targetStoryName) {
+      const targetName = normalizeStoryName(targetStoryName);
+      const srcIdx = levels.findIndex((l) => l.id === levelId);
+      if (srcIdx < 0) return;
+      const activeId = curLevel() ? curLevel().id : null;
+      const [lvl] = levels.splice(srcIdx, 1);
+      lvl.storyName = targetName;
+      emptyStories = emptyStories.filter((n) => n !== targetName);
+      const insertAfter = levels.reduce((acc, l, i) => (normalizeStoryName(l.storyName) === targetName ? i : acc), -1);
+      const insertIdx = insertAfter >= 0 ? insertAfter + 1 : levels.length;
+      levels.splice(insertIdx, 0, lvl);
+      levels.forEach((l, i) => { l.levelNumber = i + 1; });
+      if (activeId) {
+        const newIdx = levels.findIndex((l) => l.id === activeId);
+        if (newIdx >= 0) currentLevelIdx = newIdx;
+      }
+      renderAll();
+      saveCampaignConfig(true);
+      showBanner('Moved "' + lvl.name + '" into "' + targetName + '" and saved.', false);
+    }
+
+    function removeLevelFromStory(levelId) {
+      const lvl = levels.find((l) => l.id === levelId);
+      if (!lvl) return;
+      const curStory = normalizeStoryName(lvl.storyName);
+      if (curStory === 'Unassigned') {
+        return showBanner('"' + lvl.name + '" is already in "Unassigned". Use Delete Level to remove it permanently.', true);
+      }
+      assignLevelToStory(levelId, 'Unassigned');
+    }
+
+    function renderStoryGroups() {
+      const listEl = document.getElementById('storyGroupsList');
+      const summaryEl = document.getElementById('storySummaryLabel');
+      if (!listEl) return;
+      const groups = getStoryGroups();
+      const popGroups = groups.filter((g) => !g.isEmpty);
+      if (summaryEl) {
+        summaryEl.textContent = groups.length + ' stor' + (groups.length === 1 ? 'y' : 'ies') + ' • ' + levels.length + ' level' + (levels.length === 1 ? '' : 's');
+      }
+      listEl.innerHTML = '';
+
+      groups.forEach((grp, gIdx) => {
+        const popIdx = grp.isEmpty ? -1 : popGroups.indexOf(grp);
+        const card = document.createElement('div');
+        card.className = 'bg-[#060913] border border-slate-800 rounded-xl p-3 space-y-2.5 transition';
+        card.draggable = !grp.isEmpty;
+
+        card.ondragstart = (ev) => {
+          if (draggedStoryLevelId || grp.isEmpty) return;
+          draggedStoryIdx = gIdx;
+          ev.dataTransfer.effectAllowed = 'move';
+        };
+        card.ondragover = (ev) => {
+          ev.preventDefault();
+          card.classList.add('border-cyan-400');
+        };
+        card.ondragleave = () => {
+          card.classList.remove('border-cyan-400');
+        };
+        card.ondrop = (ev) => {
+          ev.preventDefault();
+          card.classList.remove('border-cyan-400');
+          if (draggedStoryLevelId) {
+            const lid = draggedStoryLevelId;
+            draggedStoryLevelId = null;
+            assignLevelToStory(lid, grp.storyName);
+            return;
+          }
+          if (draggedStoryIdx !== null) {
+            const fromIdx = draggedStoryIdx;
+            draggedStoryIdx = null;
+            reorderStoryByDrop(fromIdx, gIdx);
+          }
+        };
+
+        // Header row
+        const header = document.createElement('div');
+        header.className = 'flex items-center justify-between gap-2';
+
+        const left = document.createElement('div');
+        left.className = 'flex items-center gap-1.5 min-w-0 flex-1';
+
+        const handle = document.createElement('span');
+        handle.className = 'text-slate-500 select-none text-xs ' + (grp.isEmpty ? 'opacity-30' : 'cursor-grab');
+        handle.innerHTML = '&#8942;&#8942;';
+        handle.title = grp.isEmpty ? 'Add a level to reorder this story' : 'Drag to reorder story';
+
+        const badge = document.createElement('span');
+        badge.className = 'px-1.5 py-0.5 rounded bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-mono text-[10px] font-bold shrink-0';
+        badge.textContent = '#' + (gIdx + 1);
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.value = grp.storyName;
+        nameInput.className = 'input-dark !py-1 !text-xs font-bold flex-1 min-w-0';
+        nameInput.title = 'Rename story';
+        nameInput.onchange = () => renameStory(gIdx, nameInput.value);
+        nameInput.onkeydown = (ev) => {
+          if (ev.key === 'Enter') { ev.preventDefault(); nameInput.blur(); }
+        };
+
+        const countSpan = document.createElement('span');
+        countSpan.className = 'text-[10px] font-mono text-slate-400 shrink-0';
+        countSpan.textContent = grp.levels.length + ' lvl';
+
+        left.appendChild(handle);
+        left.appendChild(badge);
+        left.appendChild(nameInput);
+        left.appendChild(countSpan);
+
+        const actions = document.createElement('div');
+        actions.className = 'flex items-center gap-1 shrink-0';
+
+        const btnUp = document.createElement('button');
+        btnUp.type = 'button';
+        btnUp.innerHTML = '&uarr;';
+        btnUp.title = 'Move story earlier';
+        btnUp.disabled = grp.isEmpty || popIdx <= 0;
+        btnUp.className = 'px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none text-slate-200 text-[11px] font-bold';
+        btnUp.onclick = () => moveStory(gIdx, -1);
+
+        const btnDown = document.createElement('button');
+        btnDown.type = 'button';
+        btnDown.innerHTML = '&darr;';
+        btnDown.title = 'Move story later';
+        btnDown.disabled = grp.isEmpty || popIdx < 0 || popIdx >= popGroups.length - 1;
+        btnDown.className = 'px-1.5 py-1 rounded bg-slate-800 hover:bg-slate-700 disabled:opacity-30 disabled:pointer-events-none text-slate-200 text-[11px] font-bold';
+        btnDown.onclick = () => moveStory(gIdx, 1);
+
+        const btnAddLvl = document.createElement('button');
+        btnAddLvl.type = 'button';
+        btnAddLvl.textContent = '+ Level';
+        btnAddLvl.title = 'Create a new level inside this story';
+        btnAddLvl.className = 'px-2 py-1 rounded bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-300 border border-emerald-500/40 text-[10px] font-bold uppercase tracking-wider';
+        btnAddLvl.onclick = () => addLevelToStory(grp.storyName);
+
+        const btnDel = document.createElement('button');
+        btnDel.type = 'button';
+        btnDel.innerHTML = '&times;';
+        btnDel.title = 'Delete story';
+        btnDel.className = 'px-2 py-1 rounded bg-rose-600/20 hover:bg-rose-600/35 text-rose-300 border border-rose-500/40 text-[11px] font-bold';
+        btnDel.onclick = () => deleteStory(gIdx);
+
+        actions.appendChild(btnUp);
+        actions.appendChild(btnDown);
+        actions.appendChild(btnAddLvl);
+        actions.appendChild(btnDel);
+
+        header.appendChild(left);
+        header.appendChild(actions);
+        card.appendChild(header);
+
+        // Levels inside this story
+        const chipsRow = document.createElement('div');
+        chipsRow.className = 'flex flex-wrap items-center gap-1.5 min-h-[28px]';
+        if (!grp.levels.length) {
+          const emptyMsg = document.createElement('span');
+          emptyMsg.className = 'text-[11px] text-slate-500 italic';
+          emptyMsg.textContent = 'No levels yet — click + Level, choose below, or drag a level here.';
+          chipsRow.appendChild(emptyMsg);
+        } else {
+          grp.levels.forEach((item) => {
+            const isSel = item.idx === currentLevelIdx;
+            const chip = document.createElement('div');
+            chip.draggable = true;
+            chip.className = 'inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-semibold border cursor-pointer transition ' +
+              (isSel ? 'bg-cyan-500/25 border-cyan-400 text-cyan-100' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-cyan-500/50');
+            chip.title = 'Click to edit level, drag onto another story to move';
+            chip.ondragstart = (ev) => {
+              ev.stopPropagation();
+              draggedStoryLevelId = item.lvl.id;
+              ev.dataTransfer.effectAllowed = 'move';
+            };
+            chip.ondragend = () => {
+              draggedStoryLevelId = null;
+            };
+
+            const label = document.createElement('span');
+            label.textContent = 'L' + (item.idx + 1) + ': ' + item.lvl.name;
+            label.onclick = () => {
+              currentLevelIdx = item.idx;
+              selectedWaveIdx = 0;
+              selectedWaveIds.clear();
+              resetPlayback();
+              renderAll();
+            };
+
+            const rm = document.createElement('button');
+            rm.type = 'button';
+            rm.innerHTML = '&times;';
+            rm.title = 'Remove level from this story';
+            rm.className = 'ml-0.5 text-slate-400 hover:text-rose-300 font-bold leading-none';
+            rm.onclick = (ev) => {
+              ev.stopPropagation();
+              removeLevelFromStory(item.lvl.id);
+            };
+
+            chip.appendChild(label);
+            chip.appendChild(rm);
+            chipsRow.appendChild(chip);
+          });
+        }
+        card.appendChild(chipsRow);
+
+        // Assign existing level dropdown
+        const otherLevels = levels
+          .map((l, idx) => ({ l, idx }))
+          .filter((x) => !grp.levels.some((gItem) => gItem.lvl.id === x.l.id));
+        if (otherLevels.length) {
+          const assignSel = document.createElement('select');
+          assignSel.className = 'input-dark !text-[11px] !py-1 text-slate-300';
+          const defOpt = document.createElement('option');
+          defOpt.value = '';
+          defOpt.textContent = '+ Add existing level to "' + grp.storyName + '"...';
+          assignSel.appendChild(defOpt);
+          otherLevels.forEach((x) => {
+            const opt = document.createElement('option');
+            opt.value = x.l.id;
+            opt.textContent = 'L' + (x.idx + 1) + ': ' + x.l.name + ' (' + normalizeStoryName(x.l.storyName) + ')';
+            assignSel.appendChild(opt);
+          });
+          assignSel.onchange = () => {
+            if (assignSel.value) assignLevelToStory(assignSel.value, grp.storyName);
+          };
+          card.appendChild(assignSel);
+        }
+
+        listEl.appendChild(card);
+      });
     }
 
     function addPattern() {
@@ -976,12 +1427,14 @@ export function renderCampaignAdminPage(adminToken: string): string {
         btnPat.className = 'px-3 py-1 rounded-md text-xs font-bold uppercase tracking-wider transition ' +
           (!isLvl ? 'bg-violet-500 text-black' : 'text-slate-300 hover:text-white');
       }
+      document.getElementById('storyGroupingPanel').classList.toggle('hidden', !isLvl);
       document.getElementById('levelTabActions').classList.toggle('hidden', !isLvl);
       document.getElementById('patternTabActions').classList.toggle('hidden', isLvl);
       document.getElementById('levelMetaPanel').classList.toggle('hidden', !isLvl);
       document.getElementById('patternMetaPanel').classList.toggle('hidden', isLvl);
       document.getElementById('bundledPatternRow').classList.toggle('hidden', !isLvl);
 
+      if (isLvl) renderStoryGroups();
       renderTabs();
       renderMeta();
       renderBundledPatternSelect();
