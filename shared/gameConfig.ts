@@ -13,10 +13,10 @@ export interface ObstacleTypeConfig {
   enabled: boolean;
   /** Default relative probability weight */
   weight: number;
-  /** Optional per-round weight overrides (1: Round 1, 2: Round 2, 3: Round 3, 4: Round 4, 5: Endless) */
-  tierWeights?: Record<GameTier, number>;
-  /** Minimum round/tier (1-5) before this obstacle type can be generated */
-  minTier: GameTier;
+  /** Optional per-round weight overrides (1: Round 1, 2: Round 2, ... N: Round N, 'endless': Endless) */
+  tierWeights?: Record<string | number, number>;
+  /** Minimum round/tier before this obstacle type can be generated (99 = Endless only) */
+  minTier: number;
   /** Display label for UI/debug */
   label: string;
 }
@@ -24,9 +24,20 @@ export interface ObstacleTypeConfig {
 /**
  * Returns the effective spawn weight for an obstacle pattern in a specific round.
  */
-export function getObstacleWeight(config: ObstacleTypeConfig, tier: GameTier): number {
-  if (config.tierWeights && typeof config.tierWeights[tier] === 'number') {
-    return Math.max(0, config.tierWeights[tier]);
+export function getObstacleWeight(config: ObstacleTypeConfig, tier: number, isEndless?: boolean): number {
+  if (config.tierWeights) {
+    if (isEndless) {
+      if (typeof config.tierWeights['endless'] === 'number') {
+        return Math.max(0, config.tierWeights['endless']);
+      }
+      if (typeof config.tierWeights[5] === 'number') {
+        return Math.max(0, config.tierWeights[5]);
+      }
+      return Math.max(0, config.weight);
+    }
+    if (typeof config.tierWeights[tier] === 'number') {
+      return Math.max(0, config.tierWeights[tier]);
+    }
   }
   return Math.max(0, config.weight);
 }

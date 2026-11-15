@@ -25,9 +25,6 @@ export const Lobby: React.FC<LobbyProps> = ({
 
       {/* Title */}
       <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded-full text-xs font-mono text-cyan-400 mb-3 tracking-widest uppercase">
-          <Zap className="w-3.5 h-3.5 animate-pulse" /> Precision Arcade Survival
-        </div>
         <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white font-display mb-1 drop-shadow-md">
           PRECISION<span className="text-cyan-400">PATH</span>
         </h1>
@@ -117,6 +114,13 @@ export const Lobby: React.FC<LobbyProps> = ({
         </div>
         <div className="p-3.5 bg-cyber-panel/50 border border-pink-500/40 rounded-lg">
           <div className="text-xs font-bold text-pink-400 font-mono">SURVIVE.</div>
+        </div>
+      </div>
+
+      {/* Precision Arcade Survival chip */}
+      <div className="mt-5 text-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-cyan-500/10 border border-cyan-500/30 rounded-full text-xs font-mono text-cyan-400 tracking-widest uppercase">
+          <Zap className="w-3.5 h-3.5 animate-pulse" /> Precision Arcade Survival
         </div>
       </div>
     </div>

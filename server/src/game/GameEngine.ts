@@ -502,7 +502,6 @@ export class GameEngine {
    */
   private pickProceduralObstacleType(tier: GameTier): ObstaclePatternType {
     const isEndless = this.isEndlessMode();
-    const weightTier = (isEndless ? 5 : Math.min(4, tier)) as GameTier;
     const entries = Object.entries(GAME_CONFIG.obstacleTypes) as [
       ObstaclePatternType,
       (typeof GAME_CONFIG.obstacleTypes)[ObstaclePatternType]
@@ -512,9 +511,14 @@ export class GameEngine {
       .map(([type, cfg]) => ({
         type,
         cfg,
-        weight: getObstacleWeight(cfg, weightTier),
+        weight: getObstacleWeight(cfg, tier, isEndless),
       }))
-      .filter(({ cfg, weight }) => cfg.enabled && weight > 0 && (isEndless || tier >= cfg.minTier));
+      .filter(({ cfg, weight }) => {
+        if (!cfg.enabled || weight <= 0) return false;
+        if (isEndless) return true;
+        const unlock = Number(cfg.minTier);
+        return !isNaN(unlock) && tier >= unlock;
+      });
 
     if (eligible.length === 0) {
       return 'single-gap-wall';
