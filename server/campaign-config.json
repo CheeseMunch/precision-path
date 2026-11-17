@@ -1335,10 +1335,10 @@
       "levelNumber": 11,
       "name": "Keyhole Corridor",
       "storyName": "Gatekeeper",
-      "description": "Wind through a 10-gate S-curve corridor across shifting walls.",
+      "description": "Thread a tightly spaced 12-gate corridor at steady pace.",
       "spawn": {
         "x": 0,
-        "y": 220
+        "y": 200
       },
       "clearBonusPoints": 600,
       "parTimeSeconds": 26,
@@ -1349,17 +1349,17 @@
           "delayAfterPrev": 0.4,
           "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 205,
-          "gapCenter": -120,
-          "gapSize": 95,
+          "speed": 150,
+          "gapCenter": 0,
+          "gapSize": 70,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk1-gt1",
               "order": 1,
-              "start": -167,
-              "end": -72,
+              "start": -35,
+              "end": 35,
               "points": 100,
               "label": "GATE 1"
             }
@@ -1368,20 +1368,20 @@
         {
           "id": "gk1-w2",
           "order": 2,
-          "delayAfterPrev": 1.3,
-          "side": "west",
+          "delayAfterPrev": 0.42,
+          "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 175,
-          "gapCenter": -200,
-          "gapSize": 100,
+          "speed": 150,
+          "gapCenter": 50,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#05d5fa",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk1-gt2",
               "order": 2,
-              "start": -250,
-              "end": -150,
+              "start": 15,
+              "end": 85,
               "points": 100,
               "label": "GATE 2"
             }
@@ -1390,118 +1390,218 @@
         {
           "id": "gk1-w3",
           "order": 3,
-          "delayAfterPrev": 1.4,
+          "delayAfterPrev": 0.42,
           "side": "north",
-          "patternType": "double-gap-wall",
-          "speed": 210,
-          "gapCenter": 100,
-          "gapSize": 90,
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 0,
+          "gapSize": 70,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk1-gt3",
               "order": 3,
-              "start": -84,
-              "end": 1,
+              "start": -35,
+              "end": 35,
               "points": 100,
               "label": "GATE 3"
-            },
-            {
-              "id": "gk1-gt4",
-              "order": 4,
-              "start": 57,
-              "end": 143,
-              "points": 100,
-              "label": "GATE 4"
             }
           ]
         },
         {
           "id": "gk1-w4",
           "order": 4,
-          "delayAfterPrev": 1.4,
-          "side": "east",
+          "delayAfterPrev": 0.42,
+          "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 185,
-          "gapCenter": 180,
-          "gapSize": 100,
+          "speed": 150,
+          "gapCenter": -55,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#d300c5",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk1-gt5",
-              "order": 5,
-              "start": 130,
-              "end": 230,
+              "id": "gk1-gt4",
+              "order": 4,
+              "start": -90,
+              "end": -20,
               "points": 100,
-              "label": "GATE 5"
+              "label": "GATE 4"
             }
           ]
         },
         {
           "id": "gk1-w5",
           "order": 5,
-          "delayAfterPrev": 1.4,
-          "side": "south",
-          "patternType": "staggered-blocks",
-          "speed": 215,
-          "gapCenter": 0,
-          "gapSize": 95,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 10,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk1-gt6",
-              "order": 6,
-              "start": -225,
-              "end": -171,
+              "id": "gk1-gt5",
+              "order": 5,
+              "start": -25,
+              "end": 45,
               "points": 100,
-              "label": "GATE 6"
-            },
-            {
-              "id": "gk1-gt7",
-              "order": 7,
-              "start": -47,
-              "end": 48,
-              "points": 100,
-              "label": "GATE 7"
-            },
-            {
-              "id": "gk1-gt8",
-              "order": 8,
-              "start": 171,
-              "end": 225,
-              "points": 100,
-              "label": "GATE 8"
+              "label": "GATE 5"
             }
           ]
         },
         {
           "id": "gk1-w6",
           "order": 6,
-          "delayAfterPrev": 1.5,
+          "delayAfterPrev": 0.42,
           "side": "north",
-          "patternType": "double-gap-wall",
-          "speed": 220,
-          "gapCenter": -95,
-          "gapSize": 90,
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 75,
+          "gapSize": 70,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
+            {
+              "id": "gk1-gt6",
+              "order": 6,
+              "start": 40,
+              "end": 110,
+              "points": 100,
+              "label": "GATE 6"
+            }
+          ]
+        },
+        {
+          "id": "gk1-w7",
+          "order": 7,
+          "delayAfterPrev": 0.45,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 20,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
+            {
+              "id": "gk1-gt7",
+              "order": 7,
+              "start": -14,
+              "end": 54,
+              "points": 100,
+              "label": "GATE 7"
+            }
+          ]
+        },
+        {
+          "id": "gk1-w8",
+          "order": 8,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": -45,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
+            {
+              "id": "gk1-gt8",
+              "order": 8,
+              "start": -79,
+              "end": -11,
+              "points": 100,
+              "label": "GATE 8"
+            }
+          ]
+        },
+        {
+          "id": "gk1-w9",
+          "order": 9,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": -110,
+          "gapSize": 68,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk1-gt9",
               "order": 9,
-              "start": -138,
-              "end": -52,
+              "start": -144,
+              "end": -76,
               "points": 100,
               "label": "GATE 9"
-            },
+            }
+          ]
+        },
+        {
+          "id": "gk1-w10",
+          "order": 10,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": -45,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
             {
               "id": "gk1-gt10",
               "order": 10,
-              "start": 4,
-              "end": 89,
+              "start": -79,
+              "end": -11,
+              "points": 100,
+              "label": "GATE 10"
+            }
+          ]
+        },
+        {
+          "id": "gk1-w11",
+          "order": 11,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 35,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
+            {
+              "id": "gk1-gt11",
+              "order": 11,
+              "start": 1,
+              "end": 69,
+              "points": 100,
+              "label": "GATE 11"
+            }
+          ]
+        },
+        {
+          "id": "gk1-w12",
+          "order": 12,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 0,
+          "gapSize": 66,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
+            {
+              "id": "gk1-gt12",
+              "order": 12,
+              "start": -33,
+              "end": 33,
               "points": 100,
               "label": "FINISH"
             }
@@ -1514,12 +1614,12 @@
     {
       "id": "level-gatekeeper-12",
       "levelNumber": 12,
-      "name": "Zigzag Labyrinth",
+      "name": "Reversal Tunnel",
       "storyName": "Gatekeeper",
-      "description": "Thread rapid back-and-forth gates across alternating maze lanes.",
+      "description": "Weave down a tight corridor, then catch the overlapping reversal.",
       "spawn": {
-        "x": -120,
-        "y": 200
+        "x": 0,
+        "y": 0
       },
       "clearBonusPoints": 650,
       "parTimeSeconds": 28,
@@ -1530,17 +1630,17 @@
           "delayAfterPrev": 0.4,
           "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 215,
-          "gapCenter": 120,
-          "gapSize": 92,
+          "speed": 145,
+          "gapCenter": -40,
+          "gapSize": 70,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk2-gt1",
               "order": 1,
-              "start": 74,
-              "end": 166,
+              "start": -75,
+              "end": -5,
               "points": 100,
               "label": "GATE 1"
             }
@@ -1549,20 +1649,20 @@
         {
           "id": "gk2-w2",
           "order": 2,
-          "delayAfterPrev": 1.1,
-          "side": "south",
+          "delayAfterPrev": 0.42,
+          "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 215,
-          "gapCenter": -120,
-          "gapSize": 92,
+          "speed": 145,
+          "gapCenter": 20,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk2-gt2",
               "order": 2,
-              "start": -166,
-              "end": -74,
+              "start": -15,
+              "end": 55,
               "points": 100,
               "label": "GATE 2"
             }
@@ -1571,140 +1671,240 @@
         {
           "id": "gk2-w3",
           "order": 3,
-          "delayAfterPrev": 1.3,
+          "delayAfterPrev": 0.42,
           "side": "north",
-          "patternType": "staggered-blocks",
-          "speed": 220,
-          "gapCenter": 0,
-          "gapSize": 90,
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": 80,
+          "gapSize": 70,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk2-gt3",
               "order": 3,
-              "start": -225,
-              "end": -171,
+              "start": 45,
+              "end": 115,
               "points": 100,
               "label": "GATE 3"
-            },
-            {
-              "id": "gk2-gt4",
-              "order": 4,
-              "start": 171,
-              "end": 225,
-              "points": 100,
-              "label": "GATE 4"
             }
           ]
         },
         {
           "id": "gk2-w4",
           "order": 4,
-          "delayAfterPrev": 1.3,
-          "side": "west",
-          "patternType": "double-gap-wall",
-          "speed": 180,
-          "gapCenter": -140,
-          "gapSize": 95,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": 20,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#05d5fa",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk2-gt5",
-              "order": 5,
-              "start": -185,
-              "end": -95,
+              "id": "gk2-gt4",
+              "order": 4,
+              "start": -15,
+              "end": 55,
               "points": 100,
-              "label": "GATE 5"
-            },
-            {
-              "id": "gk2-gt6",
-              "order": 6,
-              "start": -39,
-              "end": 51,
-              "points": 100,
-              "label": "GATE 6"
+              "label": "GATE 4"
             }
           ]
         },
         {
           "id": "gk2-w5",
           "order": 5,
-          "delayAfterPrev": 1.4,
-          "side": "south",
+          "delayAfterPrev": 0.42,
+          "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 225,
-          "gapCenter": 130,
-          "gapSize": 90,
+          "speed": 145,
+          "gapCenter": -50,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk2-gt7",
-              "order": 7,
-              "start": 85,
-              "end": 175,
+              "id": "gk2-gt5",
+              "order": 5,
+              "start": -85,
+              "end": -15,
               "points": 100,
-              "label": "GATE 7"
+              "label": "GATE 5"
             }
           ]
         },
         {
           "id": "gk2-w6",
           "order": 6,
-          "delayAfterPrev": 1.3,
-          "side": "east",
-          "patternType": "double-gap-wall",
-          "speed": 185,
-          "gapCenter": 120,
-          "gapSize": 95,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": -110,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#d300c5",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk2-gt8",
-              "order": 8,
-              "start": -71,
-              "end": 19,
+              "id": "gk2-gt6",
+              "order": 6,
+              "start": -145,
+              "end": -75,
               "points": 100,
-              "label": "GATE 8"
-            },
-            {
-              "id": "gk2-gt9",
-              "order": 9,
-              "start": 75,
-              "end": 165,
-              "points": 100,
-              "label": "GATE 9"
+              "label": "GATE 6"
             }
           ]
         },
         {
           "id": "gk2-w7",
           "order": 7,
-          "delayAfterPrev": 1.4,
-          "side": "north",
-          "patternType": "double-gap-wall",
-          "speed": 230,
-          "gapCenter": -100,
-          "gapSize": 90,
+          "delayAfterPrev": 0.65,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": -70,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#ff2a6d",
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk2-gt7",
+              "order": 7,
+              "start": -105,
+              "end": -35,
+              "points": 100,
+              "label": "GATE 7"
+            }
+          ]
+        },
+        {
+          "id": "gk2-w8",
+          "order": 8,
+          "delayAfterPrev": 0.42,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": -10,
+          "gapSize": 70,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk2-gt8",
+              "order": 8,
+              "start": -45,
+              "end": 25,
+              "points": 100,
+              "label": "GATE 8"
+            }
+          ]
+        },
+        {
+          "id": "gk2-w9",
+          "order": 9,
+          "delayAfterPrev": 0.42,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": 55,
+          "gapSize": 70,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk2-gt9",
+              "order": 9,
+              "start": 20,
+              "end": 90,
+              "points": 100,
+              "label": "GATE 9"
+            }
+          ]
+        },
+        {
+          "id": "gk2-w10",
+          "order": 10,
+          "delayAfterPrev": 0.42,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": 115,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff7700",
           "attachedGates": [
             {
               "id": "gk2-gt10",
               "order": 10,
-              "start": -143,
-              "end": -57,
+              "start": 81,
+              "end": 149,
               "points": 100,
               "label": "GATE 10"
-            },
+            }
+          ]
+        },
+        {
+          "id": "gk2-w11",
+          "order": 11,
+          "delayAfterPrev": 0.42,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": 50,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
             {
               "id": "gk2-gt11",
               "order": 11,
-              "start": -1,
+              "start": 16,
               "end": 84,
+              "points": 100,
+              "label": "GATE 11"
+            }
+          ]
+        },
+        {
+          "id": "gk2-w12",
+          "order": 12,
+          "delayAfterPrev": 0.42,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": -20,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk2-gt12",
+              "order": 12,
+              "start": -54,
+              "end": 14,
+              "points": 100,
+              "label": "GATE 12"
+            }
+          ]
+        },
+        {
+          "id": "gk2-w13",
+          "order": 13,
+          "delayAfterPrev": 0.42,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": 0,
+          "gapSize": 66,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk2-gt13",
+              "order": 13,
+              "start": -33,
+              "end": 33,
               "points": 100,
               "label": "FINISH"
             }
@@ -1717,12 +1917,12 @@
     {
       "id": "level-gatekeeper-13",
       "levelNumber": 13,
-      "name": "Twin Lock",
+      "name": "Corner Pivot",
       "storyName": "Gatekeeper",
-      "description": "Clear paired gates along the same wall before the lock closes.",
+      "description": "Pivot smoothly from north to west to south through 14 tight gates.",
       "spawn": {
         "x": 0,
-        "y": 0
+        "y": 180
       },
       "clearBonusPoints": 700,
       "parTimeSeconds": 30,
@@ -1732,148 +1932,108 @@
           "order": 1,
           "delayAfterPrev": 0.4,
           "side": "north",
-          "patternType": "double-gap-wall",
-          "speed": 205,
-          "gapCenter": -100,
-          "gapSize": 95,
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 0,
+          "gapSize": 72,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk3-gt1",
               "order": 1,
-              "start": -145,
-              "end": -55,
+              "start": -36,
+              "end": 36,
               "points": 100,
               "label": "GATE 1"
-            },
-            {
-              "id": "gk3-gt2",
-              "order": 2,
-              "start": 1,
-              "end": 91,
-              "points": 100,
-              "label": "GATE 2"
             }
           ]
         },
         {
           "id": "gk3-w2",
           "order": 2,
-          "delayAfterPrev": 1.4,
-          "side": "west",
-          "patternType": "staggered-blocks",
-          "speed": 170,
-          "gapCenter": 0,
-          "gapSize": 100,
+          "delayAfterPrev": 0.44,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 55,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#05d5fa",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk3-gt3",
-              "order": 3,
-              "start": -400,
-              "end": -346,
+              "id": "gk3-gt2",
+              "order": 2,
+              "start": 20,
+              "end": 90,
               "points": 100,
-              "label": "GATE 3"
-            },
-            {
-              "id": "gk3-gt4",
-              "order": 4,
-              "start": -50,
-              "end": 50,
-              "points": 100,
-              "label": "GATE 4"
+              "label": "GATE 2"
             }
           ]
         },
         {
           "id": "gk3-w3",
           "order": 3,
-          "delayAfterPrev": 1.4,
-          "side": "south",
-          "patternType": "double-gap-wall",
-          "speed": 215,
-          "gapCenter": 95,
-          "gapSize": 95,
+          "delayAfterPrev": 0.44,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 0,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk3-gt5",
-              "order": 5,
-              "start": 50,
-              "end": 140,
+              "id": "gk3-gt3",
+              "order": 3,
+              "start": -35,
+              "end": 35,
               "points": 100,
-              "label": "GATE 5"
-            },
-            {
-              "id": "gk3-gt6",
-              "order": 6,
-              "start": -96,
-              "end": -6,
-              "points": 100,
-              "label": "GATE 6"
+              "label": "GATE 3"
             }
           ]
         },
         {
           "id": "gk3-w4",
           "order": 4,
-          "delayAfterPrev": 1.4,
-          "side": "east",
-          "patternType": "double-gap-wall",
-          "speed": 175,
-          "gapCenter": -110,
-          "gapSize": 95,
+          "delayAfterPrev": 0.44,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": -60,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#d300c5",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk3-gt7",
-              "order": 7,
-              "start": -155,
-              "end": -65,
+              "id": "gk3-gt4",
+              "order": 4,
+              "start": -95,
+              "end": -25,
               "points": 100,
-              "label": "GATE 7"
-            },
-            {
-              "id": "gk3-gt8",
-              "order": 8,
-              "start": -9,
-              "end": 81,
-              "points": 100,
-              "label": "GATE 8"
+              "label": "GATE 4"
             }
           ]
         },
         {
           "id": "gk3-w5",
           "order": 5,
-          "delayAfterPrev": 1.4,
+          "delayAfterPrev": 0.44,
           "side": "north",
-          "patternType": "staggered-blocks",
-          "speed": 220,
-          "gapCenter": -30,
-          "gapSize": 92,
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 0,
+          "gapSize": 70,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk3-gt9",
-              "order": 9,
-              "start": -76,
-              "end": 16,
+              "id": "gk3-gt5",
+              "order": 5,
+              "start": -35,
+              "end": 35,
               "points": 100,
-              "label": "GATE 9"
-            },
-            {
-              "id": "gk3-gt10",
-              "order": 10,
-              "start": 171,
-              "end": 225,
-              "points": 100,
-              "label": "GATE 10"
+              "label": "GATE 5"
             }
           ]
         },
@@ -1881,41 +2041,195 @@
           "id": "gk3-w6",
           "order": 6,
           "delayAfterPrev": 1.3,
-          "side": "south",
-          "patternType": "sweeping-half-wall",
-          "speed": 225,
-          "gapCenter": 80,
-          "gapSize": 105,
+          "side": "west",
+          "patternType": "single-gap-wall",
+          "speed": 115,
+          "gapCenter": -40,
+          "gapSize": 74,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#05d5fa",
           "attachedGates": [
             {
-              "id": "gk3-gt11",
-              "order": 11,
-              "start": 28,
-              "end": 225,
+              "id": "gk3-gt6",
+              "order": 6,
+              "start": -77,
+              "end": -3,
               "points": 100,
-              "label": "GATE 11"
+              "label": "GATE 6"
             }
           ]
         },
         {
           "id": "gk3-w7",
           "order": 7,
-          "delayAfterPrev": 1.2,
-          "side": "north",
+          "delayAfterPrev": 0.46,
+          "side": "west",
           "patternType": "single-gap-wall",
-          "speed": 235,
-          "gapCenter": 0,
-          "gapSize": 88,
+          "speed": 115,
+          "gapCenter": 20,
+          "gapSize": 74,
           "barThickness": 18,
-          "color": "#ff2a6d",
+          "color": "#05d5fa",
+          "attachedGates": [
+            {
+              "id": "gk3-gt7",
+              "order": 7,
+              "start": -17,
+              "end": 57,
+              "points": 100,
+              "label": "GATE 7"
+            }
+          ]
+        },
+        {
+          "id": "gk3-w8",
+          "order": 8,
+          "delayAfterPrev": 0.46,
+          "side": "west",
+          "patternType": "single-gap-wall",
+          "speed": 115,
+          "gapCenter": 80,
+          "gapSize": 74,
+          "barThickness": 18,
+          "color": "#05d5fa",
+          "attachedGates": [
+            {
+              "id": "gk3-gt8",
+              "order": 8,
+              "start": 43,
+              "end": 117,
+              "points": 100,
+              "label": "GATE 8"
+            }
+          ]
+        },
+        {
+          "id": "gk3-w9",
+          "order": 9,
+          "delayAfterPrev": 0.46,
+          "side": "west",
+          "patternType": "single-gap-wall",
+          "speed": 115,
+          "gapCenter": 10,
+          "gapSize": 74,
+          "barThickness": 18,
+          "color": "#05d5fa",
+          "attachedGates": [
+            {
+              "id": "gk3-gt9",
+              "order": 9,
+              "start": -27,
+              "end": 47,
+              "points": 100,
+              "label": "GATE 9"
+            }
+          ]
+        },
+        {
+          "id": "gk3-w10",
+          "order": 10,
+          "delayAfterPrev": 0.25,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": -50,
+          "gapSize": 70,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk3-gt10",
+              "order": 10,
+              "start": -85,
+              "end": -15,
+              "points": 100,
+              "label": "GATE 10"
+            }
+          ]
+        },
+        {
+          "id": "gk3-w11",
+          "order": 11,
+          "delayAfterPrev": 0.44,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 15,
+          "gapSize": 70,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk3-gt11",
+              "order": 11,
+              "start": -20,
+              "end": 50,
+              "points": 100,
+              "label": "GATE 11"
+            }
+          ]
+        },
+        {
+          "id": "gk3-w12",
+          "order": 12,
+          "delayAfterPrev": 0.44,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 75,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff7700",
           "attachedGates": [
             {
               "id": "gk3-gt12",
               "order": 12,
-              "start": -44,
-              "end": 44,
+              "start": 41,
+              "end": 109,
+              "points": 100,
+              "label": "GATE 12"
+            }
+          ]
+        },
+        {
+          "id": "gk3-w13",
+          "order": 13,
+          "delayAfterPrev": 0.44,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 15,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk3-gt13",
+              "order": 13,
+              "start": -19,
+              "end": 49,
+              "points": 100,
+              "label": "GATE 13"
+            }
+          ]
+        },
+        {
+          "id": "gk3-w14",
+          "order": 14,
+          "delayAfterPrev": 0.44,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": -40,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk3-gt14",
+              "order": 14,
+              "start": -74,
+              "end": -6,
               "points": 100,
               "label": "FINISH"
             }
@@ -1928,12 +2242,12 @@
     {
       "id": "level-gatekeeper-14",
       "levelNumber": 14,
-      "name": "Crosshatch Maze",
+      "name": "Twin-Gate Thread",
       "storyName": "Gatekeeper",
-      "description": "Navigate intersecting vertical and horizontal walls packed with 13 gates.",
+      "description": "Thread double-gap walls and overlapping axis flips at measured speed.",
       "spawn": {
         "x": 0,
-        "y": 150
+        "y": 180
       },
       "clearBonusPoints": 750,
       "parTimeSeconds": 32,
@@ -1944,17 +2258,17 @@
           "delayAfterPrev": 0.4,
           "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 220,
-          "gapCenter": -110,
-          "gapSize": 92,
+          "speed": 140,
+          "gapCenter": -60,
+          "gapSize": 72,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk4-gt1",
               "order": 1,
-              "start": -156,
-              "end": -64,
+              "start": -96,
+              "end": -24,
               "points": 100,
               "label": "GATE 1"
             }
@@ -1963,50 +2277,50 @@
         {
           "id": "gk4-w2",
           "order": 2,
-          "delayAfterPrev": 0.9,
-          "side": "west",
-          "patternType": "single-gap-wall",
-          "speed": 185,
-          "gapCenter": -150,
-          "gapSize": 95,
+          "delayAfterPrev": 0.45,
+          "side": "north",
+          "patternType": "double-gap-wall",
+          "speed": 140,
+          "gapCenter": -60,
+          "gapSize": 75,
           "barThickness": 18,
-          "color": "#05d5fa",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk4-gt2",
               "order": 2,
-              "start": -197,
-              "end": -102,
+              "start": -98,
+              "end": -22,
               "points": 100,
               "label": "GATE 2"
+            },
+            {
+              "id": "gk4-gt3",
+              "order": 3,
+              "start": 34,
+              "end": 110,
+              "points": 100,
+              "label": "GATE 3"
             }
           ]
         },
         {
           "id": "gk4-w3",
           "order": 3,
-          "delayAfterPrev": 1,
-          "side": "south",
-          "patternType": "double-gap-wall",
-          "speed": 225,
-          "gapCenter": 100,
-          "gapSize": 92,
+          "delayAfterPrev": 0.5,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 140,
+          "gapCenter": 70,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#ff2a6d",
           "attachedGates": [
-            {
-              "id": "gk4-gt3",
-              "order": 3,
-              "start": -87,
-              "end": 0,
-              "points": 100,
-              "label": "GATE 3"
-            },
             {
               "id": "gk4-gt4",
               "order": 4,
-              "start": 56,
-              "end": 144,
+              "start": 35,
+              "end": 105,
               "points": 100,
               "label": "GATE 4"
             }
@@ -2015,140 +2329,220 @@
         {
           "id": "gk4-w4",
           "order": 4,
-          "delayAfterPrev": 1,
-          "side": "east",
-          "patternType": "double-gap-wall",
-          "speed": 190,
-          "gapCenter": -90,
-          "gapSize": 95,
+          "delayAfterPrev": 0.45,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 140,
+          "gapCenter": 10,
+          "gapSize": 70,
           "barThickness": 18,
-          "color": "#d300c5",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk4-gt5",
               "order": 5,
-              "start": -135,
-              "end": -45,
+              "start": -25,
+              "end": 45,
               "points": 100,
               "label": "GATE 5"
-            },
-            {
-              "id": "gk4-gt6",
-              "order": 6,
-              "start": 11,
-              "end": 101,
-              "points": 100,
-              "label": "GATE 6"
             }
           ]
         },
         {
           "id": "gk4-w5",
           "order": 5,
-          "delayAfterPrev": 1.2,
-          "side": "north",
-          "patternType": "staggered-blocks",
-          "speed": 225,
-          "gapCenter": 40,
-          "gapSize": 92,
+          "delayAfterPrev": 1.5,
+          "side": "east",
+          "patternType": "single-gap-wall",
+          "speed": 115,
+          "gapCenter": -40,
+          "gapSize": 74,
           "barThickness": 18,
-          "color": "#ff2a6d",
+          "color": "#d300c5",
           "attachedGates": [
             {
-              "id": "gk4-gt7",
-              "order": 7,
-              "start": -225,
-              "end": -171,
+              "id": "gk4-gt6",
+              "order": 6,
+              "start": -77,
+              "end": -3,
               "points": 100,
-              "label": "GATE 7"
-            },
-            {
-              "id": "gk4-gt8",
-              "order": 8,
-              "start": -6,
-              "end": 86,
-              "points": 100,
-              "label": "GATE 8"
+              "label": "GATE 6"
             }
           ]
         },
         {
           "id": "gk4-w6",
           "order": 6,
-          "delayAfterPrev": 1.1,
-          "side": "west",
+          "delayAfterPrev": 0.48,
+          "side": "east",
           "patternType": "double-gap-wall",
-          "speed": 185,
-          "gapCenter": 130,
-          "gapSize": 95,
+          "speed": 115,
+          "gapCenter": -65,
+          "gapSize": 78,
           "barThickness": 18,
-          "color": "#05d5fa",
+          "color": "#d300c5",
           "attachedGates": [
             {
-              "id": "gk4-gt9",
-              "order": 9,
-              "start": -61,
-              "end": 29,
+              "id": "gk4-gt7",
+              "order": 7,
+              "start": -103,
+              "end": -27,
               "points": 100,
-              "label": "GATE 9"
+              "label": "GATE 7"
             },
             {
-              "id": "gk4-gt10",
-              "order": 10,
-              "start": 85,
-              "end": 175,
+              "id": "gk4-gt8",
+              "order": 8,
+              "start": 29,
+              "end": 105,
               "points": 100,
-              "label": "GATE 10"
+              "label": "GATE 8"
             }
           ]
         },
         {
           "id": "gk4-w7",
           "order": 7,
-          "delayAfterPrev": 1.2,
-          "side": "south",
+          "delayAfterPrev": 0.52,
+          "side": "east",
           "patternType": "single-gap-wall",
-          "speed": 235,
-          "gapCenter": -130,
-          "gapSize": 90,
+          "speed": 115,
+          "gapCenter": 70,
+          "gapSize": 74,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#d300c5",
           "attachedGates": [
             {
-              "id": "gk4-gt11",
-              "order": 11,
-              "start": -175,
-              "end": -85,
+              "id": "gk4-gt9",
+              "order": 9,
+              "start": 33,
+              "end": 107,
               "points": 100,
-              "label": "GATE 11"
+              "label": "GATE 9"
             }
           ]
         },
         {
           "id": "gk4-w8",
           "order": 8,
-          "delayAfterPrev": 1.2,
+          "delayAfterPrev": 0.48,
           "side": "east",
-          "patternType": "double-gap-wall",
-          "speed": 195,
-          "gapCenter": -120,
-          "gapSize": 95,
+          "patternType": "single-gap-wall",
+          "speed": 115,
+          "gapCenter": 0,
+          "gapSize": 74,
           "barThickness": 18,
           "color": "#d300c5",
           "attachedGates": [
             {
+              "id": "gk4-gt10",
+              "order": 10,
+              "start": -37,
+              "end": 37,
+              "points": 100,
+              "label": "GATE 10"
+            }
+          ]
+        },
+        {
+          "id": "gk4-w9",
+          "order": 9,
+          "delayAfterPrev": 0.25,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": -70,
+          "gapSize": 70,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk4-gt11",
+              "order": 11,
+              "start": -105,
+              "end": -35,
+              "points": 100,
+              "label": "GATE 11"
+            }
+          ]
+        },
+        {
+          "id": "gk4-w10",
+          "order": 10,
+          "delayAfterPrev": 0.45,
+          "side": "south",
+          "patternType": "double-gap-wall",
+          "speed": 145,
+          "gapCenter": -55,
+          "gapSize": 75,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
               "id": "gk4-gt12",
               "order": 12,
-              "start": -165,
-              "end": -75,
+              "start": -93,
+              "end": -17,
               "points": 100,
               "label": "GATE 12"
             },
             {
               "id": "gk4-gt13",
               "order": 13,
-              "start": -19,
-              "end": 71,
+              "start": 39,
+              "end": 115,
+              "points": 100,
+              "label": "GATE 13"
+            }
+          ]
+        },
+        {
+          "id": "gk4-w11",
+          "order": 11,
+          "delayAfterPrev": 0.5,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 145,
+          "gapCenter": 75,
+          "gapSize": 70,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk4-gt14",
+              "order": 14,
+              "start": 40,
+              "end": 110,
+              "points": 100,
+              "label": "GATE 14"
+            }
+          ]
+        },
+        {
+          "id": "gk4-w12",
+          "order": 12,
+          "delayAfterPrev": 0.45,
+          "side": "south",
+          "patternType": "double-gap-wall",
+          "speed": 145,
+          "gapCenter": 65,
+          "gapSize": 74,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk4-gt15",
+              "order": 15,
+              "start": 27,
+              "end": 103,
+              "points": 100,
+              "label": "GATE 15"
+            },
+            {
+              "id": "gk4-gt16",
+              "order": 16,
+              "start": -105,
+              "end": -29,
               "points": 100,
               "label": "FINISH"
             }
@@ -2161,9 +2555,9 @@
     {
       "id": "level-gatekeeper-15",
       "levelNumber": 15,
-      "name": "The Gatekeeper's Vault",
+      "name": "The Gatekeeper's Path",
       "storyName": "Gatekeeper",
-      "description": "Master 15 sequential gates through the ultimate shifting labyrinth.",
+      "description": "18 sequential gates across all four directions in tight, overlapping waves.",
       "spawn": {
         "x": 0,
         "y": 200
@@ -2176,242 +2570,364 @@
           "order": 1,
           "delayAfterPrev": 0.4,
           "side": "north",
-          "patternType": "double-gap-wall",
-          "speed": 225,
-          "gapCenter": -95,
-          "gapSize": 92,
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 0,
+          "gapSize": 70,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk5-gt1",
               "order": 1,
-              "start": -139,
-              "end": -51,
+              "start": -35,
+              "end": 35,
               "points": 100,
               "label": "GATE 1"
-            },
-            {
-              "id": "gk5-gt2",
-              "order": 2,
-              "start": 5,
-              "end": 92,
-              "points": 100,
-              "label": "GATE 2"
             }
           ]
         },
         {
           "id": "gk5-w2",
           "order": 2,
-          "delayAfterPrev": 1.1,
-          "side": "west",
-          "patternType": "double-gap-wall",
-          "speed": 185,
-          "gapCenter": -130,
-          "gapSize": 95,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 60,
+          "gapSize": 68,
           "barThickness": 18,
-          "color": "#05d5fa",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk5-gt3",
-              "order": 3,
-              "start": -175,
-              "end": -85,
+              "id": "gk5-gt2",
+              "order": 2,
+              "start": 26,
+              "end": 94,
               "points": 100,
-              "label": "GATE 3"
-            },
-            {
-              "id": "gk5-gt4",
-              "order": 4,
-              "start": -29,
-              "end": 61,
-              "points": 100,
-              "label": "GATE 4"
+              "label": "GATE 2"
             }
           ]
         },
         {
           "id": "gk5-w3",
           "order": 3,
-          "delayAfterPrev": 1.2,
-          "side": "south",
-          "patternType": "staggered-blocks",
-          "speed": 230,
-          "gapCenter": 0,
-          "gapSize": 90,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": -10,
+          "gapSize": 68,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk5-gt5",
-              "order": 5,
-              "start": -225,
-              "end": -171,
+              "id": "gk5-gt3",
+              "order": 3,
+              "start": -44,
+              "end": 24,
               "points": 100,
-              "label": "GATE 5"
-            },
-            {
-              "id": "gk5-gt6",
-              "order": 6,
-              "start": -45,
-              "end": 45,
-              "points": 100,
-              "label": "GATE 6"
-            },
-            {
-              "id": "gk5-gt7",
-              "order": 7,
-              "start": 171,
-              "end": 225,
-              "points": 100,
-              "label": "GATE 7"
+              "label": "GATE 3"
             }
           ]
         },
         {
           "id": "gk5-w4",
           "order": 4,
-          "delayAfterPrev": 1.3,
-          "side": "east",
-          "patternType": "single-gap-wall",
-          "speed": 195,
-          "gapCenter": -200,
-          "gapSize": 92,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "double-gap-wall",
+          "speed": 150,
+          "gapCenter": -70,
+          "gapSize": 74,
           "barThickness": 18,
-          "color": "#d300c5",
+          "color": "#ff2a6d",
           "attachedGates": [
             {
-              "id": "gk5-gt8",
-              "order": 8,
-              "start": -246,
-              "end": -154,
+              "id": "gk5-gt4",
+              "order": 4,
+              "start": -108,
+              "end": -32,
               "points": 100,
-              "label": "GATE 8"
+              "label": "GATE 4"
+            },
+            {
+              "id": "gk5-gt5",
+              "order": 5,
+              "start": 24,
+              "end": 100,
+              "points": 100,
+              "label": "GATE 5"
             }
           ]
         },
         {
           "id": "gk5-w5",
           "order": 5,
-          "delayAfterPrev": 1.1,
-          "side": "north",
-          "patternType": "orb-cluster",
-          "speed": 230,
-          "gapCenter": 60,
-          "gapSize": 100,
+          "delayAfterPrev": 1.35,
+          "side": "west",
+          "patternType": "single-gap-wall",
+          "speed": 115,
+          "gapCenter": -50,
+          "gapSize": 72,
           "barThickness": 18,
-          "color": "#ff2a6d",
+          "color": "#05d5fa",
           "attachedGates": [
             {
-              "id": "gk5-gt9",
-              "order": 9,
-              "start": -185,
-              "end": -78,
+              "id": "gk5-gt6",
+              "order": 6,
+              "start": -86,
+              "end": -14,
               "points": 100,
-              "label": "GATE 9"
+              "label": "GATE 6"
             }
           ]
         },
         {
           "id": "gk5-w6",
           "order": 6,
-          "delayAfterPrev": 1.2,
+          "delayAfterPrev": 0.45,
           "side": "west",
-          "patternType": "sweeping-half-wall",
-          "speed": 195,
-          "gapCenter": -90,
-          "gapSize": 105,
+          "patternType": "single-gap-wall",
+          "speed": 115,
+          "gapCenter": 20,
+          "gapSize": 72,
           "barThickness": 18,
           "color": "#05d5fa",
           "attachedGates": [
             {
-              "id": "gk5-gt10",
-              "order": 10,
-              "start": -400,
-              "end": -37,
+              "id": "gk5-gt7",
+              "order": 7,
+              "start": -16,
+              "end": 56,
               "points": 100,
-              "label": "GATE 10"
+              "label": "GATE 7"
             }
           ]
         },
         {
           "id": "gk5-w7",
           "order": 7,
-          "delayAfterPrev": 1.2,
-          "side": "south",
-          "patternType": "double-gap-wall",
-          "speed": 235,
-          "gapCenter": -100,
-          "gapSize": 90,
+          "delayAfterPrev": 0.45,
+          "side": "west",
+          "patternType": "single-gap-wall",
+          "speed": 115,
+          "gapCenter": 85,
+          "gapSize": 72,
           "barThickness": 18,
-          "color": "#ff7700",
+          "color": "#05d5fa",
           "attachedGates": [
             {
-              "id": "gk5-gt11",
-              "order": 11,
-              "start": -143,
-              "end": -57,
+              "id": "gk5-gt8",
+              "order": 8,
+              "start": 49,
+              "end": 121,
               "points": 100,
-              "label": "GATE 11"
-            },
-            {
-              "id": "gk5-gt12",
-              "order": 12,
-              "start": -1,
-              "end": 84,
-              "points": 100,
-              "label": "GATE 12"
+              "label": "GATE 8"
             }
           ]
         },
         {
           "id": "gk5-w8",
           "order": 8,
-          "delayAfterPrev": 1.3,
-          "side": "east",
-          "patternType": "staggered-blocks",
-          "speed": 195,
-          "gapCenter": 20,
-          "gapSize": 95,
+          "delayAfterPrev": 0.25,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": -60,
+          "gapSize": 68,
           "barThickness": 18,
-          "color": "#d300c5",
+          "color": "#ff7700",
           "attachedGates": [
             {
-              "id": "gk5-gt13",
-              "order": 13,
-              "start": -400,
-              "end": -346,
+              "id": "gk5-gt9",
+              "order": 9,
+              "start": -94,
+              "end": -26,
               "points": 100,
-              "label": "GATE 13"
-            },
-            {
-              "id": "gk5-gt14",
-              "order": 14,
-              "start": 346,
-              "end": 400,
-              "points": 100,
-              "label": "GATE 14"
+              "label": "GATE 9"
             }
           ]
         },
         {
           "id": "gk5-w9",
           "order": 9,
-          "delayAfterPrev": 1.3,
+          "delayAfterPrev": 0.42,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 5,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk5-gt10",
+              "order": 10,
+              "start": -29,
+              "end": 39,
+              "points": 100,
+              "label": "GATE 10"
+            }
+          ]
+        },
+        {
+          "id": "gk5-w10",
+          "order": 10,
+          "delayAfterPrev": 0.42,
+          "side": "south",
+          "patternType": "single-gap-wall",
+          "speed": 150,
+          "gapCenter": 70,
+          "gapSize": 68,
+          "barThickness": 18,
+          "color": "#ff7700",
+          "attachedGates": [
+            {
+              "id": "gk5-gt11",
+              "order": 11,
+              "start": 36,
+              "end": 104,
+              "points": 100,
+              "label": "GATE 11"
+            }
+          ]
+        },
+        {
+          "id": "gk5-w11",
+          "order": 11,
+          "delayAfterPrev": 1.4,
+          "side": "east",
+          "patternType": "single-gap-wall",
+          "speed": 120,
+          "gapCenter": 40,
+          "gapSize": 72,
+          "barThickness": 18,
+          "color": "#d300c5",
+          "attachedGates": [
+            {
+              "id": "gk5-gt12",
+              "order": 12,
+              "start": 4,
+              "end": 76,
+              "points": 100,
+              "label": "GATE 12"
+            }
+          ]
+        },
+        {
+          "id": "gk5-w12",
+          "order": 12,
+          "delayAfterPrev": 0.45,
+          "side": "east",
+          "patternType": "single-gap-wall",
+          "speed": 120,
+          "gapCenter": -30,
+          "gapSize": 72,
+          "barThickness": 18,
+          "color": "#d300c5",
+          "attachedGates": [
+            {
+              "id": "gk5-gt13",
+              "order": 13,
+              "start": -66,
+              "end": 6,
+              "points": 100,
+              "label": "GATE 13"
+            }
+          ]
+        },
+        {
+          "id": "gk5-w13",
+          "order": 13,
+          "delayAfterPrev": 0.45,
+          "side": "east",
+          "patternType": "single-gap-wall",
+          "speed": 120,
+          "gapCenter": -95,
+          "gapSize": 72,
+          "barThickness": 18,
+          "color": "#d300c5",
+          "attachedGates": [
+            {
+              "id": "gk5-gt14",
+              "order": 14,
+              "start": -131,
+              "end": -59,
+              "points": 100,
+              "label": "GATE 14"
+            }
+          ]
+        },
+        {
+          "id": "gk5-w14",
+          "order": 14,
+          "delayAfterPrev": 0.25,
           "side": "north",
           "patternType": "single-gap-wall",
-          "speed": 245,
-          "gapCenter": 0,
-          "gapSize": 85,
+          "speed": 155,
+          "gapCenter": -55,
+          "gapSize": 66,
           "barThickness": 18,
           "color": "#ff2a6d",
           "attachedGates": [
             {
               "id": "gk5-gt15",
               "order": 15,
-              "start": -42,
-              "end": 43,
+              "start": -88,
+              "end": -22,
+              "points": 100,
+              "label": "GATE 15"
+            }
+          ]
+        },
+        {
+          "id": "gk5-w15",
+          "order": 15,
+          "delayAfterPrev": 0.42,
+          "side": "north",
+          "patternType": "single-gap-wall",
+          "speed": 155,
+          "gapCenter": 20,
+          "gapSize": 66,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
+            {
+              "id": "gk5-gt16",
+              "order": 16,
+              "start": -13,
+              "end": 53,
+              "points": 100,
+              "label": "GATE 16"
+            }
+          ]
+        },
+        {
+          "id": "gk5-w16",
+          "order": 16,
+          "delayAfterPrev": 0.45,
+          "side": "north",
+          "patternType": "double-gap-wall",
+          "speed": 155,
+          "gapCenter": -65,
+          "gapSize": 74,
+          "barThickness": 18,
+          "color": "#ff2a6d",
+          "attachedGates": [
+            {
+              "id": "gk5-gt17",
+              "order": 17,
+              "start": -103,
+              "end": -27,
+              "points": 100,
+              "label": "GATE 17"
+            },
+            {
+              "id": "gk5-gt18",
+              "order": 18,
+              "start": 29,
+              "end": 105,
               "points": 100,
               "label": "FINISH"
             }
