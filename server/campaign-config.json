@@ -630,7 +630,7 @@
       "id": "level-1794765830417",
       "levelNumber": 6,
       "name": "Crossfire Relay",
-      "storyName": "Enter the Gauntlet",
+      "storyName": "Gauntlet",
       "description": "",
       "spawn": {
         "x": 0,
@@ -765,7 +765,7 @@
       "id": "level-gauntlet-2",
       "levelNumber": 7,
       "name": "Orb Matrix",
-      "storyName": "Enter the Gauntlet",
+      "storyName": "Gauntlet",
       "description": "",
       "spawn": {
         "x": 0,
@@ -886,7 +886,7 @@
       "id": "level-gauntlet-3",
       "levelNumber": 8,
       "name": "Apex Gauntlet",
-      "storyName": "Enter the Gauntlet",
+      "storyName": "Gauntlet",
       "description": "",
       "spawn": {
         "x": 0,
@@ -1028,7 +1028,7 @@
       "id": "level-gauntlet-4",
       "levelNumber": 9,
       "name": "Vortex Corridor",
-      "storyName": "Enter the Gauntlet",
+      "storyName": "Gauntlet",
       "description": "",
       "spawn": {
         "x": 0,
@@ -1170,7 +1170,7 @@
       "id": "level-gauntlet-5",
       "levelNumber": 10,
       "name": "Final Overdrive",
-      "storyName": "Enter the Gauntlet",
+      "storyName": "Gauntlet",
       "description": "",
       "spawn": {
         "x": 0,

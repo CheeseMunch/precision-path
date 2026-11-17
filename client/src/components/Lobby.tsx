@@ -333,7 +333,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                             ) : storyCleared ? (
                               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
                             ) : null}
-                            <span>{grp.storyName}</span>
+                            <span>{gIdx + 1}. {grp.storyName}</span>
                           </button>
                         );
                       })}
