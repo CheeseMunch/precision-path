@@ -1335,7 +1335,7 @@
       "levelNumber": 11,
       "name": "Keyhole Corridor",
       "storyName": "Gatekeeper",
-      "description": "Thread a tightly spaced 12-gate corridor at steady pace.",
+      "description": "",
       "spawn": {
         "x": 0,
         "y": 200
@@ -1616,7 +1616,7 @@
       "levelNumber": 12,
       "name": "Reversal Tunnel",
       "storyName": "Gatekeeper",
-      "description": "Weave down a tight corridor, then catch the overlapping reversal.",
+      "description": "",
       "spawn": {
         "x": 0,
         "y": 0
@@ -1919,7 +1919,7 @@
       "levelNumber": 13,
       "name": "Corner Pivot",
       "storyName": "Gatekeeper",
-      "description": "Pivot smoothly from north to west to south through 14 tight gates.",
+      "description": "",
       "spawn": {
         "x": 0,
         "y": 180
@@ -2244,7 +2244,7 @@
       "levelNumber": 14,
       "name": "Twin-Gate Thread",
       "storyName": "Gatekeeper",
-      "description": "Thread double-gap walls and overlapping axis flips at measured speed.",
+      "description": "",
       "spawn": {
         "x": 0,
         "y": 180
@@ -2557,7 +2557,7 @@
       "levelNumber": 15,
       "name": "The Gatekeeper's Path",
       "storyName": "Gatekeeper",
-      "description": "18 sequential gates across all four directions in tight, overlapping waves.",
+      "description": "",
       "spawn": {
         "x": 0,
         "y": 200
