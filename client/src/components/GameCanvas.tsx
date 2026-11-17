@@ -225,6 +225,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     let lastFrameTime = performance.now();
     let simNow = lastFrameTime;
+    let renderElapsedTime = (liveGameStateRef?.current || gameStateRef.current).elapsedTime || 0;
+    let lastSyncedServerElapsed = renderElapsedTime;
 
     const render = (rafNow: number) => {
       const rawDtMs = Math.max(0, rafNow - lastFrameTime);
@@ -234,11 +236,30 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const currentMyId = myPlayerIdRef.current;
       const isPlaying = currentState.status === 'playing';
       const isPaused = currentState.status === 'paused';
+      const isCampaign = currentState.gameMode === 'campaign';
       const frameDt = isPaused ? 0 : Math.min(0.05, Math.max(0.001, rawDtMs / 1000));
       if (!isPaused) {
         simNow += rawDtMs;
       }
       const now = simNow;
+
+      if (currentState.status === 'countdown' || currentState.elapsedTime < 0.05) {
+        renderElapsedTime = currentState.elapsedTime;
+        lastSyncedServerElapsed = currentState.elapsedTime;
+      } else {
+        if (currentState.elapsedTime !== lastSyncedServerElapsed) {
+          lastSyncedServerElapsed = currentState.elapsedTime;
+          const drift = currentState.elapsedTime - renderElapsedTime;
+          if (!isPlaying || Math.abs(drift) > 0.06) {
+            renderElapsedTime = currentState.elapsedTime;
+          } else {
+            renderElapsedTime += drift * 0.25;
+          }
+        }
+        if (isPlaying) {
+          renderElapsedTime += Math.min(0.05, rawDtMs / 1000);
+        }
+      }
 
       const width = LOGICAL_WIDTH;
       const height = LOGICAL_HEIGHT;
@@ -312,6 +333,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const ordered = [...cps].sort((a, b) => a.order - b.order);
         const getGateCoord = (cp: (typeof cps)[number]) => {
           if (cp.waveId && cp.spawnTime !== undefined && cp.spawnCoord !== undefined && cp.travelSign && cp.speed) {
+            if (isCampaign) {
+              const ageSec = Math.max(0, renderElapsedTime - cp.spawnTime);
+              return cp.spawnCoord + cp.travelSign * cp.speed * ageSec;
+            }
             const key = 'gate:' + cp.id;
             let spMs = spawnPerfMapGates.get(key);
             if (spMs === undefined) {
@@ -443,18 +468,23 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       for (const obs of currentState.obstacles) {
         activeIds.add(obs.id);
-        let spawnPerfMs = spawnPerfMap.get(obs.id);
+        let ageSec = 0;
+        if (isCampaign && obs.spawnTime !== undefined) {
+          ageSec = Math.max(0, renderElapsedTime - obs.spawnTime);
+        } else {
+          let spawnPerfMs = spawnPerfMap.get(obs.id);
 
-        if (spawnPerfMs === undefined) {
-          const initialAgeSec =
-            obs.spawnTime !== undefined
-              ? Math.max(0, currentState.elapsedTime - obs.spawnTime)
-              : 0;
-          spawnPerfMs = now - initialAgeSec * 1000;
-          spawnPerfMap.set(obs.id, spawnPerfMs);
+          if (spawnPerfMs === undefined) {
+            const initialAgeSec =
+              obs.spawnTime !== undefined
+                ? Math.max(0, currentState.elapsedTime - obs.spawnTime)
+                : 0;
+            spawnPerfMs = now - initialAgeSec * 1000;
+            spawnPerfMap.set(obs.id, spawnPerfMs);
+          }
+
+          ageSec = Math.max(0, (now - spawnPerfMs) / 1000);
         }
-
-        const ageSec = Math.max(0, (now - spawnPerfMs) / 1000);
         const baseX = obs.spawnX !== undefined ? obs.spawnX : obs.x;
         const baseY = obs.spawnY !== undefined ? obs.spawnY : obs.y;
         const drawX = baseX + obs.vx * ageSec;

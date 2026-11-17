@@ -566,7 +566,7 @@ export class GameEngine {
     });
   }
 
-  private spawnCampaignWave(wave: CampaignWaveSpec) {
+  private spawnCampaignWave(wave: CampaignWaveSpec, triggerAt: number) {
     const direction = wave.side;
     const isVerticalTravel = direction === 'north' || direction === 'south';
     const lateralHalfSpan = isVerticalTravel ? this.ARENA_WIDTH / 2 : this.ARENA_HEIGHT / 2;
@@ -574,6 +574,7 @@ export class GameEngine {
     const spawnDist = halfBound + GAME_CONFIG.obstacles.spawnDistanceOffset;
     const travelSign = direction === 'north' || direction === 'west' ? 1 : -1;
     const startCoord = -travelSign * spawnDist;
+    const prevObsCount = this.state.obstacles.length;
 
     const dirColors: Record<string, string> = {
       north: '#ff2a6d',
@@ -689,15 +690,30 @@ export class GameEngine {
       }
     }
 
-    // Activate all gates attached to this wave
+    // Lock obstacle spawnTime to exact scheduled triggerAt so tick jitter never alters wave spacing
+    const overshootAge = Math.max(0, this.state.elapsedTime - triggerAt);
+    for (let i = prevObsCount; i < this.state.obstacles.length; i++) {
+      const obs = this.state.obstacles[i];
+      obs.spawnTime = triggerAt;
+      if (obs.spawnX !== undefined && obs.spawnY !== undefined) {
+        obs.x = obs.spawnX + obs.vx * overshootAge;
+        obs.y = obs.spawnY + obs.vy * overshootAge;
+      }
+      if (obs.rotationSpeed) {
+        const spawnRot = obs.spawnRotation !== undefined ? obs.spawnRotation : 0;
+        obs.rotation = spawnRot + obs.rotationSpeed * overshootAge;
+      }
+    }
+
+    // Activate all gates attached to this wave locked to the exact same triggerAt
     if (this.state.checkpoints) {
       for (const cp of this.state.checkpoints) {
         if (cp.waveId === wave.id) {
-          cp.coord = startCoord;
           cp.spawnCoord = startCoord;
-          cp.spawnTime = this.state.elapsedTime;
+          cp.spawnTime = triggerAt;
           cp.travelSign = travelSign;
           cp.speed = speed;
+          cp.coord = startCoord + travelSign * speed * overshootAge;
         }
       }
     }
@@ -970,7 +986,7 @@ export class GameEngine {
         const due = this.campaignWaveQueue.filter((w) => this.state.elapsedTime >= w.triggerAt);
         this.campaignWaveQueue = this.campaignWaveQueue.filter((w) => this.state.elapsedTime < w.triggerAt);
         for (const item of due) {
-          this.spawnCampaignWave(item.wave);
+          this.spawnCampaignWave(item.wave, item.triggerAt);
         }
       }
 
@@ -980,7 +996,11 @@ export class GameEngine {
         for (const cp of this.state.checkpoints) {
           if (cp.spawnTime !== undefined && cp.travelSign && cp.speed) {
             prevGateCoords.set(cp.id, cp.coord);
-            cp.coord += cp.travelSign * cp.speed * dt;
+            if (cp.spawnCoord !== undefined) {
+              cp.coord = cp.spawnCoord + cp.travelSign * cp.speed * Math.max(0, this.state.elapsedTime - cp.spawnTime);
+            } else {
+              cp.coord += cp.travelSign * cp.speed * dt;
+            }
           }
         }
       }
