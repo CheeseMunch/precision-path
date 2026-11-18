@@ -67,11 +67,11 @@ const TIER_SPECS: Record<AiDifficultyTier, TierSpec> = {
     promptRules: [
       'Difficulty Tier: EASY (Steady Challenge).',
       'Wave count: 7 to 9 waves.',
-      'Speeds: 145 to 175 px/s.',
+      'Speeds: 145 to 175 px/s (vary speeds wave-to-wave).',
       'Gap sizes: 84 to 108 px.',
       'delayAfterPrev: 0.75 to 1.15 seconds (first wave 0.45).',
-      'Patterns: mix "single-gap-wall", "orb-cluster", "double-gap-wall", and "sweeping-half-wall".',
-      'Include 1 to 2 clean direction switches (e.g., north -> west or north -> south).',
+      'Patterns: use at least 3 to 4 DIFFERENT patternTypes across the level ("single-gap-wall", "double-gap-wall", "orb-cluster", "sweeping-half-wall", "staggered-blocks"). Never use the same patternType more than 2 waves in a row.',
+      'Include 1 to 2 clean direction switches (e.g., north -> west -> south).',
     ].join('\n'),
   },
   medium: {
@@ -89,10 +89,10 @@ const TIER_SPECS: Record<AiDifficultyTier, TierSpec> = {
     promptRules: [
       'Difficulty Tier: MEDIUM (Tactical Gauntlet).',
       'Wave count: 10 to 13 waves.',
-      'Speeds: 165 to 210 px/s.',
+      'Speeds: 165 to 210 px/s (vary speeds dynamically).',
       'Gap sizes: 70 to 88 px.',
       'delayAfterPrev: 0.45 to 0.85 seconds (first wave 0.4).',
-      'Patterns: mix "single-gap-wall", "double-gap-wall", "sweeping-half-wall", "staggered-blocks", "orb-cluster", and "diagonal-spinner".',
+      'Patterns: use at least 4 to 5 DIFFERENT patternTypes ("single-gap-wall", "double-gap-wall", "sweeping-half-wall", "staggered-blocks", "orb-cluster", "diagonal-spinner"). Never repeat the same patternType more than 2 waves in a row.',
       'Include 2 to 3 direction changes across north, south, east, west.',
     ].join('\n'),
   },
@@ -111,10 +111,10 @@ const TIER_SPECS: Record<AiDifficultyTier, TierSpec> = {
     promptRules: [
       'Difficulty Tier: HARD (Gatekeeper Labyrinth).',
       'Wave count: 14 to 18 waves.',
-      'Speeds: 160 to 225 px/s (fast, dense corridors).',
+      'Speeds: 160 to 225 px/s (vary between tight slower corridors and fast single walls).',
       'Gap sizes: 62 to 76 px (narrow, precision weaving).',
       'delayAfterPrev: 0.38 to 0.58 seconds for tight corridor trains, and 0.85 to 1.25 seconds when switching perpendicular directions (first wave 0.4).',
-      'Patterns: use tightly spaced "single-gap-wall" winding corridors, "double-gap-wall", "staggered-blocks", and "orb-cluster".',
+      'Patterns: use ALL 6 patternTypes ("single-gap-wall", "double-gap-wall", "sweeping-half-wall", "staggered-blocks", "orb-cluster", "diagonal-spinner"). Never repeat the same patternType more than 2 waves in a row.',
       'Include 3 to 4 direction changes across all four sides (north, south, east, west).',
     ].join('\n'),
   },
@@ -298,10 +298,19 @@ export function validateAndRepairAiLevel(
 
     let patternType: CampaignPatternType = ALLOWED_PATTERNS.includes(src.patternType)
       ? src.patternType
-      : 'single-gap-wall';
-    if (difficulty === 'easy' && (patternType === 'diagonal-spinner' || patternType === 'staggered-blocks')) {
-      patternType = 'single-gap-wall';
+      : ALLOWED_PATTERNS[i % ALLOWED_PATTERNS.length];
+
+    // Enforce obstacle variability: prevent 3+ identical patternTypes in a row
+    if (
+      i >= 2 &&
+      waves[i - 1].patternType === patternType &&
+      waves[i - 2].patternType === patternType
+    ) {
+      const pool = ALLOWED_PATTERNS.filter((p) => p !== patternType);
+      patternType = pool[(i + Math.floor(Math.random() * pool.length)) % pool.length];
     }
+
+    const barThickness = clamp(Math.round(Number(src.barThickness ?? 18)), 14, 24);
 
     const speed = clamp(Math.round(Number(src.speed ?? (spec.minSpeed + spec.maxSpeed) / 2)), spec.minSpeed, spec.maxSpeed);
     const gapSize = clamp(Math.round(Number(src.gapSize ?? (spec.minGap + spec.maxGap) / 2)), Math.max(60, spec.minGap), spec.maxGap);
@@ -331,7 +340,7 @@ export function validateAndRepairAiLevel(
         speed,
         gapCenter,
         gapSize,
-        barThickness: 18,
+        barThickness,
         color: EDITOR_DIR_COLORS[side],
         attachedGates: [],
       };
@@ -369,10 +378,21 @@ export function validateAndRepairAiLevel(
         speed,
         gapCenter,
         gapSize,
-        barThickness: 18,
+        barThickness,
         color: EDITOR_DIR_COLORS[side],
         attachedGates: [],
       });
+    }
+  }
+
+  // Ensure every level uses at least 3 distinct obstacle patternTypes
+  const distinctPatterns = new Set(waves.map((w) => w.patternType));
+  if (distinctPatterns.size < 3 && waves.length >= 4) {
+    const missing = ALLOWED_PATTERNS.filter((p) => !distinctPatterns.has(p));
+    let mIdx = 0;
+    for (let i = 1; i < waves.length && distinctPatterns.size < 3 && mIdx < missing.length; i += 2) {
+      waves[i].patternType = missing[mIdx++];
+      distinctPatterns.add(waves[i].patternType);
     }
   }
 
