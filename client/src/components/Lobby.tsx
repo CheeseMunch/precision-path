@@ -44,6 +44,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [aiGenerating, setAiGenerating] = React.useState(false);
   const [aiElapsed, setAiElapsed] = React.useState(0);
   const [aiError, setAiError] = React.useState<string | null>(null);
+  const aiAbortRef = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => {
     if (!aiGenerating) {
@@ -77,14 +78,25 @@ export const Lobby: React.FC<LobbyProps> = ({
     }
   };
 
+  const handleCancelAiGeneration = () => {
+    if (aiAbortRef.current) {
+      aiAbortRef.current.abort();
+      aiAbortRef.current = null;
+    }
+    setAiGenerating(false);
+  };
+
   const handleGenerateAiLevel = async () => {
     if (!aiModel || aiGenerating) return;
     setAiError(null);
     setAiGenerating(true);
+    const controller = new AbortController();
+    aiAbortRef.current = controller;
     try {
       const res = await fetch('/api/generate-ai-level', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({ difficulty: aiDifficulty, model: aiModel }),
       });
       const data = await res.json();
@@ -93,8 +105,12 @@ export const Lobby: React.FC<LobbyProps> = ({
       setShowAiModal(false);
       onPlayAiLevel(data.level);
     } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return;
+      }
       setAiError(err?.message || 'Failed to generate AI level');
     } finally {
+      aiAbortRef.current = null;
       setAiGenerating(false);
     }
   };
@@ -643,7 +659,15 @@ export const Lobby: React.FC<LobbyProps> = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
           <div className="w-full max-w-lg bg-cyber-panel border border-violet-500/45 rounded-xl p-6 shadow-2xl flex flex-col gap-5">
             {aiGenerating ? (
-              <div className="py-8 flex flex-col items-center text-center gap-4">
+              <div className="relative py-8 flex flex-col items-center text-center gap-4">
+                <button
+                  type="button"
+                  onClick={handleCancelAiGeneration}
+                  title="Cancel generation"
+                  className="absolute top-0 right-0 px-2.5 py-1.5 rounded-lg bg-cyber-bg border border-cyber-border text-slate-300 hover:text-white hover:border-rose-400/60 text-xs font-mono transition"
+                >
+                  ✕
+                </button>
                 <div className="relative">
                   <div className="w-16 h-16 rounded-full border-2 border-violet-500/30 flex items-center justify-center bg-violet-500/10">
                     <Loader2 className="w-8 h-8 text-violet-300 animate-spin" />
@@ -664,6 +688,13 @@ export const Lobby: React.FC<LobbyProps> = ({
                     ? 'Choreographing obstacle waves and directional flow...'
                     : 'Validating gate order and verifying level completability...'}
                 </div>
+                <button
+                  type="button"
+                  onClick={handleCancelAiGeneration}
+                  className="mt-1 px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-500/50 text-slate-300 hover:text-rose-200 text-xs font-mono uppercase tracking-wider transition"
+                >
+                  Cancel
+                </button>
               </div>
             ) : (
               <>

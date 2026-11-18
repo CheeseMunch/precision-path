@@ -505,7 +505,8 @@ export function validateAndRepairAiLevel(
 
 export async function generateAiLevel(
   difficulty: AiDifficultyTier,
-  model: string
+  model: string,
+  externalSignal?: AbortSignal
 ): Promise<CampaignLevelConfig> {
   const spec = TIER_SPECS[difficulty];
   const creativeSeed = Math.floor(Math.random() * 100000);
@@ -529,37 +530,52 @@ export async function generateAiLevel(
   ].join('\n\n');
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 90000);
+  const onExternalAbort = () => controller.abort();
+  if (externalSignal) {
+    if (externalSignal.aborted) controller.abort();
+    else externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+  }
+  const timer = setTimeout(() => controller.abort(), 120000);
   let parsed: any = null;
+  const isGptOss = model.toLowerCase().startsWith('gpt-oss');
 
   try {
+    const payload: Record<string, any> = {
+      model,
+      stream: false,
+      think: isGptOss ? 'low' : false,
+      options: {
+        temperature: 0.9,
+        num_predict: isGptOss ? 4096 : 2048,
+      },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
+    };
+    if (isGptOss) {
+      payload.format = 'json';
+    }
+
     const res = await fetch(`${OLLAMA_URL}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
-      body: JSON.stringify({
-        model,
-        stream: false,
-        think: false,
-        options: {
-          temperature: 0.9,
-          num_predict: 2048,
-        },
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-      }),
+      body: JSON.stringify(payload),
     });
     clearTimeout(timer);
+    if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort);
 
     if (!res.ok) {
       const errTxt = await res.text().catch(() => '');
       throw new Error(`Ollama returned HTTP ${res.status}${errTxt ? `: ${errTxt.slice(0, 140)}` : ''}`);
     }
 
-    const data = (await res.json()) as { message?: { content?: string } };
+    const data = (await res.json()) as { message?: { content?: string; thinking?: string } };
     let content = String(data?.message?.content || '').trim();
+    if (!content && data?.message?.thinking) {
+      content = String(data.message.thinking).trim();
+    }
     content = content.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
     content = content.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
 
@@ -568,10 +584,15 @@ export async function generateAiLevel(
     if (jsonStart >= 0 && jsonEnd > jsonStart) {
       content = content.slice(jsonStart, jsonEnd + 1);
     }
+    content = content.replace(/,\s*([}\]])/g, '$1');
     parsed = JSON.parse(content);
   } catch (err: any) {
     clearTimeout(timer);
-    throw new Error(err?.name === 'AbortError' ? 'AI generation timed out (90s). Try a faster model.' : err?.message || 'AI generation failed.');
+    if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort);
+    if (externalSignal?.aborted) {
+      throw new Error('Generation cancelled.');
+    }
+    throw new Error(err?.name === 'AbortError' ? 'AI generation timed out (120s). Try a faster model.' : err?.message || 'AI generation failed.');
   }
 
   return validateAndRepairAiLevel(parsed, difficulty, model);

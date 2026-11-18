@@ -1770,13 +1770,21 @@ app.post('/api/generate-ai-level', async (req, res) => {
   if (!model) {
     return res.status(400).json({ error: 'Please select an AI model.' });
   }
+  const abortController = new AbortController();
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      abortController.abort();
+    }
+  });
   try {
-    const generated = await generateAiLevel(difficulty, model);
+    const generated = await generateAiLevel(difficulty, model, abortController.signal);
+    if (abortController.signal.aborted) return;
     const sanitized = sanitizeCampaignLevel(generated, 0);
     sanitized.storyName = generated.storyName;
     sanitized.levelNumber = 1;
     res.json({ level: sanitized });
   } catch (err: any) {
+    if (abortController.signal.aborted) return;
     res.status(502).json({ error: err.message || 'Failed to generate AI level.' });
   }
 });
