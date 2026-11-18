@@ -235,9 +235,10 @@ export const Lobby: React.FC<LobbyProps> = ({
   const hasPilotName = playerName.trim().length > 0;
 
   return (
-    <div className="w-full max-h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-4 py-3 md:py-6 relative z-10">
+    <div className="w-full h-full overflow-y-auto px-4 py-3 md:py-6 relative z-10 flex flex-col items-center">
       {/* Background radial atmosphere */}
-      <div className="absolute w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
+      <div className="w-full max-w-md my-auto flex flex-col items-center">
 
       {/* Title */}
       <div className="text-center mb-3 md:mb-6 pt-1">
