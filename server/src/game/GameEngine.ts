@@ -53,6 +53,7 @@ export class GameEngine {
   private campaignLevelNumber = 1;
   private customLevel: CampaignLevelConfig | null = null;
   private communityLevelId: string | undefined = undefined;
+  private isAiGenerated = false;
   private campaignObstacleSpecs: Map<string, CampaignObstacleSpec> = new Map();
   private campaignWaveQueue: Array<{ triggerAt: number; wave: CampaignWaveSpec }> = [];
   private campaignTransitionTimer: number | null = null;
@@ -71,16 +72,18 @@ export class GameEngine {
   public readonly ARENA_RADIUS = GAME_CONFIG.arena.radius;
   public readonly PLAYER_RADIUS = GAME_CONFIG.arena.playerRadius;
 
-  constructor(roomId: string, options?: { gameMode?: GameMode; campaignLevel?: number; customLevel?: CampaignLevelConfig; communityLevelId?: string }) {
+  constructor(roomId: string, options?: { gameMode?: GameMode; campaignLevel?: number; customLevel?: CampaignLevelConfig; communityLevelId?: string; isAiGenerated?: boolean }) {
     this.initRng();
     this.gameMode = options?.gameMode ?? 'endless';
     this.campaignLevelNumber = options?.campaignLevel ?? 1;
     this.customLevel = options?.customLevel ?? null;
     this.communityLevelId = options?.communityLevelId;
+    this.isAiGenerated = Boolean(options?.isAiGenerated);
     this.state = {
       roomId,
       gameMode: this.gameMode,
       communityLevelId: this.communityLevelId,
+      isAiGenerated: this.isAiGenerated,
       campaignLevel: this.campaignLevelNumber,
       totalCampaignLevels: this.customLevel ? 1 : CAMPAIGN_CONFIG.levels.length,
       campaignResult: null,
@@ -482,9 +485,14 @@ export class GameEngine {
     const level = this.customLevel ?? getCampaignLevel(this.campaignLevelNumber);
     this.state.gameMode = 'campaign';
     this.state.communityLevelId = this.communityLevelId;
+    this.state.isAiGenerated = this.isAiGenerated;
     this.state.campaignLevel = this.customLevel ? 1 : level.levelNumber;
     this.state.campaignLevelName = level.name;
-    this.state.campaignStoryName = this.customLevel ? 'Community' : (level.storyName || 'Story 1');
+    this.state.campaignStoryName = this.isAiGenerated
+      ? (level.storyName || 'AI Generated')
+      : this.customLevel
+      ? 'Community'
+      : (level.storyName || 'Story 1');
     this.state.campaignStoryCompleted = false;
     this.state.totalCampaignLevels = this.customLevel ? 1 : CAMPAIGN_CONFIG.levels.length;
     this.state.campaignSpawn = { ...level.spawn };

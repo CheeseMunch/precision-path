@@ -31,7 +31,7 @@ export class RoomManager {
   public createRoom(
     hostSocketId: string,
     playerName: string,
-    options?: { gameMode?: GameMode; campaignLevel?: number; customLevel?: CampaignLevelConfig; communityLevelId?: string }
+    options?: { gameMode?: GameMode; campaignLevel?: number; customLevel?: CampaignLevelConfig; communityLevelId?: string; isAiGenerated?: boolean }
   ): { roomId: string; engine: GameEngine } {
     const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
     const engine = new GameEngine(roomId, options);

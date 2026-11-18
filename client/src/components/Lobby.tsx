@@ -3,8 +3,8 @@ import { Play, Users, Trophy, Flag, Lock, CheckCircle2, X } from 'lucide-react';
 import type { CampaignLevelConfig } from '../../../shared/types';
 import { getCampaignProgress } from '../utils/campaignProgress';
 
-import { Globe, Plus, Pencil, Trash2 } from 'lucide-react';
-import type { CommunityLevelConfig } from '../../../shared/types';
+import { Globe, Plus, Pencil, Trash2, Sparkles, Loader2 } from 'lucide-react';
+import type { AiDifficultyTier, CommunityLevelConfig } from '../../../shared/types';
 import { CommunityLevelEditor } from './CommunityLevelEditor';
 
 interface LobbyProps {
@@ -13,6 +13,7 @@ interface LobbyProps {
   onCreateRoom: (solo?: boolean) => void;
   onPlayCampaign: (levelNumber: number) => void;
   onPlayCommunityLevel: (communityLevelId: string) => void;
+  onPlayAiLevel: (level: CampaignLevelConfig) => void;
   onJoinRoom: (roomCode: string) => void;
   onOpenLeaderboard: () => void;
 }
@@ -23,6 +24,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   onCreateRoom,
   onPlayCampaign,
   onPlayCommunityLevel,
+  onPlayAiLevel,
   onJoinRoom,
   onOpenLeaderboard,
 }) => {
@@ -33,6 +35,69 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [editingCommunityLevel, setEditingCommunityLevel] = React.useState<CommunityLevelConfig | null>(null);
   const [creatingCommunityLevel, setCreatingCommunityLevel] = React.useState(false);
   const [deletingCommunityId, setDeletingCommunityId] = React.useState<string | null>(null);
+
+  const [showAiModal, setShowAiModal] = React.useState(false);
+  const [aiDifficulty, setAiDifficulty] = React.useState<AiDifficultyTier>('medium');
+  const [aiModels, setAiModels] = React.useState<Array<{ name: string; sizeGb: string; available: boolean }>>([]);
+  const [aiModel, setAiModel] = React.useState<string>('qwen3.5:9b');
+  const [aiLoadingModels, setAiLoadingModels] = React.useState(false);
+  const [aiGenerating, setAiGenerating] = React.useState(false);
+  const [aiElapsed, setAiElapsed] = React.useState(0);
+  const [aiError, setAiError] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (!aiGenerating) {
+      setAiElapsed(0);
+      return;
+    }
+    const start = performance.now();
+    const id = window.setInterval(() => {
+      setAiElapsed((performance.now() - start) / 1000);
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [aiGenerating]);
+
+  const openAiGenerator = async () => {
+    setShowAiModal(true);
+    setAiError(null);
+    setAiLoadingModels(true);
+    try {
+      const res = await fetch('/api/ai-models');
+      const data = await res.json();
+      if (Array.isArray(data.models) && data.models.length > 0) {
+        setAiModels(data.models);
+        if (!data.models.some((m: any) => m.name === aiModel)) {
+          setAiModel(data.models[0].name);
+        }
+      }
+    } catch {
+      // keep default fallback
+    } finally {
+      setAiLoadingModels(false);
+    }
+  };
+
+  const handleGenerateAiLevel = async () => {
+    if (!aiModel || aiGenerating) return;
+    setAiError(null);
+    setAiGenerating(true);
+    try {
+      const res = await fetch('/api/generate-ai-level', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ difficulty: aiDifficulty, model: aiModel }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to generate AI level');
+      if (!data.level) throw new Error('Invalid AI level response');
+      setShowAiModal(false);
+      onPlayAiLevel(data.level);
+    } catch (err: any) {
+      setAiError(err?.message || 'Failed to generate AI level');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   const fetchCommunityLevels = async () => {
     setCommunityLoading(true);
@@ -191,6 +256,14 @@ export const Lobby: React.FC<LobbyProps> = ({
             className="w-full py-3 px-4 bg-cyber-panel hover:bg-[#1a1f30] disabled:opacity-40 disabled:pointer-events-none border border-emerald-500/40 text-emerald-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition active:scale-[0.98]"
           >
             <Globe className="w-4 h-4" /> Browse Community Levels
+          </button>
+
+          <button
+            onClick={openAiGenerator}
+            disabled={!hasPilotName}
+            className="w-full py-3 px-4 bg-cyber-panel hover:bg-[#1a1f30] disabled:opacity-40 disabled:pointer-events-none border border-violet-500/45 text-violet-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition active:scale-[0.98]"
+          >
+            <Sparkles className="w-4 h-4" /> Generate AI Level
           </button>
 
           <button
@@ -563,6 +636,138 @@ export const Lobby: React.FC<LobbyProps> = ({
             setEditingCommunityLevel(null);
           }}
         />
+      )}
+
+      {/* Generate AI Level Modal & Loading Screen */}
+      {showAiModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md">
+          <div className="w-full max-w-lg bg-cyber-panel border border-violet-500/45 rounded-xl p-6 shadow-2xl flex flex-col gap-5">
+            {aiGenerating ? (
+              <div className="py-8 flex flex-col items-center text-center gap-4">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full border-2 border-violet-500/30 flex items-center justify-center bg-violet-500/10">
+                    <Loader2 className="w-8 h-8 text-violet-300 animate-spin" />
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-xl font-black font-display tracking-wide text-white uppercase">
+                    Generating AI Level
+                  </h3>
+                  <p className="text-xs font-mono text-violet-300 mt-1">
+                    {aiModel} &bull; {aiDifficulty.toUpperCase()} TIER &bull; {aiElapsed.toFixed(1)}s
+                  </p>
+                </div>
+                <div className="text-xs text-slate-300 max-w-sm">
+                  {aiElapsed < 2.5
+                    ? 'Sending level design prompt to local AI on Mac mini...'
+                    : aiElapsed < 6
+                    ? 'Choreographing obstacle waves and directional flow...'
+                    : 'Validating gate order and verifying level completability...'}
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between border-b border-cyber-border pb-3">
+                  <div>
+                    <h2 className="text-xl font-black font-display tracking-wide text-violet-300 uppercase flex items-center gap-2">
+                      <Sparkles className="w-5 h-5" /> Generate AI Level
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Choose a difficulty tier and local AI model to build a playable custom level.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowAiModal(false)}
+                    className="px-2.5 py-1.5 rounded-lg bg-cyber-bg border border-cyber-border text-slate-300 hover:text-white text-xs font-mono"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {aiError && (
+                  <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-500/45 text-rose-200 text-xs font-mono">
+                    {aiError}
+                  </div>
+                )}
+
+                {/* Difficulty Tier */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-slate-400">
+                    Difficulty Tier
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        { id: 'easy', label: 'Easy', desc: '5–6 waves • Wide gaps' },
+                        { id: 'medium', label: 'Medium', desc: '7–9 waves • Multi-axis' },
+                        { id: 'hard', label: 'Hard', desc: '10–14 waves • Tight maze' },
+                      ] as const
+                    ).map((tier) => {
+                      const active = aiDifficulty === tier.id;
+                      return (
+                        <button
+                          key={tier.id}
+                          type="button"
+                          onClick={() => setAiDifficulty(tier.id)}
+                          className={`p-3 rounded-lg border text-left transition ${
+                            active
+                              ? 'bg-violet-500/20 border-violet-400 text-white'
+                              : 'bg-cyber-bg/70 border-cyber-border text-slate-300 hover:border-violet-500/40'
+                          }`}
+                        >
+                          <div className="font-display font-bold text-sm uppercase">{tier.label}</div>
+                          <div className="text-[10px] font-mono text-slate-400 mt-0.5">{tier.desc}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* AI Model Selector */}
+                <div className="space-y-2">
+                  <label className="block text-xs font-mono uppercase tracking-wider text-slate-400">
+                    AI Model (Mac mini Ollama)
+                  </label>
+                  {aiLoadingModels ? (
+                    <div className="text-xs font-mono text-slate-400 py-2">Loading installed models...</div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2">
+                      {aiModels.map((m) => {
+                        const active = aiModel === m.name;
+                        return (
+                          <button
+                            key={m.name}
+                            type="button"
+                            onClick={() => setAiModel(m.name)}
+                            className={`px-3.5 py-2.5 rounded-lg border flex items-center justify-between text-left transition ${
+                              active
+                                ? 'bg-cyan-500/15 border-cyan-400 text-cyan-100'
+                                : 'bg-cyber-bg/70 border-cyber-border text-slate-300 hover:border-cyan-500/40'
+                            }`}
+                          >
+                            <span className="font-mono font-bold text-xs">{m.name}</span>
+                            <span className="text-[11px] font-mono text-slate-400">
+                              {m.sizeGb || 'Local Model'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateAiLevel}
+                  disabled={!aiModel || aiLoadingModels}
+                  className="w-full py-3 px-4 rounded-lg bg-gradient-to-r from-violet-500 to-cyan-500 hover:from-violet-400 hover:to-cyan-400 disabled:opacity-40 text-black font-display font-bold text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition"
+                >
+                  <Sparkles className="w-4 h-4 fill-black" /> Generate &amp; Play
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

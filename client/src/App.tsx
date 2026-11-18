@@ -123,7 +123,8 @@ export const App: React.FC = () => {
         state.status === 'gameover' &&
         lastStatusRef.current !== 'gameover' &&
         state.campaignResult === 'cleared' &&
-        !state.communityLevelId
+        !state.communityLevelId &&
+        !state.isAiGenerated
       ) {
         markCampaignLevelCleared(
           me?.name || 'Player',
@@ -264,6 +265,17 @@ export const App: React.FC = () => {
     });
   };
 
+  const handlePlayAiLevel = (customLevel: import('../../shared/types').CampaignLevelConfig) => {
+    const cleanName = playerName.trim();
+    if (!socket || !cleanName) return;
+    socket.emit('createRoom', {
+      playerName: cleanName,
+      autoStart: true,
+      gameMode: 'campaign',
+      customLevel,
+    });
+  };
+
   const handleNextCampaignLevel = () => {
     if (!socket) return;
     socket.emit('nextCampaignLevel');
@@ -329,6 +341,7 @@ export const App: React.FC = () => {
           onCreateRoom={handleCreateRoom}
           onPlayCampaign={handlePlayCampaign}
           onPlayCommunityLevel={handlePlayCommunityLevel}
+          onPlayAiLevel={handlePlayAiLevel}
           onJoinRoom={handleJoinRoom}
           onOpenLeaderboard={() => setShowLeaderboard(true)}
         />

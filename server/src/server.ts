@@ -14,10 +14,11 @@ import { RoomManager } from './game/RoomManager.js';
 import { User } from './entities/User.js';
 import { MatchHistory } from './entities/MatchHistory.js';
 import { CommunityLevel } from './entities/CommunityLevel.js';
-import { ClientInput, GameMode, CampaignLevelConfig, CampaignWaveSpec, CampaignPatternTemplate, CommunityLevelConfig } from '../../shared/types.js';
+import { AiDifficultyTier, ClientInput, GameMode, CampaignLevelConfig, CampaignWaveSpec, CampaignPatternTemplate, CommunityLevelConfig } from '../../shared/types.js';
 import { GAME_CONFIG, ObstaclePatternType } from '../../shared/gameConfig.js';
 import { CAMPAIGN_CONFIG, DEFAULT_CAMPAIGN_LEVELS } from '../../shared/campaignConfig.js';
 import { renderCampaignAdminPage } from './campaignAdminHtml.js';
+import { generateAiLevel, listAiModels } from './aiLevelGenerator.js';
 
 dotenv.config();
 
@@ -1750,6 +1751,36 @@ async function findCommunityLevelById(id: string): Promise<CommunityLevelConfig 
   return COMMUNITY_LEVELS_FALLBACK.find((l) => l.id === id) || null;
 }
 
+app.get('/api/ai-models', async (_req, res) => {
+  try {
+    const info = await listAiModels();
+    res.json(info);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Failed to query AI models.' });
+  }
+});
+
+app.post('/api/generate-ai-level', async (req, res) => {
+  const rawDifficulty = String(req.body?.difficulty || 'medium').toLowerCase();
+  const difficulty: AiDifficultyTier =
+    rawDifficulty === 'easy' || rawDifficulty === 'medium' || rawDifficulty === 'hard'
+      ? rawDifficulty
+      : 'medium';
+  const model = String(req.body?.model || '').trim();
+  if (!model) {
+    return res.status(400).json({ error: 'Please select an AI model.' });
+  }
+  try {
+    const generated = await generateAiLevel(difficulty, model);
+    const sanitized = sanitizeCampaignLevel(generated, 0);
+    sanitized.storyName = generated.storyName;
+    sanitized.levelNumber = 1;
+    res.json({ level: sanitized });
+  } catch (err: any) {
+    res.status(502).json({ error: err.message || 'Failed to generate AI level.' });
+  }
+});
+
 app.get('/api/community-levels', async (_req, res) => {
   try {
     const levels = await listCommunityLevels();
@@ -1999,7 +2030,7 @@ io.on('connection', (socket) => {
   console.log(`[Socket] Client connected: ${socket.id}`);
 
   // Create Room
-  socket.on('createRoom', async ({ playerName, autoStart, gameMode, campaignLevel, communityLevelId }: { playerName: string; autoStart?: boolean; gameMode?: GameMode; campaignLevel?: number; communityLevelId?: string }) => {
+  socket.on('createRoom', async ({ playerName, autoStart, gameMode, campaignLevel, communityLevelId, customLevel: incomingCustomLevel }: { playerName: string; autoStart?: boolean; gameMode?: GameMode; campaignLevel?: number; communityLevelId?: string; customLevel?: CampaignLevelConfig }) => {
     const prevRoom = roomManager.getRoomBySocketId(socket.id);
     if (prevRoom) {
       socket.leave(prevRoom.roomId);
@@ -2007,6 +2038,7 @@ io.on('connection', (socket) => {
     }
 
     let customLevel: CampaignLevelConfig | undefined;
+    let isAiGenerated = false;
     let resolvedMode: GameMode = gameMode === 'campaign' ? 'campaign' : 'endless';
     if (communityLevelId) {
       const found = await findCommunityLevelById(communityLevelId);
@@ -2016,13 +2048,21 @@ io.on('connection', (socket) => {
       }
       customLevel = found;
       resolvedMode = 'campaign';
+    } else if (incomingCustomLevel && typeof incomingCustomLevel === 'object') {
+      const sanitized = sanitizeCampaignLevel(incomingCustomLevel, 0);
+      sanitized.storyName = incomingCustomLevel.storyName || 'AI Generated';
+      sanitized.levelNumber = 1;
+      customLevel = sanitized;
+      isAiGenerated = true;
+      resolvedMode = 'campaign';
     }
 
     const { roomId, engine } = roomManager.createRoom(socket.id, playerName || 'Player', {
       gameMode: resolvedMode,
       campaignLevel: typeof campaignLevel === 'number' ? campaignLevel : 1,
       customLevel,
-      communityLevelId: customLevel ? customLevel.id : undefined,
+      communityLevelId: communityLevelId && customLevel ? customLevel.id : undefined,
+      isAiGenerated,
     });
     socket.join(roomId);
     socket.emit('roomCreated', { roomId, playerId: socket.id, state: engine.state });

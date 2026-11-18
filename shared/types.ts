@@ -128,6 +128,8 @@ export interface CampaignLevelConfig {
   checkpoints: CampaignCheckpoint[];
 }
 
+export type AiDifficultyTier = 'easy' | 'medium' | 'hard';
+
 export interface CommunityLevelConfig extends CampaignLevelConfig {
   creatorName: string;
   clearsCount?: number;
@@ -139,6 +141,7 @@ export interface GameState {
   roomId: string;
   gameMode?: GameMode;
   communityLevelId?: string;
+  isAiGenerated?: boolean;
   campaignLevel?: number;
   campaignLevelName?: string;
   campaignStoryName?: string;
