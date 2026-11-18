@@ -361,6 +361,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           <div className="text-xs font-bold text-pink-400 font-mono">Don&apos;t get hit.</div>
         </div>
       </div>
+      </div>
 
       {/* Campaign Level Select Modal */}
       {showCampaignModal && (
