@@ -45,18 +45,39 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [aiElapsed, setAiElapsed] = React.useState(0);
   const [aiError, setAiError] = React.useState<string | null>(null);
   const [confirmCancelAi, setConfirmCancelAi] = React.useState(false);
+  const [aiQueueInfo, setAiQueueInfo] = React.useState<{ status: string; position: number; queueLength: number } | null>(null);
   const aiAbortRef = React.useRef<AbortController | null>(null);
+  const aiRequestIdRef = React.useRef<string | null>(null);
 
   React.useEffect(() => {
     if (!aiGenerating) {
       setAiElapsed(0);
+      setAiQueueInfo(null);
       return;
     }
     const start = performance.now();
     const id = window.setInterval(() => {
       setAiElapsed((performance.now() - start) / 1000);
     }, 100);
-    return () => window.clearInterval(id);
+    const pollQueue = async () => {
+      const reqId = aiRequestIdRef.current;
+      if (!reqId) return;
+      try {
+        const res = await fetch(`/api/ai-queue-status?id=${encodeURIComponent(reqId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          setAiQueueInfo(data);
+        }
+      } catch {
+        // ignore transient poll errors
+      }
+    };
+    pollQueue();
+    const pollId = window.setInterval(pollQueue, 500);
+    return () => {
+      window.clearInterval(id);
+      window.clearInterval(pollId);
+    };
   }, [aiGenerating]);
 
   const openAiGenerator = async () => {
@@ -92,6 +113,8 @@ export const Lobby: React.FC<LobbyProps> = ({
     if (!aiModel || aiGenerating) return;
     setAiError(null);
     setConfirmCancelAi(false);
+    const reqId = `ai-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+    aiRequestIdRef.current = reqId;
     setAiGenerating(true);
     const controller = new AbortController();
     aiAbortRef.current = controller;
@@ -100,7 +123,7 @@ export const Lobby: React.FC<LobbyProps> = ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
-        body: JSON.stringify({ difficulty: aiDifficulty, model: aiModel }),
+        body: JSON.stringify({ difficulty: aiDifficulty, model: aiModel, requestId: reqId }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to generate AI level');
@@ -685,7 +708,9 @@ export const Lobby: React.FC<LobbyProps> = ({
                   </p>
                 </div>
                 <div className="text-xs text-slate-300 max-w-sm">
-                  {aiElapsed < 2.5
+                  {aiQueueInfo?.status === 'queued'
+                    ? `In queue (#${aiQueueInfo.position} in line, ${aiQueueInfo.queueLength} total) — waiting for another pilot's generation to finish...`
+                    : aiElapsed < 2.5
                     ? 'Sending level design prompt to local AI on Mac mini...'
                     : aiElapsed < 6
                     ? 'Choreographing obstacle waves and directional flow...'

@@ -18,7 +18,7 @@ import { AiDifficultyTier, ClientInput, GameMode, CampaignLevelConfig, CampaignW
 import { GAME_CONFIG, ObstaclePatternType } from '../../shared/gameConfig.js';
 import { CAMPAIGN_CONFIG, DEFAULT_CAMPAIGN_LEVELS } from '../../shared/campaignConfig.js';
 import { renderCampaignAdminPage } from './campaignAdminHtml.js';
-import { generateAiLevel, listAiModels } from './aiLevelGenerator.js';
+import { generateAiLevelQueued, getAiQueueStatus, listAiModels } from './aiLevelGenerator.js';
 
 dotenv.config();
 
@@ -1760,6 +1760,11 @@ app.get('/api/ai-models', async (_req, res) => {
   }
 });
 
+app.get('/api/ai-queue-status', (req, res) => {
+  const id = typeof req.query.id === 'string' ? req.query.id : undefined;
+  res.json(getAiQueueStatus(id));
+});
+
 app.post('/api/generate-ai-level', async (req, res) => {
   const rawDifficulty = String(req.body?.difficulty || 'medium').toLowerCase();
   const difficulty: AiDifficultyTier =
@@ -1767,6 +1772,7 @@ app.post('/api/generate-ai-level', async (req, res) => {
       ? rawDifficulty
       : 'medium';
   const model = String(req.body?.model || '').trim();
+  const requestId = String(req.body?.requestId || `ai-req-${crypto.randomUUID()}`).slice(0, 64);
   if (!model) {
     return res.status(400).json({ error: 'Please select an AI model.' });
   }
@@ -1777,7 +1783,7 @@ app.post('/api/generate-ai-level', async (req, res) => {
     }
   });
   try {
-    const generated = await generateAiLevel(difficulty, model, abortController.signal);
+    const generated = await generateAiLevelQueued(requestId, difficulty, model, abortController.signal);
     if (abortController.signal.aborted) return;
     const sanitized = sanitizeCampaignLevel(generated, 0);
     sanitized.storyName = generated.storyName;

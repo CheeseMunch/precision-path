@@ -503,6 +503,107 @@ export function validateAndRepairAiLevel(
   };
 }
 
+interface QueuedAiJob {
+  id: string;
+  start: () => void;
+  cancel: () => void;
+}
+
+const aiJobQueue: QueuedAiJob[] = [];
+let activeAiJobId: string | null = null;
+
+export function getAiQueueStatus(requestId?: string): {
+  status: 'running' | 'queued' | 'idle';
+  position: number;
+  queueLength: number;
+} {
+  const queueLength = aiJobQueue.length + (activeAiJobId ? 1 : 0);
+  if (requestId && activeAiJobId === requestId) {
+    return { status: 'running', position: 0, queueLength };
+  }
+  if (requestId) {
+    const idx = aiJobQueue.findIndex((j) => j.id === requestId);
+    if (idx >= 0) {
+      return { status: 'queued', position: idx + 1, queueLength };
+    }
+  }
+  return { status: activeAiJobId ? 'running' : 'idle', position: 0, queueLength };
+}
+
+function pumpAiQueue() {
+  if (activeAiJobId !== null || aiJobQueue.length === 0) return;
+  const next = aiJobQueue.shift()!;
+  activeAiJobId = next.id;
+  next.start();
+}
+
+export function generateAiLevelQueued(
+  requestId: string,
+  difficulty: AiDifficultyTier,
+  model: string,
+  externalSignal?: AbortSignal
+): Promise<CampaignLevelConfig> {
+  if (externalSignal?.aborted) {
+    return Promise.reject(new Error('Generation cancelled.'));
+  }
+
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    let started = false;
+
+    const cleanupSignal = () => {
+      if (externalSignal) externalSignal.removeEventListener('abort', onAbort);
+    };
+
+    const onAbort = () => {
+      if (finished) return;
+      if (!started) {
+        const idx = aiJobQueue.findIndex((j) => j.id === requestId);
+        if (idx >= 0) aiJobQueue.splice(idx, 1);
+        finished = true;
+        cleanupSignal();
+        reject(new Error('Generation cancelled.'));
+      }
+    };
+
+    if (externalSignal) {
+      externalSignal.addEventListener('abort', onAbort, { once: true });
+    }
+
+    aiJobQueue.push({
+      id: requestId,
+      cancel: onAbort,
+      start: () => {
+        if (finished) return;
+        started = true;
+        generateAiLevel(difficulty, model, externalSignal)
+          .then((lvl) => {
+            if (!finished) {
+              finished = true;
+              cleanupSignal();
+              resolve(lvl);
+            }
+          })
+          .catch((err) => {
+            if (!finished) {
+              finished = true;
+              cleanupSignal();
+              reject(err);
+            }
+          })
+          .finally(() => {
+            if (activeAiJobId === requestId) {
+              activeAiJobId = null;
+            }
+            pumpAiQueue();
+          });
+      },
+    });
+
+    pumpAiQueue();
+  });
+}
+
 export async function generateAiLevel(
   difficulty: AiDifficultyTier,
   model: string,
