@@ -223,10 +223,15 @@ function simulatePlayability(
       let goalY = active.targetY;
       if (tSince >= 0 && tSince <= activeItem.duration) {
         const geom = computeWaveGeometry(activeItem.wave, tSince);
+        const travelSign =
+          activeItem.wave.side === 'north' || activeItem.wave.side === 'west' ? 1 : -1;
+        const nextGate = gates[nextGatePtr + 1];
+        const sameWaveNext = nextGate && nextGate.waveId === active.waveId;
+        const leadOffset = sameWaveNext ? travelSign * 16 : 0;
         if (active.isVert) {
-          goalY = clamp(geom.coord, -EDITOR_HALF_H + 30, EDITOR_HALF_H - 30);
+          goalY = clamp(geom.coord + leadOffset, -EDITOR_HALF_H + 24, EDITOR_HALF_H - 24);
         } else {
-          goalX = clamp(geom.coord, -EDITOR_HALF_W + 30, EDITOR_HALF_W - 30);
+          goalX = clamp(geom.coord + leadOffset, -EDITOR_HALF_W + 24, EDITOR_HALF_W - 24);
         }
 
         // Check gate clear
@@ -316,6 +321,13 @@ export function validateAndRepairAiLevel(
     const gapSize = clamp(Math.round(Number(src.gapSize ?? (spec.minGap + spec.maxGap) / 2)), Math.max(60, spec.minGap), spec.maxGap);
     const maxLatCenter = Math.max(20, latHalf - gapSize / 2 - 18);
     let gapCenter = clamp(Math.round(Number(src.gapCenter ?? 0)), -maxLatCenter, maxLatCenter);
+    // Avoid clustering near center (0): push near-zero or repeated centers outward to force movement
+    const prevLat = i > 0 ? waves[i - 1].gapCenter : 0;
+    if (Math.abs(gapCenter) < 35 || (i > 0 && Math.abs(gapCenter - prevLat) < 30)) {
+      const sign = i % 2 === 0 ? 1 : -1;
+      const offsetBand = isVert ? 85 + ((i * 37) % 75) : 130 + ((i * 53) % 140);
+      gapCenter = clamp(sign * offsetBand, -maxLatCenter, maxLatCenter);
+    }
     let delayAfterPrev =
       i === 0
         ? 0.45
@@ -396,6 +408,23 @@ export function validateAndRepairAiLevel(
     }
   }
 
+  // Ensure multi-gate obstacles (double-gap-wall / staggered-blocks) appear in medium and hard tiers
+  const minMultiGateWaves = difficulty === 'hard' ? 3 : difficulty === 'medium' ? 2 : 0;
+  if (minMultiGateWaves > 0) {
+    let multiCount = waves.filter(
+      (w) => w.patternType === 'double-gap-wall' || w.patternType === 'staggered-blocks'
+    ).length;
+    for (let i = 2; i < waves.length && multiCount < minMultiGateWaves; i += 3) {
+      if (waves[i].patternType !== 'double-gap-wall' && waves[i].patternType !== 'staggered-blocks') {
+        waves[i].patternType = multiCount % 2 === 0 ? 'double-gap-wall' : 'staggered-blocks';
+        if (waves[i + 1] && waves[i + 1].delayAfterPrev < 0.9) {
+          waves[i + 1].delayAfterPrev = 0.9;
+        }
+        multiCount++;
+      }
+    }
+  }
+
   // 3. Assign chronological sequential gates (1..N) onto verified gaps framed by wave obstacles
   const assignGates = (ws: CampaignWaveSpec[]) => {
     let gateOrder = 1;
@@ -448,14 +477,14 @@ export function validateAndRepairAiLevel(
         ];
         gateOrder++;
 
-        // On hard mode, optionally attach a second gate on double-gap-wall if next wave has >= 0.9s delay
+        // On medium/hard tiers, attach multiple gates on double-gap-wall / staggered-blocks waves
         const nextW = ws[i + 1];
+        const hasRoomAfter = !nextW || nextW.delayAfterPrev >= 0.85;
         if (
-          difficulty === 'hard' &&
-          w.patternType === 'double-gap-wall' &&
+          (difficulty === 'medium' || difficulty === 'hard') &&
+          (w.patternType === 'double-gap-wall' || w.patternType === 'staggered-blocks') &&
           validGaps.length >= 2 &&
-          nextW &&
-          nextW.delayAfterPrev >= 0.9
+          hasRoomAfter
         ) {
           const second = validGaps.find((g) => g !== best);
           if (second) {
@@ -468,6 +497,25 @@ export function validateAndRepairAiLevel(
               label: `GATE ${gateOrder}`,
             });
             gateOrder++;
+          }
+          if (
+            difficulty === 'hard' &&
+            w.patternType === 'staggered-blocks' &&
+            validGaps.length >= 3 &&
+            (!nextW || nextW.delayAfterPrev >= 1.15)
+          ) {
+            const third = validGaps.find((g) => g !== best && g !== second);
+            if (third) {
+              w.attachedGates.push({
+                id: `ai-g-${stamp}-${gateOrder}`,
+                order: gateOrder,
+                start: third.start,
+                end: third.end,
+                points: 100,
+                label: `GATE ${gateOrder}`,
+              });
+              gateOrder++;
+            }
           }
         }
       }
@@ -641,6 +689,7 @@ export async function generateAiLevel(
   const userPrompt = [
     `Create a brand-new, creative Precision Path level (seed #${creativeSeed}, theme inspiration: ${themeHint}).`,
     spec.promptRules,
+    'Spread gapCenter widely across the full arena (-155 to +155 for north/south, -280 to +280 for east/west) so gates are NOT all in the center — force the player to move around!',
     'Make the path fun, rhythmic, and clearly completable without impossible lateral jumps.',
   ].join('\n\n');
 
