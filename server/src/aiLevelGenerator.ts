@@ -521,7 +521,6 @@ export async function generateAiLevel(
         model,
         stream: false,
         think: false,
-        format: 'json',
         options: {
           temperature: 0.9,
           num_predict: 2048,
