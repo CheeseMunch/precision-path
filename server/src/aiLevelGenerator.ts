@@ -98,24 +98,24 @@ const TIER_SPECS: Record<AiDifficultyTier, TierSpec> = {
   },
   hard: {
     label: 'Hard',
-    minWaves: 14,
-    maxWaves: 18,
-    minSpeed: 160,
-    maxSpeed: 225,
-    minGap: 62,
-    maxGap: 76,
-    minDelay: 0.38,
-    maxDelay: 0.65,
-    bonus: 1100,
-    parSec: 42,
+    minWaves: 18,
+    maxWaves: 24,
+    minSpeed: 175,
+    maxSpeed: 245,
+    minGap: 60,
+    maxGap: 72,
+    minDelay: 0.34,
+    maxDelay: 0.55,
+    bonus: 1500,
+    parSec: 48,
     promptRules: [
-      'Difficulty Tier: HARD (Gatekeeper Labyrinth).',
-      'Wave count: 14 to 18 waves.',
-      'Speeds: 160 to 225 px/s (vary between tight slower corridors and fast single walls).',
-      'Gap sizes: 62 to 76 px (narrow, precision weaving).',
-      'delayAfterPrev: 0.38 to 0.58 seconds for tight corridor trains, and 0.85 to 1.25 seconds when switching perpendicular directions (first wave 0.4).',
-      'Patterns: use ALL 6 patternTypes ("single-gap-wall", "double-gap-wall", "sweeping-half-wall", "staggered-blocks", "orb-cluster", "diagonal-spinner"). Never repeat the same patternType more than 2 waves in a row.',
-      'Include 3 to 4 direction changes across all four sides (north, south, east, west).',
+      'Difficulty Tier: HARD (Extreme 4-Axis Labyrinth).',
+      'Wave count: 18 to 24 waves.',
+      'Speeds: 175 to 245 px/s (fast, relentless obstacle volume).',
+      'Gap sizes: 60 to 72 px (tight precision weaving).',
+      'delayAfterPrev: 0.34 to 0.52 seconds for intense wave trains, and 0.75 to 1.05 seconds when switching perpendicular directions (first wave 0.35).',
+      'Patterns: use ALL 6 patternTypes heavily ("single-gap-wall", "double-gap-wall", "sweeping-half-wall", "staggered-blocks", "orb-cluster", "diagonal-spinner").',
+      'Cardinal variation: switch directions frequently (every 2 to 4 waves) across ALL FOUR sides: north, south, east, west!',
     ].join('\n'),
   },
 };
@@ -297,7 +297,18 @@ export function validateAndRepairAiLevel(
 
   for (let i = 0; i < targetCount; i++) {
     const src = rawWaves[i] || {};
-    const side: WaveSide = ALLOWED_SIDES.includes(src.side) ? src.side : 'north';
+    let side: WaveSide = ALLOWED_SIDES.includes(src.side) ? src.side : 'north';
+    // On hard tier, enforce frequent cardinal variation (max 3 consecutive same-side waves, rotating all 4 sides)
+    if (difficulty === 'hard' && i >= 3) {
+      const recentSame =
+        waves[i - 1].side === side &&
+        waves[i - 2].side === side &&
+        waves[i - 3].side === side;
+      if (recentSame) {
+        const idxInSides = ALLOWED_SIDES.indexOf(side);
+        side = ALLOWED_SIDES[(idxInSides + 1 + (i % 3)) % ALLOWED_SIDES.length];
+      }
+    }
     const isVert = side === 'north' || side === 'south';
     const latHalf = isVert ? EDITOR_HALF_W : EDITOR_HALF_H;
 
@@ -408,8 +419,27 @@ export function validateAndRepairAiLevel(
     }
   }
 
+  // On hard tier, guarantee all 4 cardinal directions appear
+  if (difficulty === 'hard' && waves.length >= 12) {
+    const usedSides = new Set(waves.map((w) => w.side));
+    const missingSides = ALLOWED_SIDES.filter((s) => !usedSides.has(s));
+    let msIdx = 0;
+    for (let i = 3; i < waves.length && msIdx < missingSides.length; i += 3) {
+      const newSide = missingSides[msIdx++];
+      waves[i].side = newSide;
+      waves[i].color = EDITOR_DIR_COLORS[newSide];
+      const isVert = newSide === 'north' || newSide === 'south';
+      const latHalf = isVert ? EDITOR_HALF_W : EDITOR_HALF_H;
+      const maxLat = Math.max(20, latHalf - waves[i].gapSize / 2 - 18);
+      waves[i].gapCenter = clamp(waves[i].gapCenter, -maxLat, maxLat);
+      if (waves[i - 1].side !== newSide && waves[i].delayAfterPrev < 0.72) {
+        waves[i].delayAfterPrev = 0.75;
+      }
+    }
+  }
+
   // Ensure multi-gate obstacles (double-gap-wall / staggered-blocks) appear in medium and hard tiers
-  const minMultiGateWaves = difficulty === 'hard' ? 3 : difficulty === 'medium' ? 2 : 0;
+  const minMultiGateWaves = difficulty === 'hard' ? 5 : difficulty === 'medium' ? 2 : 0;
   if (minMultiGateWaves > 0) {
     let multiCount = waves.filter(
       (w) => w.patternType === 'double-gap-wall' || w.patternType === 'staggered-blocks'
