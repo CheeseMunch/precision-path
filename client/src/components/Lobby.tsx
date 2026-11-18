@@ -698,9 +698,9 @@ export const Lobby: React.FC<LobbyProps> = ({
                   <div className="grid grid-cols-3 gap-2">
                     {(
                       [
-                        { id: 'easy', label: 'Easy', desc: '5–6 waves • Wide gaps' },
-                        { id: 'medium', label: 'Medium', desc: '7–9 waves • Multi-axis' },
-                        { id: 'hard', label: 'Hard', desc: '10–14 waves • Tight maze' },
+                        { id: 'easy', label: 'Easy', desc: '7–9 waves • Steady' },
+                        { id: 'medium', label: 'Medium', desc: '10–13 waves • Multi-axis' },
+                        { id: 'hard', label: 'Hard', desc: '14–18 waves • Tight maze' },
                       ] as const
                     ).map((tier) => {
                       const active = aiDifficulty === tier.id;
