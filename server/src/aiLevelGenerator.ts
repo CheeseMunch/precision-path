@@ -396,15 +396,25 @@ export function validateAndRepairAiLevel(
     }
   }
 
-  // 3. Assign chronological sequential gates (1..N) onto verified gaps
+  // 3. Assign chronological sequential gates (1..N) onto verified gaps framed by wave obstacles
   const assignGates = (ws: CampaignWaveSpec[]) => {
     let gateOrder = 1;
+    // Never leave the final wave as a gate-less diagonal-spinner
+    if (ws.length > 0 && ws[ws.length - 1].patternType === 'diagonal-spinner') {
+      ws[ws.length - 1].patternType = 'single-gap-wall';
+    }
     for (let i = 0; i < ws.length; i++) {
       const w = ws[i];
+      // diagonal-spinner drifts laterally and has no wall framing a gate; keep it as a pure dodge hazard
+      if (w.patternType === 'diagonal-spinner') {
+        w.attachedGates = [];
+        continue;
+      }
       const geom = computeWaveGeometry(w, 0);
       const validGaps = geom.gaps.filter((g) => Math.abs(g.end - g.start) >= 52);
-      if (validGaps.length === 0) {
-        // Fallback to single-gap-wall if pattern produced no wide enough gap
+      const hasObstacles = geom.rects.length >= 1 || geom.circles.length >= 2;
+      if (validGaps.length === 0 || !hasObstacles) {
+        // Fallback to single-gap-wall if pattern produced no framed gap
         w.patternType = 'single-gap-wall';
         const fallbackGeom = computeWaveGeometry(w, 0);
         const g = fallbackGeom.gaps[0] || { start: -40, end: 40 };
@@ -479,6 +489,10 @@ export function validateAndRepairAiLevel(
     const idx = clamp(sim.failedWaveIdx, 0, waves.length - 1);
     waves[idx].delayAfterPrev = Number((waves[idx].delayAfterPrev + 0.35).toFixed(2));
     waves[idx].gapSize = Math.min(130, waves[idx].gapSize + 10);
+    const isVert = waves[idx].side === 'north' || waves[idx].side === 'south';
+    const latHalf = isVert ? EDITOR_HALF_W : EDITOR_HALF_H;
+    const maxLat = Math.max(20, latHalf - waves[idx].gapSize / 2 - 18);
+    waves[idx].gapCenter = clamp(waves[idx].gapCenter, -maxLat, maxLat);
     if (waves[idx].patternType === 'diagonal-spinner') {
       waves[idx].patternType = 'single-gap-wall';
     }
