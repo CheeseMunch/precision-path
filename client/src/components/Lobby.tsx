@@ -44,6 +44,7 @@ export const Lobby: React.FC<LobbyProps> = ({
   const [aiGenerating, setAiGenerating] = React.useState(false);
   const [aiElapsed, setAiElapsed] = React.useState(0);
   const [aiError, setAiError] = React.useState<string | null>(null);
+  const [confirmCancelAi, setConfirmCancelAi] = React.useState(false);
   const aiAbortRef = React.useRef<AbortController | null>(null);
 
   React.useEffect(() => {
@@ -83,12 +84,14 @@ export const Lobby: React.FC<LobbyProps> = ({
       aiAbortRef.current.abort();
       aiAbortRef.current = null;
     }
+    setConfirmCancelAi(false);
     setAiGenerating(false);
   };
 
   const handleGenerateAiLevel = async () => {
     if (!aiModel || aiGenerating) return;
     setAiError(null);
+    setConfirmCancelAi(false);
     setAiGenerating(true);
     const controller = new AbortController();
     aiAbortRef.current = controller;
@@ -662,8 +665,8 @@ export const Lobby: React.FC<LobbyProps> = ({
               <div className="relative py-8 flex flex-col items-center text-center gap-4">
                 <button
                   type="button"
-                  onClick={handleCancelAiGeneration}
-                  title="Cancel generation"
+                  onClick={() => setConfirmCancelAi(true)}
+                  title="Stop generating"
                   className="absolute top-0 right-0 px-2.5 py-1.5 rounded-lg bg-cyber-bg border border-cyber-border text-slate-300 hover:text-white hover:border-rose-400/60 text-xs font-mono transition"
                 >
                   ✕
@@ -688,13 +691,30 @@ export const Lobby: React.FC<LobbyProps> = ({
                     ? 'Choreographing obstacle waves and directional flow...'
                     : 'Validating gate order and verifying level completability...'}
                 </div>
-                <button
-                  type="button"
-                  onClick={handleCancelAiGeneration}
-                  className="mt-1 px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-rose-950/60 border border-slate-700 hover:border-rose-500/50 text-slate-300 hover:text-rose-200 text-xs font-mono uppercase tracking-wider transition"
-                >
-                  Cancel
-                </button>
+
+                {confirmCancelAi && (
+                  <div className="absolute inset-0 rounded-lg bg-[#090d18]/95 backdrop-blur-sm flex flex-col items-center justify-center p-5 gap-4 border border-rose-500/40">
+                    <div className="text-sm font-display font-bold text-white uppercase tracking-wide">
+                      Are you sure you want to stop generating?
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmCancelAi(false)}
+                        className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-200 text-xs font-mono uppercase tracking-wider transition"
+                      >
+                        Keep Generating
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleCancelAiGeneration}
+                        className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-mono font-bold uppercase tracking-wider transition"
+                      >
+                        Stop
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               <>
