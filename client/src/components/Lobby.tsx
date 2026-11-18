@@ -235,28 +235,28 @@ export const Lobby: React.FC<LobbyProps> = ({
   const hasPilotName = playerName.trim().length > 0;
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen px-4 py-8 relative z-10">
+    <div className="w-full max-h-[100dvh] overflow-y-auto flex flex-col items-center justify-center px-4 py-3 md:py-6 relative z-10">
       {/* Background radial atmosphere */}
       <div className="absolute w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl pointer-events-none -z-10" />
 
       {/* Title */}
-      <div className="text-center mb-8">
-        <h1 className="text-4xl md:text-6xl font-black tracking-tight text-white font-display mb-1 drop-shadow-md">
+      <div className="text-center mb-3 md:mb-6 pt-1">
+        <h1 className="text-3xl sm:text-4xl md:text-6xl font-black tracking-tight text-white font-display mb-0.5 md:mb-1 drop-shadow-md">
           PRECISION<span className="text-cyan-400">PATH</span>
         </h1>
-        <div className="text-xs font-mono uppercase tracking-[0.25em] text-cyan-300/80 mb-3">
+        <div className="text-[11px] sm:text-xs font-mono uppercase tracking-[0.25em] text-cyan-300/80 mb-1.5 md:mb-3">
           CheeseMunch Studios
         </div>
-        <p className="text-gray-400 text-sm md:text-base max-w-md mx-auto">
+        <p className="text-gray-400 text-xs sm:text-sm md:text-base max-w-md mx-auto">
           Pass through the gates to rack up points and survive converging obstacle waves as long as you can.
         </p>
       </div>
 
       {/* Main Card */}
-      <div className="w-full max-w-md bg-cyber-panel/90 border border-cyber-border rounded-xl p-6 shadow-2xl backdrop-blur-md flex flex-col gap-5">
+      <div className="w-full max-w-md bg-cyber-panel/90 border border-cyber-border rounded-xl p-4 sm:p-5 md:p-6 shadow-2xl backdrop-blur-md flex flex-col gap-3 sm:gap-4">
         {/* Name Input */}
         <div>
-          <label className="block text-xs uppercase tracking-wider font-mono text-gray-400 mb-2">
+          <label className="block text-[11px] sm:text-xs uppercase tracking-wider font-mono text-gray-400 mb-1.5">
             Pilot Name
           </label>
           <input
@@ -265,21 +265,21 @@ export const Lobby: React.FC<LobbyProps> = ({
             onChange={(e) => setPlayerName(e.target.value)}
             maxLength={14}
             placeholder="Create a pilot name..."
-            className="w-full px-4 py-2.5 bg-[#0a0c13] border border-cyber-border rounded-lg text-white font-mono focus:outline-none focus:border-cyan-400 transition"
+            className="w-full px-3.5 py-2 bg-[#0a0c13] border border-cyber-border rounded-lg text-white font-mono text-sm focus:outline-none focus:border-cyan-400 transition"
           />
           {!hasPilotName && (
-            <p className="text-[11px] font-mono text-amber-400/90 mt-1.5">
+            <p className="text-[11px] font-mono text-amber-400/90 mt-1">
               Create a pilot name to play or join a lobby.
             </p>
           )}
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:gap-2.5">
           <button
             onClick={openCampaignSelect}
             disabled={!hasPilotName}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-emerald-400 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 disabled:opacity-40 disabled:pointer-events-none text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
+            className="w-full py-2.5 sm:py-3 px-4 bg-gradient-to-r from-emerald-400 to-cyan-500 hover:from-emerald-300 hover:to-cyan-400 disabled:opacity-40 disabled:pointer-events-none text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-xs sm:text-sm tracking-wider uppercase transition shadow-lg shadow-emerald-500/20 active:scale-[0.98]"
           >
             <Flag className="w-4 h-4 fill-black" /> Play Campaign
           </button>
@@ -287,7 +287,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           <button
             onClick={() => onCreateRoom(true)}
             disabled={!hasPilotName}
-            className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-40 disabled:pointer-events-none text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition shadow-lg shadow-cyan-500/20 active:scale-[0.98]"
+            className="w-full py-2.5 sm:py-3 px-4 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 disabled:opacity-40 disabled:pointer-events-none text-black font-bold font-display rounded-lg flex items-center justify-center gap-2 text-xs sm:text-sm tracking-wider uppercase transition shadow-lg shadow-cyan-500/20 active:scale-[0.98]"
           >
             <Play className="w-4 h-4 fill-black" /> Play Solo Endless
           </button>
@@ -295,7 +295,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           <button
             onClick={openCommunityBrowser}
             disabled={!hasPilotName}
-            className="w-full py-3 px-4 bg-cyber-panel hover:bg-[#1a1f30] disabled:opacity-40 disabled:pointer-events-none border border-emerald-500/40 text-emerald-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition active:scale-[0.98]"
+            className="w-full py-2 sm:py-2.5 px-4 bg-cyber-panel hover:bg-[#1a1f30] disabled:opacity-40 disabled:pointer-events-none border border-emerald-500/40 text-emerald-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-xs sm:text-sm tracking-wider uppercase transition active:scale-[0.98]"
           >
             <Globe className="w-4 h-4" /> Browse Community Levels
           </button>
@@ -303,7 +303,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           <button
             onClick={openAiGenerator}
             disabled={!hasPilotName}
-            className="w-full py-3 px-4 bg-cyber-panel hover:bg-[#1a1f30] disabled:opacity-40 disabled:pointer-events-none border border-violet-500/45 text-violet-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition active:scale-[0.98]"
+            className="w-full py-2 sm:py-2.5 px-4 bg-cyber-panel hover:bg-[#1a1f30] disabled:opacity-40 disabled:pointer-events-none border border-violet-500/45 text-violet-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-xs sm:text-sm tracking-wider uppercase transition active:scale-[0.98]"
           >
             <Sparkles className="w-4 h-4" /> Generate AI Level
           </button>
@@ -311,7 +311,7 @@ export const Lobby: React.FC<LobbyProps> = ({
           <button
             onClick={() => onCreateRoom(false)}
             disabled={!hasPilotName}
-            className="w-full py-3 px-4 bg-cyber-panel hover:bg-[#1a1f30] disabled:opacity-40 disabled:pointer-events-none border border-cyan-500/40 text-cyan-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-sm tracking-wider uppercase transition active:scale-[0.98]"
+            className="w-full py-2 sm:py-2.5 px-4 bg-cyber-panel hover:bg-[#1a1f30] disabled:opacity-40 disabled:pointer-events-none border border-cyan-500/40 text-cyan-300 font-display font-semibold rounded-lg flex items-center justify-center gap-2 text-xs sm:text-sm tracking-wider uppercase transition active:scale-[0.98]"
           >
             <Users className="w-4 h-4" /> Create Multiplayer Lobby
           </button>
@@ -320,7 +320,7 @@ export const Lobby: React.FC<LobbyProps> = ({
         {/* Join by Code Divider */}
         <div className="flex items-center gap-3">
           <div className="h-[1px] bg-cyber-border flex-1" />
-          <span className="text-[11px] font-mono uppercase text-gray-500">OR JOIN WITH CODE</span>
+          <span className="text-[10px] sm:text-[11px] font-mono uppercase text-gray-500">OR JOIN WITH CODE</span>
           <div className="h-[1px] bg-cyber-border flex-1" />
         </div>
 
@@ -332,12 +332,12 @@ export const Lobby: React.FC<LobbyProps> = ({
             onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
             maxLength={6}
             placeholder="ROOM CODE"
-            className="w-full px-4 py-2 bg-[#0a0c13] border border-cyber-border rounded-lg text-white font-mono uppercase tracking-widest text-center focus:outline-none focus:border-cyan-400 transition"
+            className="w-full px-3.5 py-1.5 sm:py-2 bg-[#0a0c13] border border-cyber-border rounded-lg text-white font-mono text-sm uppercase tracking-widest text-center focus:outline-none focus:border-cyan-400 transition"
           />
           <button
             onClick={() => onJoinRoom(joinCode)}
             disabled={!hasPilotName || !joinCode.trim()}
-            className="px-5 py-2 bg-cyber-panel hover:bg-cyan-500 hover:text-black border border-cyber-border hover:border-cyan-400 disabled:opacity-40 disabled:hover:bg-cyber-panel disabled:hover:text-white rounded-lg text-xs font-mono font-bold uppercase transition"
+            className="px-5 py-1.5 sm:py-2 bg-cyber-panel hover:bg-cyan-500 hover:text-black border border-cyber-border hover:border-cyan-400 disabled:opacity-40 disabled:hover:bg-cyber-panel disabled:hover:text-white rounded-lg text-xs font-mono font-bold uppercase transition"
           >
             Join
           </button>
@@ -347,7 +347,7 @@ export const Lobby: React.FC<LobbyProps> = ({
         <div>
           <button
             onClick={onOpenLeaderboard}
-            className="w-full py-2.5 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 font-mono text-xs rounded-lg flex items-center justify-center gap-1.5 transition"
+            className="w-full py-2 bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 font-mono text-xs rounded-lg flex items-center justify-center gap-1.5 transition"
           >
             <Trophy className="w-3.5 h-3.5" /> Leaderboard
           </button>
@@ -355,7 +355,7 @@ export const Lobby: React.FC<LobbyProps> = ({
       </div>
 
       {/* Core Rule Chip */}
-      <div className="mt-8 text-center">
+      <div className="mt-3 sm:mt-5 mb-1 text-center">
         <div className="inline-block px-4 py-2 bg-cyber-panel/50 border border-pink-500/40 rounded-lg">
           <div className="text-xs font-bold text-pink-400 font-mono">Don&apos;t get hit.</div>
         </div>
