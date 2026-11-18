@@ -776,7 +776,7 @@ export const Lobby: React.FC<LobbyProps> = ({
                       [
                         { id: 'easy', label: 'Easy', desc: '7–9 waves • Steady' },
                         { id: 'medium', label: 'Medium', desc: '10–13 waves • Multi-axis' },
-                        { id: 'hard', label: 'Hard', desc: '18–24 waves • 4-axis blitz' },
+                        { id: 'hard', label: 'Hard', desc: '24–30 waves • 4-axis blitz' },
                       ] as const
                     ).map((tier) => {
                       const active = aiDifficulty === tier.id;
