@@ -3,7 +3,7 @@
 **Live Game:** [https://precisionpath.pro](https://precisionpath.pro) | [https://www.precisionpath.pro](https://www.precisionpath.pro)  
 **Repository:** [https://github.com/CheeseMunch/precision-path](https://github.com/CheeseMunch/precision-path)
 
-A real-time multiplayer top-down dodging & gate-clearing arcade game built with **React 19 + HTML5 Canvas**, a **dedicated Node.js + Socket.io authoritative server**, **MikroORM + PostgreSQL 16**, **local Ollama AI level generation**, and hosted on an Apple Silicon **Mac mini** via **PM2** and **Cloudflare Tunnel (`cloudflared`)**.
+A real-time multiplayer top-down dodging & gate-clearing arcade game built with **React 19 + HTML5 Canvas**, an **authoritative Node.js + Socket.io server**, **MikroORM + PostgreSQL**, **local LLM level generation**, and served behind a **Cloudflare Tunnel**.
 
 ---
 
@@ -28,11 +28,11 @@ A real-time multiplayer top-down dodging & gate-clearing arcade game built with 
 * **Browse Community Levels** from the Lobby, play custom 1-level challenges, and track **Player Clears** stored in PostgreSQL (`community_levels`).
 * **Community Level Creator**: Interactive `450×800` live map editor with timeline scrubber, spawn & dummy collision testing, click-to-attach gates, bulk wave schedule actions, and creator-only edit/delete permissions.
 
-### 4. Generate AI Level (Local Ollama)
-* Powered by local models running on the Mac mini (**`qwen3.5:9b`**, **`gemma4:12b`**, **`gpt-oss:20b`**).
+### 4. Generate AI Level
+* Powered by local LLM inference on the game host.
 * **3 Difficulty Tiers:** `Easy` (`7–9` waves), `Medium` (`10–13` waves), and `Hard` (`24–30` waves, 4-cardinal blitz, `5+` multi-gate walls).
 * **5-Step Completability Validator:** Clamps arena bounds, enforces direction-change clearances & lateral reachability, attaches sequential gates (`1..N`) only onto obstacle-framed openings, and runs a simulated playthrough before launching.
-* **FIFO Generation Queue & Cancel:** Serializes concurrent requests (`/api/ai-queue-status`) with live queue position and a `✕` stop-generating confirmation popup.
+* **Generation Queue & Cancel:** Serializes concurrent requests with live queue position and a confirmation prompt when cancelling.
 
 ### 6 Obstacle Archetypes
 1. `single-gap-wall` — Barrier wall with a single navigable gap.
@@ -53,69 +53,26 @@ A real-time multiplayer top-down dodging & gate-clearing arcade game built with 
 
 ### Backend (`server/`)
 * **Node.js** + **TypeScript** (`tsx` / `tsc`) + **Express.js** + **Socket.io**
-* **MikroORM v6** + **PostgreSQL 16** (`users`, `match_history`, `community_levels` entities, with automatic in-memory fallback)
-* **Local Admin Consoles** *(localhost-only via `isDirectLocalhost` + `.admin-token`)*:
-  * `/campaign-admin` — Campaign & Community Level Designer
-  * `/db-admin` — Live Tuning & PostgreSQL Studio
+* **MikroORM v6** + **PostgreSQL** (`users`, `match_history`, `community_levels` entities, with automatic in-memory fallback)
 
 ---
 
-## 🚀 Development & Mac mini Production Hosting
+## 🚀 Development & Hosting
 
-### 1. Local Development (Windows)
-Run the local game server and Vite dev client independently of production:
+### 1. Local Development
+Run the local game server and Vite dev client:
 
-```powershell
-# Terminal 1: Dedicated game server + embedded PostgreSQL (http://127.0.0.1:4000)
+```bash
+# Terminal 1: Dedicated game server
 cd server
 npm install
 npm run dev
 
-# Terminal 2: Vite React dev server (http://localhost:5173)
+# Terminal 2: Vite React dev server
 cd client
 npm install
-npm run dev -- --port 5173
+npm run dev
 ```
 
-* Local Admin Consoles: `http://127.0.0.1:4000/campaign-admin` and `http://127.0.0.1:4000/db-admin`.
-
----
-
-### 2. Production Hosting (`macmini` → `https://precisionpath.pro`)
-Production runs on an Apple Silicon **Mac mini** (`ssh macmini`):
-* **PostgreSQL 16**: Homebrew `postgresql@16` (`brew services start postgresql@16`, DB `precision_path`).
-* **PM2 Processes**:
-  * `precision-path-server` — `NODE_ENV=production` on port `4000` (serves REST API, Socket.io, AI level generation via local Ollama `http://127.0.0.1:11434`, and compiled `client/dist`).
-  * `precision-path-tunnel` — `cloudflared tunnel run precision-path` (`8bcdd1cc-ba69-4da6-b130-05f9eb6bd991`) routing `precisionpath.pro` & `www.precisionpath.pro` to `http://localhost:4000`.
-
-#### One-Command Deploy from Windows
-After committing changes on Windows, deploy to `macmini`:
-
-```powershell
-.\deploy-macmini.ps1
-```
-This script:
-1. Checks `macmini` for any live `server/campaign-config.json` edits (from `:4001/campaign-admin`) and syncs/commits them back to Windows automatically.
-2. Pushes `main` to `origin` and transfers a `git bundle` to `macmini`.
-3. Builds `client` and `server` on `macmini`, restarts `precision-path-server` in PM2, and verifies `https://precisionpath.pro/api/health`.
-
-#### SSH Port Forwarding to Mac mini Admin Consoles
-```powershell
-ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -L 4001:127.0.0.1:4000 macmini
-```
-Then open `http://127.0.0.1:4001/campaign-admin` or `http://127.0.0.1:4001/db-admin` in your Windows browser.
-
----
-
-## 🛠️ Health & Diagnostic Commands
-
-```powershell
-# Check local dev server health
-Invoke-RestMethod -Uri "http://127.0.0.1:4000/api/health"
-
-# Check live production health
-Invoke-RestMethod -Uri "https://precisionpath.pro/api/health"
-
-# Check Mac mini Ollama models
-Invoke-RestMethod -Uri "https://precisionpath.pro/api/ai-models"
-```
+### 2. Production Hosting
+* Production runs on a dedicated self-hosted server running PostgreSQL, the compiled Node.js + Express + Socket.io backend (serving the production `client/dist` bundle), local LLM inference, and an outbound Cloudflare Tunnel for TLS and edge routing.
