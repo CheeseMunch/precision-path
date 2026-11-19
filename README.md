@@ -3,187 +3,119 @@
 **Live Game:** [https://precisionpath.pro](https://precisionpath.pro) | [https://www.precisionpath.pro](https://www.precisionpath.pro)  
 **Repository:** [https://github.com/CheeseMunch/precision-path](https://github.com/CheeseMunch/precision-path)
 
-A real-time multiplayer top-down radial survival browser game built with **React 19 + HTML5 Canvas**, a **dedicated Node.js + Socket.io authoritative server**, **MikroORM + PostgreSQL**, and hosted via **Cloudflare Tunnel (`cloudflared`)** & **Docker**.
+A real-time multiplayer top-down dodging & gate-clearing arcade game built with **React 19 + HTML5 Canvas**, a **dedicated Node.js + Socket.io authoritative server**, **MikroORM + PostgreSQL 16**, **local Ollama AI level generation**, and hosted on an Apple Silicon **Mac mini** via **PM2** and **Cloudflare Tunnel (`cloudflared`)**.
 
 ---
 
-## 🕹️ Gameplay & Level Progression
+## 🕹️ Game Modes & Features
 
-* **Objective:** Keep your pilot circle inside the `325px`-radius circular arena while dodging procedurally generated obstacles collapsing inward.
 * **Controls:**
-  * **Desktop:** Smooth mouse tracking inside the arena boundary.
-  * **Mobile / Touch:** Direct touch-and-drag steering with automatic viewport coordinate scaling.
-  * **Pause:** Press **`ESC`** at any time to pause/resume the simulation (`togglePause`).
-* **Tiered Directional Progression (7 Seconds per Round):**
-  * **Level 1 (7s):** Obstacles attack from **1 Side**.
-  * **Level 2 (7s):** Obstacles attack from **2 Sides**.
-  * **Level 3 (7s):** Obstacles attack from **3 Sides**.
-  * **Level 4 (7s):** Obstacles attack from **All 4 Sides** (`north`, `east`, `south`, `west`).
-  * **Level 5 (Endless Mode):** All 4 sides active with continuous speed scaling and high-score tracking.
-* **5 Procedural Obstacle Archetypes:**
-  1. `single-gap-wall` — Classic barrier wall with a single randomized gate.
-  2. `double-gap-wall` — Split barrier with a center island and two navigable gates.
-  3. `sweeping-half-wall` — Flank sweeper anchored to one side of the arena.
-  4. `staggered-blocks` *(Level 2+)* — 3 staggered chicane blocks at varying depths and widths.
-  5. `orb-cluster` *(Level 3+)* — Barrage of circular pulse orbs with depth stagger and lateral drift.
+  * **Desktop:** Smooth mouse tracking or click-to-teleport inside the `450×800` portrait arena.
+  * **Mobile / Touch:** Direct touch-and-drag steering with responsive viewport scaling.
+  * **Pause:** Press **`ESC`** (or tap **PAUSE**) to freeze both obstacles and gates.
+
+### 1. Campaign Mode (3 Stories • 15 Levels)
+* **`1. Training`** *(Levels 1–5)* — Introduces gate-clearing, orbs, multi-wave side-steps, rotational dodging, and orb entry patterns.
+* **`2. Gauntlet`** *(Levels 6–10)* — Crossfire relays, orb matrices, and faster multi-axis gauntlets.
+* **`3. Gatekeeper`** *(Levels 11–15)* — Gate-heavy, tightly spaced corridors (`0.4–0.5s`) with overlapping direction transitions.
+* Deterministic `triggerAt` server scheduling paired with a shared client `renderElapsedTime` clock keeps wave spacing locked regardless of network jitter.
+
+### 2. Play Survival & Survival Leaderboard
+* Solo or multiplayer (`Create Multiplayer Lobby` / `Join with Code`) tiered directional survival scaling into Endless mode.
+* **Survival Leaderboard** persists pilot high scores, survival times, and match history in PostgreSQL.
+
+### 3. Community Level Creator & Browser
+* **Browse Community Levels** from the Lobby, play custom 1-level challenges, and track **Player Clears** stored in PostgreSQL (`community_levels`).
+* **Community Level Creator**: Interactive `450×800` live map editor with timeline scrubber, spawn & dummy collision testing, click-to-attach gates, bulk wave schedule actions, and creator-only edit/delete permissions.
+
+### 4. Generate AI Level (Local Ollama)
+* Powered by local models running on the Mac mini (**`qwen3.5:9b`**, **`gemma4:12b`**, **`gpt-oss:20b`**).
+* **3 Difficulty Tiers:** `Easy` (`7–9` waves), `Medium` (`10–13` waves), and `Hard` (`24–30` waves, 4-cardinal blitz, `5+` multi-gate walls).
+* **5-Step Completability Validator:** Clamps arena bounds, enforces direction-change clearances & lateral reachability, attaches sequential gates (`1..N`) only onto obstacle-framed openings, and runs a simulated playthrough before launching.
+* **FIFO Generation Queue & Cancel:** Serializes concurrent requests (`/api/ai-queue-status`) with live queue position and a `✕` stop-generating confirmation popup.
+
+### 6 Obstacle Archetypes
+1. `single-gap-wall` — Barrier wall with a single navigable gap.
+2. `double-gap-wall` — Split barrier with a center island and two openings.
+3. `sweeping-half-wall` — Flank sweeper anchored to one side of the arena.
+4. `staggered-blocks` — Staggered chicane blocks with center and outer lanes.
+5. `orb-cluster` — Pulse orb barrage with staggered openings.
+6. `diagonal-spinner` — Drifting, rotating bar hazard.
 
 ---
 
-## ⚙️ Master Configuration (`shared/gameConfig.ts`)
-
-All gameplay timings, arena geometry, and procedural randomness parameters live in [`shared/gameConfig.ts`](./shared/gameConfig.ts) and can also be adjusted live in the browser via the **Tune Config** modal (`GET/POST /api/config`):
-
-* **`rounds.tierDurations`:** Duration in seconds for Levels 1–4 (default: `7` seconds each).
-* **`randomness`:**
-  * `seed`: `null` for fresh random runs every match, or any integer for deterministic seeded runs.
-  * `gapPositionVariance`, `gapSizeVariance`, `speedVariance`, `waveIntervalJitter`, `staggerVariance`, `randomizeRound1Direction`.
-* **`obstacleTypes`:** Individual enable/disable flags, minimum level (`minTier`), and spawn probability weights (`weight`) for each of the 5 obstacle archetypes.
-* **`arena`:** Playable circle radius (`325px`), player radius (`13px`), and hitbox forgiveness (`1.5px`).
-
----
-
-## 🧱 Tech Stack (Frontend & Backend)
+## 🧱 Tech Stack
 
 ### Frontend (`client/`)
-* **Framework & Language:** **React 19** (`react`, `react-dom` `^19.0.0`) + **TypeScript** (`^5.7.2`)
-* **Rendering Engine:** **HTML5 2D Canvas** for the arena, obstacle patterns, edge warning bars, and player rendering
-* **Styling & Icons:** **Tailwind CSS** (`^3.4.17`), **PostCSS**, **Autoprefixer**, and **Lucide React** (`^1.16.0`)
-* **Real-Time Client:** **Socket.io Client** (`^4.8.1`) for live `gameState` updates and throttled pointer/touch input
-* **Build Tooling:** **Vite** (`^6.0.7`) + `@vitejs/plugin-react` (HMR dev server on `:5173` and production bundle to `client/dist`)
+* **React 19** + **TypeScript** (`^5.7.2`) + **Vite** (`^6.x`)
+* **HTML5 2D Canvas** renderer with shared [`levelEditorUtils.ts`](./shared/levelEditorUtils.ts) geometry & collision math
+* **Tailwind CSS** + **Lucide React** + **Socket.io Client**
 
 ### Backend (`server/`)
-* **Runtime & Language:** **Node.js** + **TypeScript** (`tsx` `^4.19.2` for dev watch, `tsc` for production builds)
-* **HTTP & API Server:** **Express.js** (`^4.21.2`), **CORS** (`^2.8.5`), and **dotenv** (`^16.4.7`) serving static builds, REST endpoints (`/api/health`, `/api/leaderboard`, `/api/config`), and the localhost-only Admin Studio (`/db-admin`)
-* **Authoritative Multiplayer:** **Socket.io** (`^4.8.1`) driving the server-side `GameEngine` and `RoomManager`
-* **Database & ORM:** **MikroORM v6** (`@mikro-orm/core`, `@mikro-orm/postgresql`, `@mikro-orm/reflection` `^6.4.0`) + **`pg`** (`^8.13.1`) backed by **Embedded PostgreSQL** (`embedded-postgres` `^18.6.0-beta.19`, `.pgdata`) with automatic in-memory fallback
+* **Node.js** + **TypeScript** (`tsx` / `tsc`) + **Express.js** + **Socket.io**
+* **MikroORM v6** + **PostgreSQL 16** (`users`, `match_history`, `community_levels` entities, with automatic in-memory fallback)
+* **Local Admin Consoles** *(localhost-only via `isDirectLocalhost` + `.admin-token`)*:
+  * `/campaign-admin` — Campaign & Community Level Designer
+  * `/db-admin` — Live Tuning & PostgreSQL Studio
 
 ---
 
-## 🌐 Networking Stack & Tools Used
+## 🚀 Development & Mac mini Production Hosting
 
-| Layer | Tool / Technology | Purpose |
-| :--- | :--- | :--- |
-| **Real-Time Transport** | **Socket.io** (`ws://` / `wss://`) | Authoritative 30Hz server state broadcast (`gameState`, `tierUp`) & ~55Hz throttled client pointer input (`playerInput`). |
-| **HTTP & Static Server** | **Express.js** (`PORT=4000`) | Single-origin server that serves the compiled Vite React bundle (`client/dist`), REST API (`/api/health`, `/api/leaderboard`, `/api/config`), and Socket.io on one port. |
-| **Database & ORM** | **PostgreSQL 16 + MikroORM v6** | Unit-of-Work persistence for `User` high scores and `MatchHistory` records, with automatic in-memory fallback when PostgreSQL is offline. |
-| **Edge Reverse Tunnel** | **Cloudflare Tunnel (`cloudflared`)** | Encrypted outbound QUIC tunnel from the host PC (`localhost:4000`) to Cloudflare's global edge (`precisionpath.pro`), requiring zero router port-forwarding and hiding the host IP. |
-| **Domain & DNS** | **Porkbun + Cloudflare DNS** | Domain `precisionpath.pro` registered on Porkbun, delegated to Cloudflare authoritative nameservers (`ophelia.ns.cloudflare.com`, `zac.ns.cloudflare.com`) with proxied `CNAME` tunnel routes and Universal SSL. |
-| **Containerization** | **Docker & Docker Compose** | Optional `Dockerfile` and `docker-compose.yml` bundling the Node.js server, built React frontend, and `postgres:16-alpine`. |
-
----
-
-## 🚀 Complete Deployment Process
-
-### 1. Local Development (Two-Port Hot Reload)
-
-Run the dedicated game server and Vite dev server in separate terminals:
+### 1. Local Development (Windows)
+Run the local game server and Vite dev client independently of production:
 
 ```powershell
-# Terminal 1: Start dedicated game server (http://localhost:4000)
+# Terminal 1: Dedicated game server + embedded PostgreSQL (http://127.0.0.1:4000)
 cd server
 npm install
 npm run dev
 
-# Terminal 2: Start Vite React dev server (http://localhost:5173)
+# Terminal 2: Vite React dev server (http://localhost:5173)
 cd client
 npm install
-npm run dev
+npm run dev -- --port 5173
 ```
+
+* Local Admin Consoles: `http://127.0.0.1:4000/campaign-admin` and `http://127.0.0.1:4000/db-admin`.
 
 ---
 
-### 2. PC Self-Hosting via Cloudflare Tunnel (`precisionpath.pro`)
+### 2. Production Hosting (`macmini` → `https://precisionpath.pro`)
+Production runs on an Apple Silicon **Mac mini** (`ssh macmini`):
+* **PostgreSQL 16**: Homebrew `postgresql@16` (`brew services start postgresql@16`, DB `precision_path`).
+* **PM2 Processes**:
+  * `precision-path-server` — `NODE_ENV=production` on port `4000` (serves REST API, Socket.io, AI level generation via local Ollama `http://127.0.0.1:11434`, and compiled `client/dist`).
+  * `precision-path-tunnel` — `cloudflared tunnel run precision-path` (`8bcdd1cc-ba69-4da6-b130-05f9eb6bd991`) routing `precisionpath.pro` & `www.precisionpath.pro` to `http://localhost:4000`.
 
-#### Quick Start (One-Click Launcher)
-Whenever you restart your PC and want to host `https://precisionpath.pro`:
+#### One-Command Deploy from Windows
+After committing changes on Windows, deploy to `macmini`:
 
 ```powershell
-cd C:\Users\ankit\precision-path
-.\start-pc-host.ps1
+.\deploy-macmini.ps1
 ```
-This script automatically:
-1. Builds the latest production React frontend into `client/dist`.
-2. Starts the dedicated Node.js + Socket.io server on `http://localhost:4000`.
-3. Starts the permanent `precision-path` Cloudflare Tunnel routing `https://precisionpath.pro` and `https://www.precisionpath.pro` to `http://localhost:4000`.
+This script:
+1. Checks `macmini` for any live `server/campaign-config.json` edits (from `:4001/campaign-admin`) and syncs/commits them back to Windows automatically.
+2. Pushes `main` to `origin` and transfers a `git bundle` to `macmini`.
+3. Builds `client` and `server` on `macmini`, restarts `precision-path-server` in PM2, and verifies `https://precisionpath.pro/api/health`.
 
----
-
-#### Full Step-by-Step Cloudflare Tunnel Setup (From Scratch)
-
-If setting up on a new Windows machine:
-
-1. **Install `cloudflared` via Winget:**
-   ```powershell
-   winget install --id Cloudflare.cloudflared --accept-package-agreements --accept-source-agreements
-   ```
-
-2. **Authenticate `cloudflared` with Cloudflare:**
-   ```powershell
-   & "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel login
-   ```
-   *Select `precisionpath.pro` in the browser prompt and click **Authorize**. If `cert.pem` downloads to your `Downloads` folder, copy it into `C:\Users\<username>\.cloudflared\cert.pem`.*
-
-3. **Create the Named Tunnel (Only Needed Once):**
-   ```powershell
-   & "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel create precision-path
-   ```
-   *Current Tunnel ID:* `8bcdd1cc-ba69-4da6-b130-05f9eb6bd991`
-
-4. **Route Cloudflare DNS Records to the Tunnel:**
-   ```powershell
-   & "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --overwrite-dns route dns precision-path precisionpath.pro
-   & "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --overwrite-dns route dns precision-path www.precisionpath.pro
-   ```
-
-5. **Configure Ingress Rules (`C:\Users\<username>\.cloudflared\config.yml`):**
-   ```yaml
-   tunnel: 8bcdd1cc-ba69-4da6-b130-05f9eb6bd991
-   credentials-file: C:\Users\ankit\.cloudflared\8bcdd1cc-ba69-4da6-b130-05f9eb6bd991.json
-
-   ingress:
-     - hostname: precisionpath.pro
-       service: http://localhost:4000
-     - hostname: www.precisionpath.pro
-       service: http://localhost:4000
-     - service: http_status:404
-   ```
-
-6. **Run the Tunnel:**
-   ```powershell
-   & "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel run precision-path
-   ```
-
----
-
-### 3. Docker Compose (Optional Containerized Run)
-
-The repository includes an optional [`Dockerfile`](./Dockerfile) and [`docker-compose.yml`](./docker-compose.yml) that bundle the React UI, Node.js server, and PostgreSQL 16:
-
-```bash
-docker compose up -d --build
+#### SSH Port Forwarding to Mac mini Admin Consoles
+```powershell
+ssh -N -o ExitOnForwardFailure=yes -o ServerAliveInterval=30 -L 4001:127.0.0.1:4000 macmini
 ```
-*Exposes the full application + WebSockets on port `4000` with persistent PostgreSQL storage.*
+Then open `http://127.0.0.1:4001/campaign-admin` or `http://127.0.0.1:4001/db-admin` in your Windows browser.
 
 ---
 
-## 🛠️ Networking & DNS Diagnostic Commands
-
-Useful commands for verifying DNS propagation, Cloudflare edge routing, and local server health on Windows PowerShell:
+## 🛠️ Health & Diagnostic Commands
 
 ```powershell
-# 1. Check local game server health
-Invoke-RestMethod -Uri "http://localhost:4000/api/health"
+# Check local dev server health
+Invoke-RestMethod -Uri "http://127.0.0.1:4000/api/health"
 
-# 2. Check live production health over HTTPS
+# Check live production health
 Invoke-RestMethod -Uri "https://precisionpath.pro/api/health"
 
-# 3. Verify authoritative nameservers at the .pro registry (RDAP)
-(Invoke-RestMethod -Uri "https://rdap.identitydigital.services/rdap/domain/precisionpath.pro").nameservers.ldhName
-
-# 4. Query Cloudflare's authoritative nameserver directly
-Resolve-DnsName -Name precisionpath.pro -Server ophelia.ns.cloudflare.com -Type A
-
-# 5. Flush Windows DNS cache if switching DNS records
-ipconfig /flushdns
+# Check Mac mini Ollama models
+Invoke-RestMethod -Uri "https://precisionpath.pro/api/ai-models"
 ```
-*(In Chrome/Edge, you can also clear the browser's internal DNS cache at `chrome://net-internals/#dns`.)*
