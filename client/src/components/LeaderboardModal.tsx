@@ -30,7 +30,7 @@ export const LeaderboardModal: React.FC<LeaderboardModalProps> = ({ onClose }) =
         <div className="flex items-center justify-between pb-3 border-b border-cyber-border">
           <div className="flex items-center gap-2">
             <Trophy className="w-5 h-5 text-yellow-400" />
-            <h3 className="font-display font-bold text-lg text-white">Global Pilot Leaderboard</h3>
+            <h3 className="font-display font-bold text-lg text-white">Survival Leaderboard</h3>
           </div>
           <button
             onClick={onClose}
